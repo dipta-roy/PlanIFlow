@@ -133,16 +133,18 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 
 | Home Screen | Gantt Chart |
 | :-------------------------------------------------: | :-------------------------------------------------: |
-| ![Home Screen](home_screen.png) | ![Gantt Chart](gantt_chart.png) |
+| ![Home Screen](screenshots/home_screen.png) | ![Gantt Chart](screenshots/gantt_chart.png) |
 
 | Dashboard Screen | Resource Screen |
 | :-------------------------------------------------: | :-------------------------------------------------: |
-| ![Dashboard Screen](dashboard_screen.png) | ![Resource Screen](resource_screen.png) |
+| ![Dashboard Screen](screenshots/dashboard_screen.png) | ![Resource Screen](screenshots/resource_screen.png) |
+
+
 
 ## 📂 Sample Files
 
-- [Project_Replica.json](Project_Replica.json)
-- [Project_Replica.xlsx](Project_Replica.xlsx)
+- [Sample Project JSON](sample/sample_project.json) - A basic project example in JSON format.
+- [Sample Project Excel](sample/sample_project.xlsx) - The same project exported to Excel for compatibility.
 
 ## ⌨️ Shortcuts
 
