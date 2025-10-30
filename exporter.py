@@ -7,7 +7,7 @@ import pandas as pd
 import json
 from typing import Dict, Any, Tuple
 from datetime import datetime
-from data_manager import DataManager, Task, Resource, DependencyType
+from data_manager import DataManager, Task, Resource, DependencyType, DurationUnit
 from calendar_manager import CalendarManager
 
 class Exporter:

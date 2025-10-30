@@ -154,7 +154,7 @@ class GanttChart(FigureCanvas):
             if task.percent_complete > 0 and not task.is_summary:
                 completed_duration = duration * (task.percent_complete / 100)
                 self.ax.barh(y, completed_duration, left=start_num,
-                           height=0.4, color=status_color, alpha=1.0,
+                           height=0.3, color=status_color, alpha=1.0,
                            edgecolor='none')
             
             # Add percentage text
@@ -258,7 +258,7 @@ class GanttChart(FigureCanvas):
         edge_color = 'black' if not self.dark_mode else 'white'
         
         self.ax.barh(y, duration, left=start_num, 
-                    height=0.6, color=color, alpha=0.7,
+                    height=0.4, color=color, alpha=0.7,
                     edgecolor=edge_color,
                     linewidth=1.0)
     
@@ -274,7 +274,7 @@ class GanttChart(FigureCanvas):
         darker_color = tuple(c * 0.7 for c in rgb)
         
         self.ax.barh(y, duration, left=start_num, 
-                    height=0.8, color=darker_color, alpha=0.9,
+                    height=0.6, color=darker_color, alpha=0.9,
                     edgecolor=edge_color,
                     linewidth=2.0)
         

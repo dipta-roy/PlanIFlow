@@ -263,17 +263,19 @@ class Resource:
     """Resource data model"""
     
     def __init__(self, name: str, max_hours_per_day: float = 8.0,
-                 exceptions: List[str] = None):
+                 exceptions: List[str] = None, billing_rate: float = 0.0):
         self.name = name
         self.max_hours_per_day = max_hours_per_day
         self.exceptions = exceptions or []
+        self.billing_rate = billing_rate
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert resource to dictionary"""
         return {
             'name': self.name,
             'max_hours_per_day': self.max_hours_per_day,
-            'exceptions': self.exceptions
+            'exceptions': self.exceptions,
+            'billing_rate': self.billing_rate
         }
     
     @staticmethod
@@ -282,7 +284,8 @@ class Resource:
         return Resource(
             name=data['name'],
             max_hours_per_day=data.get('max_hours_per_day', 8.0),
-            exceptions=data.get('exceptions', [])
+            exceptions=data.get('exceptions', []),
+            billing_rate=data.get('billing_rate', 0.0)
         )
 
 
@@ -585,17 +588,30 @@ class DataManager:
                     latest_end = constraint_end
         
         # Apply constraints to task
-        duration = task.duration
-        
+        # Store original duration before modifying start/end dates
+        original_duration_days = task.calculate_duration_days(self.calendar_manager)
+
         if latest_start is not None:
             task.start_date = latest_start
-            if latest_end is None:
-                task.end_date = latest_start + timedelta(days=duration - 1)
-        
+            if latest_end is None: # Only update end_date if not constrained by FF/SF
+                if self.calendar_manager:
+                    task.end_date = self.calendar_manager.add_working_days(task.start_date, original_duration_days - 1)
+                else:
+                    task.end_date = task.start_date + timedelta(days=original_duration_days - 1)
+
         if latest_end is not None:
             task.end_date = latest_end
-            if latest_start is None:
-                task.start_date = latest_end - timedelta(days=duration - 1)
+            if latest_start is None: # Only update start_date if not constrained by FS/SS
+                if self.calendar_manager:
+                    # Calculate backwards from end_date to find start_date
+                    temp_start = task.end_date
+                    for _ in range(original_duration_days - 1):
+                        temp_start -= timedelta(days=1)
+                        while not self.calendar_manager.is_working_day(temp_start):
+                            temp_start -= timedelta(days=1)
+                    task.start_date = temp_start
+                else:
+                    task.start_date = task.end_date - timedelta(days=original_duration_days - 1)
     
     def _auto_adjust_dependent_tasks(self, updated_task: Task):
         """Auto-shift dependent tasks when a task changes"""
@@ -695,7 +711,8 @@ class DataManager:
             allocation[resource.name] = {
                 'total_hours': 0.0,
                 'max_hours_per_day': resource.max_hours_per_day,
-                'tasks_assigned': 0
+                'tasks_assigned': 0,
+                'billing_rate': resource.billing_rate
             }
         
         for task in self.tasks:
@@ -717,6 +734,10 @@ class DataManager:
                     allocation[resource_name]['total_hours'] += hours_per_resource
                     allocation[resource_name]['tasks_assigned'] += 1
         
+        # Calculate total amount after all hours are accumulated
+        for resource_name, data in allocation.items():
+            data['total_amount'] = data['total_hours'] * data['billing_rate']
+
         return allocation
     
     def check_resource_overallocation(self) -> Dict[str, List[str]]:

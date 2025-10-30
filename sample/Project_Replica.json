@@ -1,0 +1,170 @@
+{
+  "version": "2.1",
+  "project_name": "Project Replica",
+  "project_data": {
+    "project_name": "Project Replica",
+    "tasks": [
+      {
+        "id": 1,
+        "name": "Project Name",
+        "start_date": "2025-10-30T00:00:00",
+        "end_date": "2025-11-14T00:00:00",
+        "percent_complete": 5,
+        "predecessors": [],
+        "assigned_resources": [],
+        "notes": "",
+        "parent_id": null,
+        "is_summary": true,
+        "is_milestone": false
+      },
+      {
+        "id": 2,
+        "name": "Project Start Milestone",
+        "start_date": "2025-10-30T00:00:00",
+        "end_date": "2025-10-30T00:00:00",
+        "percent_complete": 100,
+        "predecessors": [],
+        "assigned_resources": [
+          "Project"
+        ],
+        "notes": "",
+        "parent_id": 1,
+        "is_summary": false,
+        "is_milestone": true
+      },
+      {
+        "id": 3,
+        "name": "Requirements",
+        "start_date": "2025-10-31T00:00:00",
+        "end_date": "2025-11-13T00:00:00",
+        "percent_complete": 5,
+        "predecessors": [],
+        "assigned_resources": [],
+        "notes": "",
+        "parent_id": 1,
+        "is_summary": true,
+        "is_milestone": false
+      },
+      {
+        "id": 4,
+        "name": "Find Scope",
+        "start_date": "2025-10-31T00:00:00",
+        "end_date": "2025-11-04T00:00:00",
+        "percent_complete": 0,
+        "predecessors": [
+          [
+            2,
+            "FS"
+          ]
+        ],
+        "assigned_resources": [
+          "Security",
+          "Project"
+        ],
+        "notes": "",
+        "parent_id": 3,
+        "is_summary": false,
+        "is_milestone": false
+      },
+      {
+        "id": 5,
+        "name": "Create Plan",
+        "start_date": "2025-11-05T00:00:00",
+        "end_date": "2025-11-12T00:00:00",
+        "percent_complete": 10,
+        "predecessors": [
+          [
+            4,
+            "FS"
+          ]
+        ],
+        "assigned_resources": [
+          "Security"
+        ],
+        "notes": "",
+        "parent_id": 3,
+        "is_summary": false,
+        "is_milestone": false
+      },
+      {
+        "id": 6,
+        "name": "Get Plan Approval",
+        "start_date": "2025-11-13T00:00:00",
+        "end_date": "2025-11-13T00:00:00",
+        "percent_complete": 0,
+        "predecessors": [
+          [
+            5,
+            "FS"
+          ]
+        ],
+        "assigned_resources": [
+          "Project"
+        ],
+        "notes": "Get Approval",
+        "parent_id": 3,
+        "is_summary": false,
+        "is_milestone": false
+      },
+      {
+        "id": 7,
+        "name": "Project End",
+        "start_date": "2025-11-14T00:00:00",
+        "end_date": "2025-11-14T00:00:00",
+        "percent_complete": 0,
+        "predecessors": [
+          [
+            6,
+            "FS"
+          ]
+        ],
+        "assigned_resources": [
+          "Project"
+        ],
+        "notes": "",
+        "parent_id": 1,
+        "is_summary": false,
+        "is_milestone": true
+      }
+    ],
+    "resources": [
+      {
+        "name": "Security",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 10.0
+      },
+      {
+        "name": "Project",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 20.0
+      }
+    ],
+    "next_task_id": 8,
+    "settings": {
+      "duration_unit": "days"
+    },
+    "version": "2.1"
+  },
+  "calendar_settings": {
+    "working_days": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "hours_per_day": 8.0,
+    "non_working_days": []
+  },
+  "saved_at": "2025-10-30T20:22:58.246071",
+  "metadata": {
+    "total_tasks": 7,
+    "summary_tasks": 2,
+    "work_tasks": 5,
+    "total_resources": 2,
+    "overall_completion": 5.2272727272727275,
+    "duration_unit": "days"
+  }
+}

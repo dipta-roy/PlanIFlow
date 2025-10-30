@@ -20,6 +20,8 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
   - [Gantt Chart](#gantt-chart)
   - [Dashboard](#dashboard)
   - [Importing and Exporting Data](#importing-and-exporting-data)
+- [Screenshots](#-screenshots)
+- [Sample Files](#-sample-files)
 - [Shortcuts](#️-shortcuts)
 - [Batch Scripts](#-batch-scripts)
 - [Building from Source](#️-building-from-source)
@@ -31,16 +33,20 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 ## ✨ Features
 
 - **Task Management**: Create, edit, delete tasks with dependencies
+- **Inline Editing**: Directly edit task properties within the table for quick modifications.
+- **Context Menus**: Right-click on tasks for quick access to actions like edit, delete, indent, and outdent.
 - **Hierarchical Tasks**: Create summary tasks and sub-tasks.
-- **Resource Management**: Allocate resources and track utilization
+- **Resource Management**: Allocate resources, track utilization, and manage billing rates.
 - **Dynamic Gantt Charts**: Real-time visualization with dependencies
 - **Excel Import/Export**: Share plans via Excel files
 - **JSON Import/Export**: Save and load projects in JSON format.
 - **Calendar Management**: Custom work hours and holidays
 - **Dark Mode**: Toggle between light and dark themes
 - **Resource Allocation Tracking**: Detect over-allocation
-- **Project Dashboard**: Overview of project metrics
+- **Project Dashboard**: Overview of project metrics, including total project cost.
 - **Task Filtering**: Search and filter by resource, status, or name
+- **Resource Billing Rate Fix**: Corrected an issue where updating resource billing rates was not properly reflected in the resource table and total amount calculations.
+- **Total Project Cost in Dashboard**: The dashboard now displays the total estimated cost of the project, calculated from all assigned resources and their billing rates.
 
 ## 🛠️ Technologies Used
 
@@ -91,14 +97,18 @@ This script will activate the virtual environment and start the application.
 
 ### Adding Tasks and Resources
 
-- **Add Resources**: Click the `👤 Add Resource` button in the toolbar to add resources like team members or equipment.
+- **Add Resources**: Click the `👤 Add Resource` button in the toolbar to add resources like team members or equipment. You can now also specify a billing rate for each resource.
 - **Add Tasks**: Click the `➕ Add Task` button to create a new task. You can set the start and end dates, assign resources, and add notes.
 
 ### Managing Tasks
 
 - **Sub-tasks**: Select a task and click `➕ Add Subtask` to create a child task.
+- **Inline Editing**: Double-click on a task field (e.g., Task Name, Start Date, End Date, Duration, % Complete, Dependencies, Resources, Notes) to directly edit its value. Press `Enter` to save changes or `Esc` to cancel.
+  - **Date Fields**: Use the calendar dropdown for Start Date and End Date.
+  - **Resources Field**: Select from a dropdown of existing resources or type new ones.
+  - **Status and ID**: These fields are automatically populated and cannot be edited directly.
+- **Context Menu**: Right-click on any task row to bring up a context menu with options such as editing the task, deleting it, indenting, or outdenting.
 - **Indent/Outdent**: Use the `Tab` and `Shift+Tab` keys to indent and outdent tasks, creating a task hierarchy.
-- **Dependencies**: When creating or editing a task, you can set predecessors (dependencies) to link tasks together.
 
 ### Gantt Chart
 
@@ -112,11 +122,27 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 -   Total number of tasks
 -   Overall project completion percentage
 -   Task status breakdown
+-   **Total Project Cost**: A summary of the estimated cost across all resources.
 
 ### Importing and Exporting Data
 
 - **JSON**: Save and load your projects using the `.json` format. This is the recommended format for saving your work.
 - **Excel**: Import and export your projects to and from Excel files. This is useful for sharing your project with others who may not have the application.
+
+## 📸 Screenshots
+
+| Home Screen | Gantt Chart |
+| :-------------------------------------------------: | :-------------------------------------------------: |
+| ![Home Screen](home_screen.png) | ![Gantt Chart](gantt_chart.png) |
+
+| Dashboard Screen | Resource Screen |
+| :-------------------------------------------------: | :-------------------------------------------------: |
+| ![Dashboard Screen](dashboard_screen.png) | ![Resource Screen](resource_screen.png) |
+
+## 📂 Sample Files
+
+- [Project_Replica.json](Project_Replica.json)
+- [Project_Replica.xlsx](Project_Replica.xlsx)
 
 ## ⌨️ Shortcuts
 

@@ -10,18 +10,49 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QDateEdit, QTextEdit, QListWidget, QMessageBox, QCheckBox,
                              QGroupBox, QSplitter, QAbstractItemView, QHeaderView,
                              QComboBox, QScrollArea, QTreeWidget, QTreeWidgetItem,
-                             QStyledItemDelegate, QStyleOptionViewItem, QInputDialog, QStyle)
-from PyQt6.QtCore import Qt, QDate, QTimer, QModelIndex
+                             QStyledItemDelegate, QStyleOptionViewItem, QInputDialog, QStyle, QCompleter)
+from PyQt6.QtCore import Qt, QDate, QTimer, QModelIndex, QEvent, QAbstractItemModel
 from PyQt6.QtGui import QAction, QIcon, QColor, QBrush, QPainter, QFont, QPixmap
 from datetime import datetime, timedelta
 import os
 import sys
+import json
+import logging
 from data_manager import DataManager, Task, Resource, DependencyType, TaskStatus
 from calendar_manager import CalendarManager
 from gantt_chart import GanttChart
 from exporter import Exporter
 from themes import ThemeManager
 from settings_manager import ProjectSettings, DurationUnit 
+
+# Constants for ColorDelegate
+CIRCLE_SIZE = 10
+LEFT_PADDING = 8
+TEXT_SHIFT = 15
+
+# Constants for status filters
+STATUS_ALL = "All"
+STATUS_OVERDUE = "Overdue"
+STATUS_IN_PROGRESS = "In Progress"
+STATUS_UPCOMING = "Upcoming"
+STATUS_COMPLETED = "Completed"
+
+# Constants for resource paths
+LOGO_PATH = 'images/logo.ico'
+
+class SortableTreeWidgetItem(QTreeWidgetItem):
+    """Custom QTreeWidgetItem that allows sorting by data role and controls editability"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        print("SortableTreeWidgetItem instance created!")
+
+    def __lt__(self, other_item):
+        column = self.treeWidget().sortColumn()
+        try:
+            return self.data(column, Qt.ItemDataRole.DisplayRole) < other_item.data(column, Qt.ItemDataRole.DisplayRole)
+        except TypeError:
+            # Handle cases where data types might not be directly comparable (e.g., mixed strings and numbers)
+            return str(self.data(column, Qt.ItemDataRole.DisplayRole)) < str(other_item.data(column, Qt.ItemDataRole.DisplayRole))
 
 class ColorDelegate(QStyledItemDelegate):
     """Custom delegate to show colored status indicators"""
@@ -32,7 +63,6 @@ class ColorDelegate(QStyledItemDelegate):
         color_name = index.data(Qt.ItemDataRole.UserRole)
         status_text = index.data(Qt.ItemDataRole.DisplayRole)
         
-        # *** FIX: Use QStyle.StateFlag instead of QStyleOptionViewItem.StateFlag ***
         # Draw background
         if option.state & QStyle.StateFlag.State_Selected:
             painter.fillRect(option.rect, option.palette.highlight())
@@ -57,16 +87,15 @@ class ColorDelegate(QStyledItemDelegate):
             
             # Draw circle on the left side with padding
             rect = option.rect
-            circle_size = 10
-            x = rect.x() + 8  # Left padding
-            y = rect.y() + (rect.height() - circle_size) // 2
+            x = rect.x() + LEFT_PADDING  # Left padding
+            y = rect.y() + (rect.height() - CIRCLE_SIZE) // 2
             
             painter.setBrush(QBrush(color))
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(x, y, circle_size, circle_size)
+            painter.drawEllipse(x, y, CIRCLE_SIZE, CIRCLE_SIZE)
             
             # Draw text to the right of the circle
-            text_rect = rect.adjusted(circle_size + 15, 0, 0, 0)  # Shift text right
+            text_rect = rect.adjusted(CIRCLE_SIZE + TEXT_SHIFT, 0, 0, 0)  # Shift text right
             
             # Set text color
             painter.setPen(text_color)
@@ -87,6 +116,81 @@ class ColorDelegate(QStyledItemDelegate):
         return size
 
 
+class DateDelegate(QStyledItemDelegate):
+    """Custom delegate for date editing with a QDateEdit calendar popup"""
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+        editor = QDateEdit(parent)
+        editor.setCalendarPopup(True)
+        editor.setDisplayFormat("yyyy-MM-dd")
+        return editor
+
+    def setEditorData(self, editor: QWidget, index: QModelIndex):
+        date_str = index.data(Qt.ItemDataRole.DisplayRole)
+        if date_str and date_str != "Milestone":
+            date = QDate.fromString(date_str, "yyyy-MM-dd")
+            editor.setDate(date)
+        else:
+            editor.setDate(QDate.currentDate())
+
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
+        if isinstance(editor, QDateEdit):
+            model.setData(index, editor.date().toString("yyyy-MM-dd"), Qt.ItemDataRole.EditRole)
+        else:
+            super().setModelData(editor, model, index)
+
+    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
+        editor.setGeometry(option.rect)
+
+
+class ResourceDelegate(QStyledItemDelegate):
+    """Custom delegate for resource assignment with a dropdown"""
+    def __init__(self, parent=None, data_manager=None):
+        super().__init__(parent)
+        self.data_manager = data_manager
+        self._resource_names = [] # Store resource names internally
+
+    def update_resource_list(self, resource_names: list[str]):
+        """Update the internal list of resource names"""
+        self._resource_names = resource_names
+
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+        if index.column() == 8:  # Resources column
+            editor = QComboBox(parent)
+            editor.setEditable(True) # Allow typing for multiple resources or new ones
+            editor.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+            
+            editor.addItems(self._resource_names) # Use the internal list
+            
+            # Set up completer for suggestions
+            completer = QCompleter(editor.model(), editor)
+            completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            editor.setCompleter(completer)
+            
+            return editor
+        return super().createEditor(parent, option, index)
+
+    def setEditorData(self, editor: QWidget, index: QModelIndex):
+        if index.column() == 8:  # Resources column
+            current_resources_str = index.data(Qt.ItemDataRole.DisplayRole)
+            if isinstance(editor, QComboBox):
+                editor.setCurrentText(current_resources_str)
+        else:
+            super().setEditorData(editor, index)
+
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
+        if index.column() == 8:  # Resources column
+            if isinstance(editor, QComboBox):
+                # Get text from line edit, as it can be multiple comma-separated resources
+                new_resources_str = editor.lineEdit().text()
+                model.setData(index, new_resources_str, Qt.ItemDataRole.EditRole)
+        else:
+            super().setModelData(editor, model, index)
+
+    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
+        editor.setGeometry(option.rect)
+
+
 def get_resource_path(relative_path):
     """
     Get absolute path to resource, works for dev and for PyInstaller
@@ -94,7 +198,7 @@ def get_resource_path(relative_path):
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
-    except Exception:
+    except AttributeError:
         base_path = os.path.abspath(".")
     
     return os.path.join(base_path, relative_path)
@@ -105,7 +209,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        # *** SET WINDOW ICON ***
         self._set_application_icon()
         
         # Initialize managers
@@ -144,7 +247,7 @@ class MainWindow(QMainWindow):
    
     def _set_application_icon(self):
         """Set application icon for window and taskbar"""
-        icon_path = get_resource_path('images/logo.ico')
+        icon_path = get_resource_path(LOGO_PATH)
         
         if os.path.exists(icon_path):
             icon = QIcon(icon_path)
@@ -220,7 +323,6 @@ class MainWindow(QMainWindow):
         file_menu.addAction(exit_action)
         
       
-        # *** EDIT MENU (ADD MILESTONE ACTION HERE) ***
         edit_menu = menubar.addMenu("&Edit")
         # Add Task
         add_task_action = QAction("Add &Task", self)
@@ -228,7 +330,6 @@ class MainWindow(QMainWindow):
         add_task_action.triggered.connect(self._add_task_dialog)
         edit_menu.addAction(add_task_action)
         
-        # *** ADD MILESTONE ACTION ***
         add_milestone_action = QAction("Add &Milestone", self)
         add_milestone_action.setShortcut("Ctrl+M")
         add_milestone_action.triggered.connect(self._add_milestone_dialog)
@@ -252,7 +353,6 @@ class MainWindow(QMainWindow):
         
         edit_menu.addSeparator()
         
-        # *** ADD INSERT OPTIONS ***
         insert_above_action = QAction("Insert Task &Above", self)
         insert_above_action.setShortcut("Ctrl+Shift+A")
         insert_above_action.triggered.connect(self._insert_task_above)
@@ -280,7 +380,6 @@ class MainWindow(QMainWindow):
         
         view_menu.addSeparator()
         
-        # *** ADD AUTO-REFRESH TOGGLE ***
         self.auto_refresh_action = QAction("&Auto-Refresh", self)
         self.auto_refresh_action.setCheckable(True)
         self.auto_refresh_action.setChecked(True)  # Default ON
@@ -304,29 +403,8 @@ class MainWindow(QMainWindow):
         dark_mode_action.triggered.connect(self._toggle_dark_mode)
         view_menu.addAction(dark_mode_action)
         
-      
-        # Settings Menu
-        settings_menu = menubar.addMenu("&Settings")
-        
-        duration_unit_action = QAction("&Duration Unit...", self)
-        duration_unit_action.triggered.connect(self._show_duration_unit_settings)
-        settings_menu.addAction(duration_unit_action)
-        
-        calendar_action = QAction("&Calendar Settings...", self)
-        calendar_action.triggered.connect(self._show_calendar_settings)
-        settings_menu.addAction(calendar_action)
-        
-        # View Menu
-        view_menu = menubar.addMenu("&View")
-        
-        refresh_action = QAction("&Refresh All", self)
-        refresh_action.setShortcut("F5")
-        refresh_action.triggered.connect(self._update_all_views)
-        view_menu.addAction(refresh_action)
-        
         view_menu.addSeparator()
         
-        # *** ADD SORTING OPTIONS ***
         sort_menu = view_menu.addMenu("&Sort By")
         
         sort_id_action = QAction("Task &ID", self)
@@ -352,6 +430,17 @@ class MainWindow(QMainWindow):
         sort_complete_action = QAction("% &Complete", self)
         sort_complete_action.triggered.connect(lambda: self._sort_by_column(6))
         sort_menu.addAction(sort_complete_action)
+        
+        # Settings Menu
+        settings_menu = menubar.addMenu("&Settings")
+        
+        duration_unit_action = QAction("&Duration Unit...", self)
+        duration_unit_action.triggered.connect(self._show_duration_unit_settings)
+        settings_menu.addAction(duration_unit_action)
+        
+        calendar_action = QAction("&Calendar Settings...", self)
+        calendar_action.triggered.connect(self._show_calendar_settings)
+        settings_menu.addAction(calendar_action)
         
         view_menu.addSeparator()
         
@@ -383,7 +472,7 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
         
-        logo_path = get_resource_path('images/logo.ico')
+        logo_path = get_resource_path(LOGO_PATH)
         if os.path.exists(logo_path):
             logo_label = QLabel()
             logo_pixmap = QPixmap(logo_path).scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, 
@@ -523,7 +612,7 @@ class MainWindow(QMainWindow):
         
         filter_layout.addWidget(QLabel("Filter by Status:"))
         self.status_filter = QComboBox()
-        self.status_filter.addItems(["All", "Overdue", "In Progress", "Upcoming", "Completed"])
+        self.status_filter.addItems([STATUS_ALL, STATUS_OVERDUE, STATUS_IN_PROGRESS, STATUS_UPCOMING, STATUS_COMPLETED])
         self.status_filter.currentTextChanged.connect(self._filter_tasks)
         filter_layout.addWidget(self.status_filter)
         
@@ -540,6 +629,7 @@ class MainWindow(QMainWindow):
         
         # Task List Tab (now with tree view)
         self.task_tree = self._create_task_tree()
+        self.task_tree.installEventFilter(self)
         self.tabs.addTab(self.task_tree, "📋 Task List")
         
         # Gantt Chart Tab
@@ -581,18 +671,11 @@ class MainWindow(QMainWindow):
         tree.setSortingEnabled(True)
         tree.sortByColumn(1, Qt.SortOrder.AscendingOrder)
         
-        # Set column widths
+        # Set column widths to allow interactive resizing
         header = tree.header()
-        header.resizeSection(0, 80)   # Status
-        header.resizeSection(1, 50)   # ID
-        header.resizeSection(2, 350)  # Task Name - increased for indented text
-        header.resizeSection(3, 100)  # Start
-        header.resizeSection(4, 100)  # End
-        header.resizeSection(5, 80)   # Duration
-        header.resizeSection(6, 90)   # Complete
-        header.resizeSection(7, 120)  # Dependencies
-        header.resizeSection(8, 150)  # Resources
-        header.setStretchLastSection(True)
+        for i in range(tree.columnCount()):
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch) # Task Name column stretches
         
         # Make header interactive
         header.setSectionsClickable(True)
@@ -603,8 +686,20 @@ class MainWindow(QMainWindow):
         self.color_delegate = ColorDelegate()
         tree.setItemDelegateForColumn(0, self.color_delegate)
         
-        # Double-click to edit
-        tree.itemDoubleClicked.connect(self._edit_task_dialog)
+        # Enable custom delegate for start and end date columns
+        self.date_delegate = DateDelegate(self)
+        tree.setItemDelegateForColumn(3, self.date_delegate) # Start Date
+        tree.setItemDelegateForColumn(4, self.date_delegate) # End Date
+        
+        # Enable custom delegate for resources column
+        self.resource_delegate = ResourceDelegate(self, self.data_manager)
+        tree.setItemDelegateForColumn(8, self.resource_delegate)
+        
+        # Enable inline editing (e.g., double-click or F2)
+        tree.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.EditKeyPressed)
+        
+        # Connect item changed signal for inline editing
+        tree.itemChanged.connect(self._on_task_item_changed)
         
         # Track expanded/collapsed state
         tree.itemExpanded.connect(self._on_item_expanded)
@@ -617,11 +712,8 @@ class MainWindow(QMainWindow):
         # Keyboard shortcuts
         from PyQt6.QtGui import QShortcut, QKeySequence
         
-        indent_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Tab), tree)
-        indent_shortcut.activated.connect(self._indent_task)
-        
-        outdent_shortcut = QShortcut(QKeySequence(Qt.Modifier.SHIFT | Qt.Key.Key_Tab), tree)
-        outdent_shortcut.activated.connect(self._outdent_task)
+
+
         
         toggle_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), tree)
         toggle_shortcut.activated.connect(self._toggle_expand_collapse)
@@ -773,14 +865,16 @@ class MainWindow(QMainWindow):
         
         # Resource table
         self.resource_table = QTableWidget()
-        self.resource_table.setColumnCount(5)
+        self.resource_table.setColumnCount(7) # Increased from 5 to 7
         self.resource_table.setHorizontalHeaderLabels([
             "Resource Name", "Max Hours/Day", "Total Hours", 
-            "Tasks Assigned", "Status"
+            "Tasks Assigned", "Billing Rate ($/hr)", "Total Amount ($)", "Status"
         ])
         self.resource_table.setAlternatingRowColors(True)
         self.resource_table.horizontalHeader().setStretchLastSection(True)
         self.resource_table.doubleClicked.connect(self._edit_resource_dialog)
+        self.resource_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.resource_table.customContextMenuRequested.connect(self._show_resource_context_menu)
         
         layout.addWidget(QLabel("<h3>Resource Allocation</h3>"))
         layout.addWidget(self.resource_table)
@@ -795,6 +889,27 @@ class MainWindow(QMainWindow):
         
         return widget
     
+    def _show_resource_context_menu(self, position):
+        """Show context menu on resource table right-click"""
+        item = self.resource_table.itemAt(position)
+        if not item:
+            return
+        
+        row = item.row()
+        resource_name = self.resource_table.item(row, 0).text()
+        
+        menu = QMenu(self)
+        
+        edit_action = QAction("✏️ Edit Resource", self)
+        edit_action.triggered.connect(self._edit_resource_dialog)
+        menu.addAction(edit_action)
+        
+        delete_action = QAction("🗑️ Delete Resource", self)
+        delete_action.triggered.connect(self._delete_resource)
+        menu.addAction(delete_action)
+        
+        menu.exec(self.resource_table.mapToGlobal(position))
+
     def _create_dashboard(self):
         """Create project dashboard"""
         widget = QWidget()
@@ -848,6 +963,18 @@ class MainWindow(QMainWindow):
     
     # Tree View Methods
     
+    def eventFilter(self, obj, event):
+        """Event filter to catch Tab and Shift+Tab for indent/outdent"""
+        if obj == self.task_tree and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Tab:
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    self._outdent_task()
+                    return True  # Event handled
+                else:
+                    self._indent_task()
+                    return True  # Event handled
+        return super().eventFilter(obj, event)
+
     def _on_item_expanded(self, item: QTreeWidgetItem):
         """Track expanded items"""
         # Get task ID from column 1
@@ -862,11 +989,143 @@ class MainWindow(QMainWindow):
         if task_id:
             self.expanded_tasks.discard(task_id)
     
+    def _on_task_item_changed(self, item: QTreeWidgetItem, column: int):
+        """Handle inline editing of task properties"""
+        # Block signals to prevent recursive calls during update
+        self.task_tree.blockSignals(True)
+
+        task_id = item.data(1, Qt.ItemDataRole.UserRole) # Task ID is in column 1
+        task = self.data_manager.get_task(task_id)
+
+        if not task:
+            self.task_tree.blockSignals(False)
+            return
+
+        original_task = Task.from_dict(task.to_dict()) # Create a copy to revert if validation fails
+
+        try:
+            new_value = item.text(column)
+            changed = False
+
+            if column == 2:  # Task Name
+                # Clean up display markers before saving to actual task name
+                cleaned_name = new_value.lstrip(' ▶◆')
+                if task.name != cleaned_name:
+                    task.name = cleaned_name
+                    changed = True
+            elif column == 3:  # Start Date
+                new_start_date = datetime.strptime(new_value, '%Y-%m-%d')
+                if task.start_date.date() != new_start_date.date():
+                    task.start_date = new_start_date
+                    changed = True
+            elif column == 4:  # End Date
+                if not task.is_milestone: # Milestones have fixed end date
+                    new_end_date = datetime.strptime(new_value, '%Y-%m-%d')
+                    if task.end_date.date() != new_end_date.date():
+                        task.end_date = new_end_date
+                        changed = True
+            elif column == 5:  # Duration
+                if not task.is_milestone: # Milestones have fixed duration
+                    current_duration_unit = self.data_manager.settings.duration_unit
+                    new_duration = float(new_value)
+                    if abs(task.get_duration(current_duration_unit, self.calendar_manager) - new_duration) > 0.01:
+                        task.set_duration_and_update_end(new_duration, current_duration_unit, self.calendar_manager)
+                        changed = True
+            elif column == 6:  # % Complete
+                new_percent_complete = int(new_value.strip('%'))
+                if task.percent_complete != new_percent_complete:
+                    task.percent_complete = new_percent_complete
+                    changed = True
+            elif column == 7:  # Dependencies
+                # This is complex, might need a separate dialog or more robust parsing
+                # For now, a simple update, but full validation is needed
+                new_predecessors = []
+                if new_value.strip():
+                    for pred_str in new_value.split(','):
+                        parts = pred_str.strip().split('(')
+                        if len(parts) == 2:
+                            pred_id = int(parts[0].strip())
+                            dep_type_str = parts[1].replace(')', '').strip()
+                            new_predecessors.append((pred_id, dep_type_str))
+                        else:
+                            # Assume FS if no type specified
+                            pred_id = int(pred_str.strip())
+                            new_predecessors.append((pred_id, DependencyType.FS.name))
+                if task.predecessors != new_predecessors:
+                    task.predecessors = new_predecessors
+                    changed = True
+            elif column == 8:  # Resources
+                new_resources = [r.strip() for r in new_value.split(',') if r.strip()]
+                if task.assigned_resources != new_resources:
+                    task.assigned_resources = new_resources
+                    changed = True
+            elif column == 9:  # Notes
+                if task.notes != new_value:
+                    task.notes = new_value
+                    changed = True
+
+            if changed:
+                if self.data_manager.update_task(task_id, task):
+                    self._update_all_views()
+                    self.status_label.setText(f"✓ Task '{task.name}' updated successfully")
+                else:
+                    QMessageBox.warning(self, "Validation Error",
+                                      "Task update failed (e.g., circular dependency, invalid date).")
+                    # Revert changes in UI if update failed
+                    self._revert_task_item_in_ui(item, original_task)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Input Error", f"Invalid input for {item.text(0)}: {e}")
+            # Revert changes in UI if input was invalid
+            self._revert_task_item_in_ui(item, original_task)
+
+        self.task_tree.blockSignals(False)
+
+    def _revert_task_item_in_ui(self, item: QTreeWidgetItem, original_task: Task):
+        """Revert the UI item to its original task values"""
+        # Temporarily block signals to prevent itemChanged from firing again
+        self.task_tree.blockSignals(True)
+
+        # Update each column with original data
+        item.setText(2, original_task.name) # Task Name
+        item.setText(3, original_task.start_date.strftime('%Y-%m-%d')) # Start Date
+        if original_task.is_milestone:
+            item.setText(4, "Milestone")
+        else:
+            item.setText(4, original_task.end_date.strftime('%Y-%m-%d')) # End Date
+        
+        # Duration
+        duration = original_task.get_duration(
+            self.data_manager.settings.duration_unit,
+            self.calendar_manager
+        )
+        if original_task.is_milestone:
+            item.setText(5, "0")
+        elif self.data_manager.settings.duration_unit == DurationUnit.HOURS:
+            item.setText(5, f"{duration:.1f}")
+        else:
+            item.setText(5, str(int(duration)))
+
+        item.setText(6, f"{original_task.percent_complete}%") # % Complete
+        
+        pred_text = ', '.join([
+            f"{pred_id} ({DependencyType[dep_type].value})" 
+            for pred_id, dep_type in original_task.predecessors
+        ])
+        item.setText(7, pred_text) # Dependencies
+        item.setText(8, ', '.join(original_task.assigned_resources)) # Resources
+        item.setText(9, original_task.notes) # Notes
+
+        self.task_tree.blockSignals(False)
+
     def _expand_all_tasks(self):
         """Expand all tasks in tree"""
         self.task_tree.expandAll()
+        # Track all summary tasks as expanded
         for task in self.data_manager.get_all_tasks():
-            self.expanded_tasks.add(task.id)
+            if task.is_summary:
+                self.expanded_tasks.add(task.id)
+        self.status_label.setText("✓ Expanded all tasks")
     
     def _collapse_all_tasks(self):
         """Collapse all tasks in tree"""
@@ -1124,6 +1383,7 @@ class MainWindow(QMainWindow):
             
             if self.data_manager.add_resource(resource):
                 self._update_all_views()
+                self._update_resource_delegates()
                 self.status_label.setText(f"Resource '{resource.name}' added successfully")
             else:
                 QMessageBox.warning(self, "Duplicate Resource", 
@@ -1148,11 +1408,13 @@ class MainWindow(QMainWindow):
                 updated_resource = Resource(
                     name=resource_data['name'],
                     max_hours_per_day=resource_data['max_hours_per_day'],
-                    exceptions=resource_data['exceptions']
+                    exceptions=resource_data['exceptions'],
+                    billing_rate=resource_data['billing_rate']
                 )
                 
                 self.data_manager.update_resource(resource_name, updated_resource)
                 self._update_all_views()
+                self._update_resource_delegates()
                 self.status_label.setText("Resource updated")
     
     def _delete_resource(self):
@@ -1173,15 +1435,18 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             self.data_manager.delete_resource(resource_name)
             self._update_all_views()
-            self.status_label.setText("Resource deleted")
-    
+            self._update_resource_delegates()
+            self.status_label.setText("Resource deleted")    
     # Update Methods
     
     def _update_all_views(self):
         """Update all UI views"""
+        # For very large projects, consider adding QApplication.processEvents()
+        # or moving heavy updates to a separate thread to maintain UI responsiveness.
 
         self._update_task_tree()
         self._update_gantt_chart()
+        self._update_resource_delegates()
         self._update_resource_summary()
         self._update_dashboard()
         self._update_resource_filter()
@@ -1196,7 +1461,6 @@ class MainWindow(QMainWindow):
         current_sort_order = self.task_tree.header().sortIndicatorOrder()
         
         # Disable sorting during update
-        self.task_tree.setSortingEnabled(False)
         self.task_tree.setSortingEnabled(False)
         self.task_tree.blockSignals(True)
         self.task_tree.clear()
@@ -1213,22 +1477,61 @@ class MainWindow(QMainWindow):
         resource_filter = self.resource_filter.currentText()
         status_filter = self.status_filter.currentText()
         
-        # Build tree starting from top-level tasks
-        def add_task_to_tree(task: Task, parent_item: QTreeWidgetItem = None, level: int = 0):
-            # Apply filters
-            if search_text and search_text not in task.name.lower():
-                return None
+        # --- NEW FILTERING LOGIC ---
+        tasks_to_display = set()
+        all_tasks = self.data_manager.get_all_tasks()
+        
+        # Pass 1: Identify tasks that directly match the filter criteria
+        for task in all_tasks:
+            match_name = True
+            if search_text:
+                cleaned_search_text = search_text.replace('◆', '').replace('▶', '').strip()
+                if cleaned_search_text and cleaned_search_text not in task.name.lower():
+                    match_name = False
             
+            match_resource = True
             if resource_filter != "All Resources":
                 if resource_filter not in task.assigned_resources:
-                    return None
+                    match_resource = False
             
-            if status_filter != "All":
+            match_status = True
+            if status_filter != STATUS_ALL:
                 if status_filter != task.get_status_text():
-                    return None
+                    match_status = False
             
+            if match_name and match_resource and match_status:
+                tasks_to_display.add(task.id)
+        
+        # Pass 2: Include all ancestors of tasks that are to be displayed
+        # This ensures that if a child matches, its parent is also shown
+        for task_id in list(tasks_to_display): # Iterate over a copy as set changes during iteration
+            current_task = self.data_manager.get_task(task_id)
+            while current_task and current_task.parent_id is not None:
+                parent_task = self.data_manager.get_task(current_task.parent_id)
+                if parent_task:
+                    tasks_to_display.add(parent_task.id)
+                    current_task = parent_task
+                else:
+                    break # Parent not found, stop
+        
+        # Helper function to add tasks to tree, only if they are in tasks_to_display
+        # and their parent is also in tasks_to_display (or is None for top-level)
+        added_items = {} # To store QTreeWidgetItem references by task ID
+
+        def add_task_to_tree_filtered(task: Task, parent_item: QTreeWidgetItem = None, level: int = 0):
+            if task.id not in tasks_to_display:
+                return None
+
             # Create tree item
             item = SortableTreeWidgetItem()
+            
+            # Set flags for editability for each column
+            for col_idx in range(self.task_tree.columnCount()):
+                if col_idx == 0 or col_idx == 1:  # Status and ID columns
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                else:
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+
             
             # COLUMN 0: Status
             status_color = task.get_status_color()
@@ -1236,18 +1539,17 @@ class MainWindow(QMainWindow):
             item.setText(0, status_text)
             item.setData(0, Qt.ItemDataRole.UserRole, status_color)
             
-            # COLUMN 1: Task ID
+            # COLUMN 1: Task ID (not editable)
             item.setText(1, str(task.id))
             item.setData(1, Qt.ItemDataRole.UserRole, task.id)
             item.setData(1, Qt.ItemDataRole.DisplayRole, task.id)  # Store as int, display as string
             
-            # *** COLUMN 2: Task Name WITH MANUAL INDENTATION ***
+            # COLUMN 2: Task Name WITH MANUAL INDENTATION
             is_milestone = getattr(task, 'is_milestone', False)
             is_summary = getattr(task, 'is_summary', False)
             
             # Add spacing based on level (use em space for better appearance)
             indent = "    " * level  # 4 spaces per level
-            # OR use em space: indent = "\u2003" * level
             
             if is_milestone:
                 display_name = f"{indent}◆ {task.name}"
@@ -1319,7 +1621,7 @@ class MainWindow(QMainWindow):
                     item.setBackground(col, QBrush(milestone_color))
             elif not self.dark_mode:
                 bg_color = color_map.get(status_color, QColor(255, 255, 255))
-                # *** SLIGHTLY LIGHTER BACKGROUND FOR DEEPER LEVELS ***
+                # SLIGHTLY LIGHTER BACKGROUND FOR DEEPER LEVELS
                 if level > 0:
                     bg_color = bg_color.lighter(100 + (level * 2))
                 for col in range(10):
@@ -1331,10 +1633,12 @@ class MainWindow(QMainWindow):
             else:
                 self.task_tree.addTopLevelItem(item)
             
-            # Add children recursively
+            added_items[task.id] = item
+
+            # Add children recursively, but only if they are also in tasks_to_display
             children = self.data_manager.get_child_tasks(task.id)
             for child in children:
-                add_task_to_tree(child, item, level + 1)  # *** PASS LEVEL + 1 ***
+                add_task_to_tree_filtered(child, item, level + 1)
             
             # Restore expanded state
             if task.id in self.expanded_tasks:
@@ -1342,13 +1646,27 @@ class MainWindow(QMainWindow):
             
             return item
         
-        # Add all top-level tasks
-        top_level_tasks = self.data_manager.get_top_level_tasks()
+        # Build tree starting from top-level tasks that are in tasks_to_display
+        top_level_tasks = [t for t in self.data_manager.get_top_level_tasks() if t.id in tasks_to_display]
         for task in top_level_tasks:
-            add_task_to_tree(task, None, 0)  # *** START WITH LEVEL 0 ***
-        
+            add_task_to_tree_filtered(task, None, 0)
+
         # Re-enable signals
         self.task_tree.blockSignals(False)
+        
+        # Auto-adjust column widths to content after population
+        self.task_tree.header().resizeSections(QHeaderView.ResizeMode.ResizeToContents)
+        
+        # Re-enable sorting
+        self.task_tree.setSortingEnabled(True)
+        if current_sort_column >= 0:
+            self.task_tree.sortByColumn(current_sort_column, current_sort_order)
+
+    def _update_gantt_chart():
+        self.task_tree.blockSignals(False)
+        
+        # Auto-adjust column widths to content after population
+        self.task_tree.header().resizeSections(QHeaderView.ResizeMode.ResizeToContents)
         
         # Re-enable sorting
         self.task_tree.setSortingEnabled(True)
@@ -1360,6 +1678,11 @@ class MainWindow(QMainWindow):
         tasks = self.data_manager.get_all_tasks()
         self.gantt_chart.update_chart(tasks, self.data_manager)
     
+    def _update_resource_delegates(self):
+        """Update the resource delegate with the latest list of resource names"""
+        resource_names = [r.name for r in self.data_manager.get_all_resources()]
+        self.resource_delegate.update_resource_list(resource_names)
+
     def _update_resource_summary(self):
         """Update resource summary"""
         self.resource_table.setRowCount(0)
@@ -1384,7 +1707,9 @@ class MainWindow(QMainWindow):
             self.resource_table.setItem(row, 1, QTableWidgetItem(str(resource.max_hours_per_day)))
             self.resource_table.setItem(row, 2, QTableWidgetItem(f"{total_hours:.1f}"))
             self.resource_table.setItem(row, 3, QTableWidgetItem(str(tasks_assigned)))
-            self.resource_table.setItem(row, 4, QTableWidgetItem(status))
+            self.resource_table.setItem(row, 4, QTableWidgetItem(f"{resource.billing_rate:.2f}")) # New: Billing Rate
+            self.resource_table.setItem(row, 5, QTableWidgetItem(f"{alloc.get('total_amount', 0.0):.2f}")) # New: Total Amount
+            self.resource_table.setItem(row, 6, QTableWidgetItem(status)) # Status is now column 6
         
         # Update warnings
         warnings = self.data_manager.check_resource_overallocation()
@@ -1431,10 +1756,10 @@ class MainWindow(QMainWindow):
         
         # Task counts by status
         status_counts = {
-            'Overdue': 0,
-            'In Progress': 0,
-            'Upcoming': 0,
-            'Completed': 0
+            STATUS_OVERDUE: 0,
+            STATUS_IN_PROGRESS: 0,
+            STATUS_UPCOMING: 0,
+            STATUS_COMPLETED: 0
         }
         
         for task in self.data_manager.tasks:
@@ -1442,10 +1767,10 @@ class MainWindow(QMainWindow):
                 status_counts[task.get_status_text()] += 1
         
         stats += f"<p><b>Total Tasks:</b> {total_tasks}</p>"
-        stats += f"<p><b>├─ Completed:</b> {status_counts['Completed']} ({status_counts['Completed']/max(total_tasks, 1)*100:.0f}%)</p>"
-        stats += f"<p><b>├─ In Progress:</b> {status_counts['In Progress']}</p>"
-        stats += f"<p><b>├─ Upcoming:</b> {status_counts['Upcoming']}</p>"
-        stats += f"<p><b>└─ Overdue:</b> {status_counts['Overdue']}</p>"
+        stats += f"<p><b>├─ Completed:</b> {status_counts[STATUS_COMPLETED]} ({status_counts[STATUS_COMPLETED]/max(total_tasks, 1)*100:.0f}%)</p>"
+        stats += f"<p><b>├─ In Progress:</b> {status_counts[STATUS_IN_PROGRESS]}</p>"
+        stats += f"<p><b>├─ Upcoming:</b> {status_counts[STATUS_UPCOMING]}</p>"
+        stats += f"<p><b>└─ Overdue:</b> {status_counts[STATUS_OVERDUE]}</p>"
         
         # Summary tasks
         summary_count = sum(1 for t in self.data_manager.tasks if t.is_summary)
@@ -1453,8 +1778,12 @@ class MainWindow(QMainWindow):
         
         stats += "<h3>Resource Summary</h3>"
         allocation = self.data_manager.get_resource_allocation()
+        total_project_cost = 0.0
         for resource_name, alloc in allocation.items():
-            stats += f"<p><b>{resource_name}:</b> {alloc['total_hours']:.1f}h across {alloc['tasks_assigned']} tasks</p>"
+            stats += f"<p><b>{resource_name}:</b> {alloc['total_hours']:.1f}h across {alloc['tasks_assigned']} tasks (Cost: ${alloc.get('total_amount', 0.0):.2f})</p>"
+            total_project_cost += alloc.get('total_amount', 0.0)
+        
+        stats += f"<h3>Total Project Cost: ${total_project_cost:.2f}</h3>"
         
         self.stats_text.setHtml(stats)
     
@@ -1481,7 +1810,7 @@ class MainWindow(QMainWindow):
         """Clear all filters"""
         self.search_box.clear()
         self.resource_filter.setCurrentIndex(0)
-        self.status_filter.setCurrentIndex(0)
+        self.status_filter.setCurrentIndex(self.status_filter.findText(STATUS_ALL))
         self._update_task_tree()
     
     # File Operations
@@ -1670,8 +1999,8 @@ class MainWindow(QMainWindow):
         try:
             with open('.last_project', 'w') as f:
                 f.write(path)
-        except:
-            pass
+        except IOError as e:
+            logging.error(f"Failed to save last project path: {e}")
     
     def _try_load_last_project(self):
         """Try to load last opened project"""
@@ -1689,8 +2018,8 @@ class MainWindow(QMainWindow):
                         self.current_file = path
                         self._update_all_views()
                         self.status_label.setText(f"Loaded: {self.data_manager.project_name}")
-        except:
-            pass
+        except (IOError, json.JSONDecodeError) as e:
+            logging.warning(f"Failed to load last project: {e}")
         
     def _show_duration_unit_settings(self):
         """Show duration unit settings dialog"""
@@ -1882,6 +2211,8 @@ class MainWindow(QMainWindow):
         if not selected_items:
             return
         
+        # Note: This method currently operates on the first selected item.
+        # If multiple items are selected, only the first one's state will be toggled.
         item = selected_items[0]
         if item.isExpanded():
             self._collapse_selected()
@@ -2543,6 +2874,15 @@ class ResourceDialog(QDialog):
         self.hours_spin.setValue(8.0)
         self.hours_spin.setSuffix(" hours")
         form_layout.addRow("Max Hours/Day:", self.hours_spin)
+
+        # Billing Rate
+        self.billing_rate_spin = QDoubleSpinBox()
+        self.billing_rate_spin.setRange(0.0, 10000.0) # Assuming a reasonable range for billing rates
+        self.billing_rate_spin.setValue(0.0)
+        self.billing_rate_spin.setPrefix("$")
+        self.billing_rate_spin.setSuffix("/hr")
+        self.billing_rate_spin.setDecimals(2)
+        form_layout.addRow("Billing Rate:", self.billing_rate_spin)
         
         layout.addLayout(form_layout)
         
@@ -2563,13 +2903,15 @@ class ResourceDialog(QDialog):
         """Populate fields when editing"""
         self.name_edit.setText(self.resource.name)
         self.hours_spin.setValue(self.resource.max_hours_per_day)
+        self.billing_rate_spin.setValue(self.resource.billing_rate)
     
     def get_resource_data(self):
         """Get resource data from form"""
         return {
             'name': self.name_edit.text(),
             'max_hours_per_day': self.hours_spin.value(),
-            'exceptions': []
+            'exceptions': [], # Exceptions are not handled in this dialog currently
+            'billing_rate': self.billing_rate_spin.value()
         }
 
 
@@ -2750,8 +3092,8 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
                     return int(text1) < int(text2)
                 
                 return text1 < text2
-            except Exception as e:
-                print(f"ID sort error: {e}")
+            except (ValueError, TypeError) as e:
+                logging.error(f"ID sort error: {e}")
                 return False
         
         # Column 2: Task Name (text, ignore symbols and spaces)
@@ -2766,7 +3108,8 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
                 date1 = datetime.strptime(self.text(3), '%Y-%m-%d')
                 date2 = datetime.strptime(other.text(3), '%Y-%m-%d')
                 return date1 < date2
-            except:
+            except ValueError:
+                logging.warning(f"Could not parse start date for sorting: {self.text(3)} or {other.text(3)}")
                 return self.text(3) < other.text(3)
         
         # Column 4: End Date
@@ -2777,7 +3120,8 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
                 date1 = datetime.strptime(text1, '%Y-%m-%d')
                 date2 = datetime.strptime(text2, '%Y-%m-%d')
                 return date1 < date2
-            except:
+            except ValueError:
+                logging.warning(f"Could not parse end date for sorting: {self.text(4)} or {other.text(4)}")
                 return self.text(4) < other.text(4)
         
         # Column 5: Duration (numeric)
@@ -2786,7 +3130,8 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
                 val1 = float(self.text(5)) if self.text(5) else 0
                 val2 = float(other.text(5)) if other.text(5) else 0
                 return val1 < val2
-            except:
+            except ValueError:
+                logging.warning(f"Could not parse duration for sorting: {self.text(5)} or {other.text(5)}")
                 return self.text(5) < other.text(5)
         
         # Column 6: % Complete (numeric)
@@ -2795,7 +3140,8 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
                 val1 = int(self.text(6).replace('%', '').strip())
                 val2 = int(other.text(6).replace('%', '').strip())
                 return val1 < val2
-            except:
+            except ValueError:
+                logging.warning(f"Could not parse percent complete for sorting: {self.text(6)} or {other.text(6)}")
                 return self.text(6) < other.text(6)
         
         # Default: text comparison
