@@ -123,7 +123,7 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 | Shortcut         | Action                  |
 | ---------------- | ----------------------- |
 | `Ctrl+T`         | Add Task                |
-| `Ctrl+M`         | Add Milestone ✨ NEW    |
+| `Ctrl+M`         | Add Milestone		     |
 | `Ctrl+Shift+T`   | Add Subtask             |
 | `Ctrl+N`         | New Project             |
 | `Ctrl+O`         | Open Project            |
