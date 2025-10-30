@@ -20,8 +20,6 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
   - [Gantt Chart](#gantt-chart)
   - [Dashboard](#dashboard)
   - [Importing and Exporting Data](#importing-and-exporting-data)
-- [Screenshots](#-screenshots)
-- [Sample Files](#-sample-files)
 - [Shortcuts](#️-shortcuts)
 - [Batch Scripts](#-batch-scripts)
 - [Building from Source](#️-building-from-source)
@@ -128,23 +126,6 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 
 - **JSON**: Save and load your projects using the `.json` format. This is the recommended format for saving your work.
 - **Excel**: Import and export your projects to and from Excel files. This is useful for sharing your project with others who may not have the application.
-
-## 📸 Screenshots
-
-| Home Screen | Gantt Chart |
-| :-------------------------------------------------: | :-------------------------------------------------: |
-| ![Home Screen](screenshots/home_screen.png) | ![Gantt Chart](screenshots/gantt_chart.png) |
-
-| Dashboard Screen | Resource Screen |
-| :-------------------------------------------------: | :-------------------------------------------------: |
-| ![Dashboard Screen](screenshots/dashboard_screen.png) | ![Resource Screen](screenshots/resource_screen.png) |
-
-
-
-## 📂 Sample Files
-
-- [Sample Project JSON](sample/sample_project.json) - A basic project example in JSON format.
-- [Sample Project Excel](sample/sample_project.xlsx) - The same project exported to Excel for compatibility.
 
 ## ⌨️ Shortcuts
 
