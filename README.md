@@ -56,8 +56,6 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 
 ## 🚀 Getting Started
 
-![Application GIF](https://via.placeholder.com/800x400.gif?text=Application+In+Action)
-
 ### Prerequisites
 
 - Windows Operating System
@@ -153,11 +151,8 @@ This project includes a set of batch scripts to automate common tasks on Windows
 | `install.bat`       | One-click installer for first-time users.                                      |
 | `run.bat`           | Runs the application, creating a virtual environment and installing dependencies if needed. |
 | `build.bat`         | Builds a standalone `.exe` file of the application.                            |
-| `build-advance.bat` | Provides advanced build options, such as creating a one-folder executable.     |
 | `setup.bat`         | Sets up the virtual environment and installs dependencies.                     |
-| `dev.bat`           | Runs the application in development mode with console output for debugging.    |
 | `clean.bat`         | Cleans up the project directory by removing build artifacts and cache files.   |
-| `test.bat`          | Runs a series of tests to verify the installation and file integrity.          |
 | `quick-start.bat`   | A menu-driven script to quickly run any of the other scripts.                  |
 
 ## 🛠️ Building from Source
@@ -167,10 +162,6 @@ To build a standalone executable from the source code, you can use the `build.ba
 -   **`build.bat`**: Creates a single `.exe` file in the `dist` folder. This is the easiest way to create a distributable version of the application.
 -   **`build-advance.bat`**: Provides more control over the build process, allowing you to create a one-folder build or a debug build.
 
-## 📄 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
-
 ## 📂 Project Structure
 
 ```
@@ -179,10 +170,7 @@ ProjectPlanner\
 ├───build.bat ⭐ Build to EXE
 ├───install.bat ⭐ One-click installer
 ├───setup.bat 📦 Environment setup only
-├───dev.bat 🔧 Development mode
 ├───clean.bat 🗑️ Clean build artifacts
-├───test.bat ✅ Test installation
-├───build-advanced.bat ⚙️ Advanced build options
 ├───calendar_manager.py
 ├───data_manager.py
 ├───exporter.py
@@ -193,12 +181,15 @@ ProjectPlanner\
 ├───ui_main.py
 ├───readme.md
 ├───requirements.txt
-├───images\
-│   └───logo.ico
-└───venv\
+└───images\
+   └───logo.ico
 ```
 
 ## 🐛 Troubleshooting
 
 -   **Application does not start**: Ensure you have Python 3.10 or higher installed and that it is in your system's PATH. Try running `install.bat` again.
 -   **`ModuleNotFoundError`**: If you get an error about a missing module, run `pip install -r requirements.txt` in the activated virtual environment.
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
