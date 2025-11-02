@@ -2,10 +2,10 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.0 - One-Click Installer
+echo   PlanIFlow - Project Planner v1.1 - One-Click Installer
 echo ===============================================
 echo.
-echo This installer will set up PlanIFlow - Project Planner v1.0
+echo This installer will set up PlanIFlow - Project Planner v1.1
 echo.
 echo This will:
 echo   1. Check Python installation
@@ -111,7 +111,7 @@ echo ===============================================
 echo   Installation Complete!
 echo ===============================================
 echo.
-echo Project Planner v2.0 is ready to use!
+echo Project Planner v1.1 is ready to use!
 echo.
 echo Quick Start Guide:
 echo   - Run the app:        run.bat
@@ -125,7 +125,7 @@ echo.
 set /p RUN_NOW="Do you want to run Project Planner now? (Y/N): "
 if /i "!RUN_NOW!"=="Y" (
     echo.
-    echo [INFO] Launching Project Planner v1.0...
+    echo [INFO] Launching Project Planner v1.1...
     echo.
     call run.bat
 ) else (

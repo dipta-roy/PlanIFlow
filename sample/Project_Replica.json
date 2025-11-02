@@ -1,5 +1,5 @@
 {
-  "version": "2.1",
+  "version": "1.1",
   "project_name": "Project Replica",
   "project_data": {
     "project_name": "Project Replica",
@@ -8,14 +8,15 @@
         "id": 1,
         "name": "Project Name",
         "start_date": "2025-10-30T00:00:00",
-        "end_date": "2025-11-14T00:00:00",
-        "percent_complete": 5,
+        "end_date": "2025-11-26T00:00:00",
+        "percent_complete": 0,
         "predecessors": [],
         "assigned_resources": [],
         "notes": "",
         "parent_id": null,
         "is_summary": true,
-        "is_milestone": false
+        "is_milestone": false,
+        "wbs": "1"
       },
       {
         "id": 2,
@@ -25,113 +26,143 @@
         "percent_complete": 100,
         "predecessors": [],
         "assigned_resources": [
-          "Project"
+          [
+            "Project",
+            100
+          ]
         ],
         "notes": "",
         "parent_id": 1,
         "is_summary": false,
-        "is_milestone": true
+        "is_milestone": true,
+        "wbs": "1.1"
       },
       {
         "id": 3,
         "name": "Requirements",
         "start_date": "2025-10-31T00:00:00",
-        "end_date": "2025-11-13T00:00:00",
-        "percent_complete": 5,
+        "end_date": "2025-11-26T00:00:00",
+        "percent_complete": 0,
         "predecessors": [],
         "assigned_resources": [],
-        "notes": "",
+        "notes": "tets",
         "parent_id": 1,
         "is_summary": true,
-        "is_milestone": false
+        "is_milestone": false,
+        "wbs": "1.2"
       },
       {
         "id": 4,
         "name": "Find Scope",
         "start_date": "2025-10-31T00:00:00",
-        "end_date": "2025-11-04T00:00:00",
+        "end_date": "2025-11-06T00:00:00",
         "percent_complete": 0,
         "predecessors": [
           [
             2,
-            "FS"
+            "FS",
+            0
           ]
         ],
         "assigned_resources": [
-          "Security",
-          "Project"
+          [
+            "Security",
+            100
+          ],
+          [
+            "Project",
+            100
+          ]
         ],
         "notes": "",
         "parent_id": 3,
         "is_summary": false,
-        "is_milestone": false
+        "is_milestone": false,
+        "wbs": "1.2.1"
       },
       {
         "id": 5,
         "name": "Create Plan",
-        "start_date": "2025-11-05T00:00:00",
-        "end_date": "2025-11-12T00:00:00",
-        "percent_complete": 10,
+        "start_date": "2025-11-07T00:00:00",
+        "end_date": "2025-11-17T00:00:00",
+        "percent_complete": 0,
         "predecessors": [
           [
             4,
-            "FS"
+            "FS",
+            0
           ]
         ],
         "assigned_resources": [
-          "Security"
+          [
+            "Security",
+            100
+          ]
         ],
         "notes": "",
         "parent_id": 3,
         "is_summary": false,
-        "is_milestone": false
+        "is_milestone": false,
+        "wbs": "1.2.2"
       },
       {
         "id": 6,
         "name": "Get Plan Approval",
-        "start_date": "2025-11-13T00:00:00",
-        "end_date": "2025-11-13T00:00:00",
+        "start_date": "2025-11-18T00:00:00",
+        "end_date": "2025-11-26T00:00:00",
         "percent_complete": 0,
         "predecessors": [
           [
             5,
-            "FS"
+            "FS",
+            0
           ]
         ],
         "assigned_resources": [
-          "Project"
+          [
+            "Project",
+            100
+          ]
         ],
         "notes": "Get Approval",
         "parent_id": 3,
         "is_summary": false,
-        "is_milestone": false
+        "is_milestone": false,
+        "wbs": "1.2.3"
       },
       {
         "id": 7,
         "name": "Project End",
-        "start_date": "2025-11-14T00:00:00",
-        "end_date": "2025-11-14T00:00:00",
+        "start_date": "2025-11-27T00:00:00",
+        "end_date": "2025-11-26T00:00:00",
         "percent_complete": 0,
         "predecessors": [
           [
             6,
-            "FS"
+            "FS",
+            0
           ]
         ],
         "assigned_resources": [
-          "Project"
+          [
+            "Project",
+            100
+          ]
         ],
         "notes": "",
         "parent_id": 1,
         "is_summary": false,
-        "is_milestone": true
+        "is_milestone": true,
+        "wbs": "1.3"
       }
     ],
     "resources": [
       {
         "name": "Security",
-        "max_hours_per_day": 8.0,
-        "exceptions": [],
+        "max_hours_per_day": 8,
+        "exceptions": [
+          "2025-11-03 to 2025-11-05"
+        ],
         "billing_rate": 10.0
       },
       {
@@ -139,13 +170,56 @@
         "max_hours_per_day": 8.0,
         "exceptions": [],
         "billing_rate": 20.0
+      },
+      {
+        "name": "test",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "test 2",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "test 3",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "test 4",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "test 5",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "test 6",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "test 7",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "test 8",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
       }
-    ],
-    "next_task_id": 8,
-    "settings": {
-      "duration_unit": "days"
-    },
-    "version": "2.1"
+    ]
   },
   "calendar_settings": {
     "working_days": [
@@ -158,13 +232,18 @@
     "hours_per_day": 8.0,
     "non_working_days": []
   },
-  "saved_at": "2025-10-30T20:22:58.246071",
+  "project_settings": {
+    "duration_unit": "days",
+    "default_date_format": "yyyy-mm-dd",
+    "project_start_date": "2025-10-30T00:00:00"
+  },
+  "saved_at": "2025-11-02T05:14:39.181457",
   "metadata": {
     "total_tasks": 7,
     "summary_tasks": 2,
     "work_tasks": 5,
-    "total_resources": 2,
-    "overall_completion": 5.2272727272727275,
+    "total_resources": 10,
+    "overall_completion": 0.0,
     "duration_unit": "days"
   }
 }

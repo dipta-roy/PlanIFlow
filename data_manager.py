@@ -6,7 +6,7 @@ Enhanced with hierarchical tasks, dependency types, and status indicators
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any, Tuple
 from enum import Enum
-from settings_manager import ProjectSettings, DurationUnit
+from settings_manager import ProjectSettings, DurationUnit, DateFormat
 
 class DependencyType(Enum):
     """Dependency relationship types"""
@@ -28,10 +28,10 @@ class Task:
     _next_id = 1
     
     def __init__(self, name: str, start_date: datetime, end_date: datetime,
-                 percent_complete: int = 0, predecessors: List[Tuple[int, str]] = None,
+                 percent_complete: int = 0,                  predecessors: List[Tuple[int, str, int]] = None,
                  assigned_resources: List[str] = None, notes: str = "",
                  task_id: int = None, parent_id: int = None, is_summary: bool = False,
-                 is_milestone: bool = False):
+                 is_milestone: bool = False, wbs: str = None):
         """
         Initialize task with hierarchy support
         
@@ -49,6 +49,7 @@ class Task:
         self.is_milestone = is_milestone
         self.is_summary = is_summary
         self.parent_id = parent_id
+        self.wbs = wbs
         
         # Now set other attributes
         self.name = name
@@ -65,13 +66,22 @@ class Task:
         # Convert old format to new format if needed
         if predecessors and len(predecessors) > 0:
             if isinstance(predecessors[0], tuple):
-                self.predecessors = predecessors
+                if len(predecessors[0]) == 3:
+                    self.predecessors = predecessors
+                else:
+                    self.predecessors = [(pred_id, dep_type, 0) for pred_id, dep_type in predecessors]
             else:
-                self.predecessors = [(pred_id, DependencyType.FS.name) for pred_id in predecessors]
+                self.predecessors = [(pred_id, DependencyType.FS.name, 0) for pred_id in predecessors]
         else:
             self.predecessors = predecessors or []
+
+        # Handle assigned_resources with allocation
+        if assigned_resources and len(assigned_resources) > 0 and isinstance(assigned_resources[0], str):
+            # Backward compatibility: convert list of strings to list of tuples
+            self.assigned_resources = [(name, 100) for name in assigned_resources]
+        else:
+            self.assigned_resources = assigned_resources or []
         
-        self.assigned_resources = assigned_resources or []
         self.notes = notes
         
         # Store original dates
@@ -128,47 +138,110 @@ class Task:
             return parent.get_level(all_tasks) + 1
         return 0
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert task to dictionary"""
+    def _get_date_format_string(self, date_format: DateFormat) -> str:
+        if date_format == DateFormat.DD_MM_YYYY:
+            return '%d-%m-%Y %H:%M:%S'
+        elif date_format == DateFormat.DD_MMM_YYYY:
+            return '%d-%b-%Y %H:%M:%S'
+        else: # DateFormat.YYYY_MM_DD
+            return '%Y-%m-%dT%H:%M:%S'
+
+    def to_dict(self, date_format: DateFormat = None) -> Dict[str, Any]:
+        if date_format is None:
+            date_format = DateFormat.YYYY_MM_DD # Default for internal use
+        format_string = self._get_date_format_string(date_format)
+        
         return {
             'id': self.id,
             'name': self.name,
-            'start_date': self.start_date.isoformat(),
-            'end_date': self.end_date.isoformat(),
+            'start_date': self.start_date.strftime(format_string),
+            'end_date': self.end_date.strftime(format_string),
             'percent_complete': self.percent_complete,
             'predecessors': self.predecessors,
             'assigned_resources': self.assigned_resources,
             'notes': self.notes,
             'parent_id': self.parent_id,
             'is_summary': self.is_summary,
-            'is_milestone': self.is_milestone
+            'is_milestone': self.is_milestone,
+            'wbs': self.wbs
         }
     
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'Task':
+    def from_dict(data: Dict[str, Any], date_format: DateFormat = None) -> 'Task':
         """Create task from dictionary with backward compatibility"""
+        if date_format is None:
+            date_format = DateFormat.YYYY_MM_DD # Default for internal use
+        
+        # Helper to get format string
+        def _get_format_string(df: DateFormat) -> str:
+            if df == DateFormat.DD_MM_YYYY:
+                return '%d-%m-%Y %H:%M:%S'
+            elif df == DateFormat.DD_MMM_YYYY:
+                return '%d-%b-%Y %H:%M:%S'
+            else: # DateFormat.YYYY_MM_DD
+                return '%Y-%m-%dT%H:%M:%S'
+        
+        format_string = _get_format_string(date_format)
+
         # Handle old format predecessors
         predecessors = data.get('predecessors', [])
-        if predecessors and len(predecessors) > 0:
-            if isinstance(predecessors[0], (list, tuple)):
-                predecessors = [tuple(p) if isinstance(p, list) else p for p in predecessors]
-            else:
-                predecessors = [(pred_id, DependencyType.FS.name) for pred_id in predecessors]
+        new_predecessors = []
+        if predecessors:
+            for pred in predecessors:
+                if isinstance(pred, (list, tuple)):
+                    if len(pred) == 2:
+                        new_predecessors.append((pred[0], pred[1], 0))
+                    elif len(pred) == 3:
+                        new_predecessors.append(tuple(pred))
+                    else: # Should not happen with good data, but as a fallback
+                        new_predecessors.append((pred[0], DependencyType.FS.name, 0))
+                else:
+                    new_predecessors.append((pred, DependencyType.FS.name, 0))
+        predecessors = new_predecessors
         
+        # Handle assigned_resources with allocation for backward compatibility
+        assigned_resources = data.get('assigned_resources', [])
+        if assigned_resources and isinstance(assigned_resources[0], str):
+            assigned_resources = [(name, 100) for name in assigned_resources]
+
+        # Parse start_date
+        start_date_str = data['start_date']
+        parsed_start_date = None
+        for fmt in [format_string, '%d-%m-%Y %H:%M:%S', '%d-%b-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
+            try:
+                parsed_start_date = datetime.strptime(start_date_str, fmt)
+                break
+            except ValueError:
+                continue
+        if parsed_start_date is None:
+            raise ValueError(f"Could not parse start date '{start_date_str}' with any known format.")
+
+        # Parse end_date
+        end_date_str = data['end_date']
+        parsed_end_date = None
+        for fmt in [format_string, '%d-%m-%Y %H:%M:%S', '%d-%b-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
+            try:
+                parsed_end_date = datetime.strptime(end_date_str, fmt)
+                break
+            except ValueError:
+                continue
+        if parsed_end_date is None:
+            raise ValueError(f"Could not parse end date '{end_date_str}' with any known format.")
+
         return Task(
             name=data['name'],
-            start_date=datetime.fromisoformat(data['start_date']),
-            end_date=datetime.fromisoformat(data['end_date']),
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
             percent_complete=data.get('percent_complete', 0),
-            predecessors=predecessors,
-            assigned_resources=data.get('assigned_resources', []),
+            predecessors=predecessors, # Use the processed predecessors
+            assigned_resources=assigned_resources, # Use the processed assigned_resources
             notes=data.get('notes', ''),
-            task_id=data['id'],
-            parent_id=data.get('parent_id'),
-            is_summary=data.get('is_summary', False),
-            is_milestone=data.get('is_milestone', False)
+            task_id=data.get('id'), # Pass task_id from data
+            parent_id=data.get('parent_id'), # Pass parent_id from data
+            is_summary=data.get('is_summary', False), # Pass is_summary from data
+            is_milestone=data.get('is_milestone', False), # Pass is_milestone from data
+            wbs=data.get('wbs') # Pass wbs from data
         )
-        
     def calculate_duration_days(self, calendar_manager=None) -> int:
         """Calculate duration in working days"""
         if self.is_milestone:
@@ -294,13 +367,36 @@ class DataManager:
     
     def __init__(self, calendar_manager=None):
         self.tasks: List[Task] = []
-        self.resources: List[Resource] = []
+        self.resources: List[Resource] = [Resource(name="Default Resource", max_hours_per_day=8.0, billing_rate=50.0)] # Add a default resource
         self.calendar_manager = calendar_manager
         self.project_name: str = "Untitled Project"
         self.settings = ProjectSettings()
     
     # Task CRUD Operations
     
+    def _generate_wbs(self):
+        """Generate WBS for all tasks based on their hierarchy."""
+        # Sort tasks by parent_id and then by id to ensure consistent WBS generation
+        sorted_tasks = sorted(self.tasks, key=lambda t: (t.parent_id if t.parent_id is not None else -1, t.id))
+        
+        # Build a dictionary for quick lookup of children
+        children_map = {}
+        for task in sorted_tasks:
+            if task.parent_id not in children_map:
+                children_map[task.parent_id] = []
+            children_map[task.parent_id].append(task)
+
+        def _assign_wbs_recursive(task_list: List[Task], prefix: str = ""):
+            for i, task in enumerate(task_list):
+                wbs_number = f"{prefix}{i + 1}"
+                task.wbs = wbs_number
+                if task.id in children_map:
+                    _assign_wbs_recursive(children_map[task.id], f"{wbs_number}.")
+        
+        # Start WBS generation from top-level tasks (parent_id is None)
+        top_level_tasks = [t for t in sorted_tasks if t.parent_id is None]
+        _assign_wbs_recursive(top_level_tasks)
+
     def add_task(self, task: Task, parent_id: int = None) -> bool:
         """Add a new task with validation"""
         task.parent_id = parent_id
@@ -321,6 +417,7 @@ class DataManager:
         self._auto_calculate_dates_from_predecessors(task)
         
         self.tasks.append(task)
+        self._generate_wbs()
         
         # Update parent summary dates
         if parent_id is not None:
@@ -346,10 +443,12 @@ class DataManager:
                 if not self._validate_predecessors(updated_task, exclude_id=task_id):
                     return False
                 
-                # Auto-calculate dates from predecessors
-                self._auto_calculate_dates_from_predecessors(updated_task)
+                # The updated_task should already have its dates correctly set (by user or duration change)
+                # We no longer auto-calculate dates from predecessors for the updated_task itself here
+                # self._auto_calculate_dates_from_predecessors(updated_task) # Removed this line
                 
                 self.tasks[i] = updated_task
+                self._generate_wbs()
                 
                 # Update summary task if this has a parent
                 if updated_task.parent_id is not None:
@@ -378,6 +477,7 @@ class DataManager:
         
         # Remove task
         self.tasks = [t for t in self.tasks if t.id != task_id]
+        self._generate_wbs()
         
         # Remove from all predecessor lists
         for t in self.tasks:
@@ -441,6 +541,7 @@ class DataManager:
         
         # Update task parent
         task.parent_id = new_parent_id
+        self._generate_wbs()
         
         # Update old parent
         if old_parent_id is not None:
@@ -476,9 +577,10 @@ class DataManager:
             if resource.name == old_name:
                 if old_name != updated_resource.name:
                     for task in self.tasks:
-                        if old_name in task.assigned_resources:
-                            idx = task.assigned_resources.index(old_name)
-                            task.assigned_resources[idx] = updated_resource.name
+                        task.assigned_resources = [
+                            (updated_resource.name, alloc) if name == old_name else (name, alloc) 
+                            for name, alloc in task.assigned_resources
+                        ]
                 self.resources[i] = updated_resource
                 return True
         return False
@@ -487,8 +589,7 @@ class DataManager:
         """Delete a resource"""
         self.resources = [r for r in self.resources if r.name != name]
         for task in self.tasks:
-            if name in task.assigned_resources:
-                task.assigned_resources.remove(name)
+            task.assigned_resources = [(r_name, alloc) for r_name, alloc in task.assigned_resources if r_name != name]
         return True
     
     def get_resource(self, name: str) -> Optional[Resource]:
@@ -502,11 +603,18 @@ class DataManager:
         """Get all resources"""
         return self.resources.copy()
     
+    def get_successors(self, task_id: int) -> List[Task]:
+        """Get all tasks that have the given task_id as a predecessor"""
+        successors = []
+        for task in self.tasks:
+            if any(pred_id == task_id for pred_id, _, _ in task.predecessors):
+                successors.append(task)
+        return successors
+
     # Validation and Business Logic
     
     def _validate_predecessors(self, task: Task, exclude_id: int = None) -> bool:
-        """Validate that task doesn't create circular dependencies"""
-        for pred_id, dep_type in task.predecessors:
+        for pred_id, dep_type, lag_days in task.predecessors:
             if pred_id == exclude_id or pred_id == task.id:
                 continue
             
@@ -535,7 +643,7 @@ class DataManager:
             if not task:
                 return False
             
-            for pred_id, _ in task.predecessors:
+            for pred_id, _, _ in task.predecessors:
                 if has_path(pred_id, to_id):
                     return True
             return False
@@ -551,16 +659,17 @@ class DataManager:
         latest_start = None
         latest_end = None
         
-        for pred_id, dep_type_str in task.predecessors:
+        for pred_id, dep_type_str, lag_days in task.predecessors:
             predecessor = self.get_task(pred_id)
             if not predecessor:
                 continue
             
             dep_type = DependencyType[dep_type_str]
-            
+            lag = timedelta(days=lag_days)
+
             if dep_type == DependencyType.FS:
                 # Finish-to-Start: task starts after predecessor ends
-                constraint_start = predecessor.end_date + timedelta(days=1)
+                constraint_start = predecessor.end_date + timedelta(days=1) + lag
                 if self.calendar_manager:
                     # Move to next working day
                     while not self.calendar_manager.is_working_day(constraint_start):
@@ -571,19 +680,19 @@ class DataManager:
             
             elif dep_type == DependencyType.SS:
                 # Start-to-Start: task starts when predecessor starts
-                constraint_start = predecessor.start_date
+                constraint_start = predecessor.start_date + lag
                 if latest_start is None or constraint_start > latest_start:
                     latest_start = constraint_start
             
             elif dep_type == DependencyType.FF:
                 # Finish-to-Finish: task ends when predecessor ends
-                constraint_end = predecessor.end_date
+                constraint_end = predecessor.end_date + lag
                 if latest_end is None or constraint_end > latest_end:
                     latest_end = constraint_end
             
             elif dep_type == DependencyType.SF:
                 # Start-to-Finish: task ends when predecessor starts
-                constraint_end = predecessor.start_date
+                constraint_end = predecessor.start_date + lag
                 if latest_end is None or constraint_end > latest_end:
                     latest_end = constraint_end
         
@@ -613,24 +722,49 @@ class DataManager:
                 else:
                     task.start_date = task.end_date - timedelta(days=original_duration_days - 1)
     
-    def _auto_adjust_dependent_tasks(self, updated_task: Task):
-        """Auto-shift dependent tasks when a task changes"""
-        # Find all tasks that have this task as a predecessor
-        dependent_tasks = [
-            t for t in self.tasks 
-            if any(pred_id == updated_task.id for pred_id, _ in t.predecessors)
-        ]
+    def _auto_adjust_dependent_tasks(self, initial_task: Task):
+        """Auto-shift dependent tasks when a task changes, using an iterative approach"""
+        queue = [initial_task.id] # Store task IDs in the queue
+        # Use a set to keep track of tasks that have been added to the queue
+        # to avoid redundant processing within a single propagation cycle
+        queued_ids = {initial_task.id}
         
-        for dep_task in dependent_tasks:
+        # Use a separate set to track tasks whose dates have been finalized in this cycle
+        # This prevents infinite loops in circular dependencies, but allows re-evaluation if needed
+        finalized_ids = set()
+
+        while queue:
+            task_id = queue.pop(0)
+            task = self.get_task(task_id)
+            if not task or task_id in finalized_ids:
+                continue
+
+            original_start = task.start_date
+            original_end = task.end_date
+
             # Recalculate dates based on predecessors
-            self._auto_calculate_dates_from_predecessors(dep_task)
-            
-            # Update parent summary if exists
-            if dep_task.parent_id is not None:
-                self._update_summary_task_dates(dep_task.parent_id)
-            
-            # Recursively adjust tasks dependent on this one
-            self._auto_adjust_dependent_tasks(dep_task)
+            self._auto_calculate_dates_from_predecessors(task)
+
+            # If dates changed, or if it's the initial task, mark as finalized and add successors to queue
+            if original_start != task.start_date or original_end != task.end_date or task_id == initial_task.id:
+                finalized_ids.add(task_id)
+
+                # Update parent summary if exists
+                if task.parent_id is not None:
+                    self._update_summary_task_dates(task.parent_id)
+                
+                # Add all direct successors to the queue for re-evaluation
+                for successor in self.get_successors(task.id):
+                    if successor.id not in queued_ids:
+                        queue.append(successor.id)
+                        queued_ids.add(successor.id)
+
+        # After all dependencies are resolved, update all summary tasks from bottom-up
+        # This ensures summary tasks reflect the latest dates of their children
+        for task in sorted(self.tasks, key=lambda t: t.get_level(self.tasks), reverse=True):
+            if task.is_summary:
+                self._update_summary_task_dates(task.id)
+
     
     def _update_summary_task_dates(self, summary_task_id: int):
         """Update summary task dates based on child tasks"""
@@ -720,18 +854,20 @@ class DataManager:
             if task.is_summary:
                 continue
             
-            task_hours = task.duration * 8
-            if self.calendar_manager:
-                task_hours = self.calendar_manager.calculate_working_hours(
-                    task.start_date, task.end_date
-                )
-            
-            num_resources = len(task.assigned_resources) or 1
-            hours_per_resource = task_hours / num_resources
-            
-            for resource_name in task.assigned_resources:
+            for resource_name, allocation_percent in task.assigned_resources:
                 if resource_name in allocation:
-                    allocation[resource_name]['total_hours'] += hours_per_resource
+                    resource_obj = self.get_resource(resource_name)
+                    if resource_obj and self.calendar_manager:
+                        # Calculate task hours considering resource-specific exceptions
+                        individual_task_hours = self.calendar_manager.calculate_working_hours(
+                            task.start_date, task.end_date, resource_exceptions=resource_obj.exceptions
+                        )
+                    else:
+                        # Fallback if no calendar manager or resource not found
+                        individual_task_hours = task.duration * 8
+
+                    effort_hours = individual_task_hours * (allocation_percent / 100.0)
+                    allocation[resource_name]['total_hours'] += effort_hours
                     allocation[resource_name]['tasks_assigned'] += 1
         
         # Calculate total amount after all hours are accumulated
@@ -752,13 +888,21 @@ class DataManager:
             
             current_date = task.start_date
             while current_date <= task.end_date:
+                date_key = current_date.strftime('%Y-%m-%d') # Define date_key here
+
                 if self.calendar_manager and not self.calendar_manager.is_working_day(current_date):
                     current_date += timedelta(days=1)
                     continue
                 
-                date_key = current_date.strftime('%Y-%m-%d')
-                
-                for resource_name in task.assigned_resources:
+                for resource_name, allocation_percent in task.assigned_resources:
+                    resource = self.get_resource(resource_name)
+                    if not resource: # Should not happen if data is consistent
+                        continue
+
+                    # Check if current_date is a working day for this specific resource
+                    if self.calendar_manager and not self.calendar_manager.is_working_day(current_date, resource.exceptions):
+                        continue # Skip this day for this resource if it's an exception
+
                     key = f"{resource_name}_{date_key}"
                     hours_per_day = 8.0
                     if self.calendar_manager:
@@ -767,7 +911,7 @@ class DataManager:
                     if key not in resource_daily_hours:
                         resource_daily_hours[key] = 0
                     
-                    resource_daily_hours[key] += hours_per_day / len(task.assigned_resources)
+                    resource_daily_hours[key] += (hours_per_day * (allocation_percent / 100.0))
                 
                 current_date += timedelta(days=1)
         
@@ -786,16 +930,6 @@ class DataManager:
         return warnings
     
     # Data Persistence
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Export all data to dictionary"""
-        return {
-            'project_name': self.project_name,
-            'tasks': [task.to_dict() for task in self.tasks],
-            'resources': [resource.to_dict() for resource in self.resources],
-            'next_task_id': Task._next_id,
-            'version': '2.0'  # Version tracking for compatibility
-        }
     
     def from_dict(self, data: Dict[str, Any]):
         """Import all data from dictionary with backward compatibility"""
@@ -877,11 +1011,8 @@ class DataManager:
         """Export all data to dictionary"""
         return {
             'project_name': self.project_name,
-            'tasks': [task.to_dict() for task in self.tasks],
-            'resources': [resource.to_dict() for resource in self.resources],
-            'next_task_id': Task._next_id,
-            'settings': self.settings.to_dict(),  # ADD THIS
-            'version': '2.1'  # Increment version
+            'tasks': [task.to_dict(date_format=self.settings.default_date_format) for task in self.tasks],
+            'resources': [resource.to_dict() for resource in self.resources], # Include resources
         }
     
     def from_dict(self, data: Dict[str, Any]):
@@ -891,22 +1022,43 @@ class DataManager:
         Task._next_id = data.get('next_task_id', 1)
         self.project_name = data.get('project_name', 'Untitled Project')
         
-        # Load tasks
-        self.tasks = [Task.from_dict(t) for t in data.get('tasks', [])]
+        # Load settings (with backward compatibility)
+        if 'settings' in data:
+            self.settings.from_dict(data['settings'])
+        else:
+            self.settings = ProjectSettings()
+        
+        # Load tasks using the retrieved date format
+        self.tasks = [Task.from_dict(t, date_format=self.settings.default_date_format) for t in data.get('tasks', [])]
+        self._generate_wbs() # Generate WBS for loaded tasks
         
         # *** BACKWARD COMPATIBILITY: Add is_milestone to old tasks ***
         for task in self.tasks:
             if not hasattr(task, 'is_milestone'):
                 task.is_milestone = False
         
-        # Load resources
-        self.resources = [Resource.from_dict(r) for r in data.get('resources', [])]
+        # Clear existing resources before loading new ones
+        self.resources.clear()
         
-        # Load settings (with backward compatibility)
-        if 'settings' in data:
-            self.settings.from_dict(data['settings'])
-        else:
-            self.settings = ProjectSettings()
+        # Load resources, preserving existing ones if none are provided in the data
+        loaded_resources_data = data.get('resources')
+        if loaded_resources_data is not None: # Only overwrite if 'resources' key is explicitly present
+            self.resources = [Resource.from_dict(r) for r in loaded_resources_data]
+        
+        # Ensure there's always at least a default resource if none were loaded
+        if not self.resources:
+            self.resources.append(Resource(name="Default Resource", max_hours_per_day=8.0, billing_rate=50.0))
+        
+        # Re-evaluate all task dates based on predecessors after loading
+        # This is crucial for correct dependency handling on import
+        for task in self.tasks:
+            self._auto_calculate_dates_from_predecessors(task)
+        
+        # Update summary task dates after all individual task dates are set
+        # This ensures hierarchy dates are correct
+        for task in self.get_top_level_tasks():
+            if task.is_summary:
+                self._update_summary_task_dates(task.id)
     
     def insert_task_at_position(self, task: Task, insert_after_id: int = None) -> bool:
         """
@@ -951,6 +1103,7 @@ class DataManager:
         
         # Add the task
         self.tasks.append(task)
+        self._generate_wbs()
         
         # Update summary tasks if needed
         if task.parent_id is not None:
@@ -999,6 +1152,7 @@ class DataManager:
         
         # Add the task
         self.tasks.append(task)
+        self._generate_wbs()
         
         # Update summary tasks if needed
         if task.parent_id is not None:
@@ -1032,12 +1186,12 @@ class DataManager:
         # Second pass: update all predecessor references
         for task in self.tasks:
             updated_predecessors = []
-            for pred_id, dep_type in task.predecessors:
+            for pred_id, dep_type, lag in task.predecessors:
                 # If this predecessor was renumbered, use the new ID
                 if pred_id in id_mapping:
-                    updated_predecessors.append((id_mapping[pred_id], dep_type))
+                    updated_predecessors.append((id_mapping[pred_id], dep_type, lag))
                 else:
-                    updated_predecessors.append((pred_id, dep_type))
+                    updated_predecessors.append((pred_id, dep_type, lag))
             task.predecessors = updated_predecessors
         
         # Third pass: update parent_id references

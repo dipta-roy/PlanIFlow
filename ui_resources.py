@@ -1,0 +1,201 @@
+
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTableWidget, QLabel, QMenu, QTextEdit, QTableWidgetItem, QMessageBox, QDialog, QHeaderView
+from PyQt6.QtGui import QAction, QBrush, QColor
+from PyQt6.QtCore import Qt
+from data_manager import Resource
+from ui_project_settings import ResourceDialog
+
+class ResourceSheet(QWidget):
+    def __init__(self, parent, data_manager):
+        super().__init__(parent)
+        self.data_manager = data_manager
+        self.parent_window = parent
+
+        layout = QVBoxLayout(self)
+        
+        # Resource table
+        self.resource_table = QTableWidget()
+        self.resource_table.setColumnCount(7) 
+        self.resource_table.setHorizontalHeaderLabels([
+            "Resource Name", "Max Hours/Day", "Total Hours", 
+            "Tasks Assigned", "Billing Rate ($/hr)", "Total Amount ($)", "Status"
+        ])
+        self.resource_table.setAlternatingRowColors(True)
+        self.resource_table.horizontalHeader().setStretchLastSection(True)
+        self.resource_table.doubleClicked.connect(self._edit_resource_dialog)
+        self.resource_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.resource_table.customContextMenuRequested.connect(self._show_resource_context_menu)
+        
+        layout.addWidget(QLabel("<h3>Resource Allocation</h3>"))
+        layout.addWidget(self.resource_table)
+        
+        # Warnings
+        self.resource_warnings = QTextEdit()
+        self.resource_warnings.setReadOnly(True)
+        self.resource_warnings.setMaximumHeight(150)
+        
+        layout.addWidget(QLabel("<h3>⚠️ Over-Allocation Warnings</h3>"))
+        layout.addWidget(self.resource_warnings)
+
+    def _show_resource_context_menu(self, position):
+        """Show context menu on resource table right-click"""
+        item = self.resource_table.itemAt(position)
+        if not item:
+            return
+        
+        row = item.row()
+        resource_name = self.resource_table.item(row, 0).text()
+        
+        menu = QMenu(self)
+        
+        edit_action = QAction("✏️ Edit Resource", self)
+        edit_action.triggered.connect(self._edit_resource_dialog)
+        menu.addAction(edit_action)
+        
+        delete_action = QAction("🗑️ Delete Resource", self)
+        delete_action.triggered.connect(self._delete_resource)
+        menu.addAction(delete_action)
+        
+        menu.exec(self.resource_table.mapToGlobal(position))
+
+    def _edit_resource_dialog(self):
+        """Show edit resource dialog"""
+        selected_items = self.resource_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", "Please select a resource to edit.")
+            return
+        
+        row = selected_items[0].row()
+        resource_name = self.resource_table.item(row, 0).text()
+        resource = self.data_manager.get_resource(resource_name)
+        
+        if resource:
+            dialog = ResourceDialog(self, resource)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                resource_data = dialog.get_resource_data()
+                
+                updated_resource = Resource(
+                    name=resource_data['name'],
+                    max_hours_per_day=resource_data['max_hours_per_day'],
+                    exceptions=resource_data['exceptions'],
+                    billing_rate=resource_data['billing_rate']
+                )
+                
+                self.data_manager.update_resource(resource_name, updated_resource)
+                self.parent_window._update_all_views()
+                self.parent_window.status_label.setText("Resource updated")
+
+    def _add_resource_dialog(self):
+        """Show add resource dialog"""
+        dialog = ResourceDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            resource_data = dialog.get_resource_data()
+            
+            resource = Resource(
+                name=resource_data['name'],
+                max_hours_per_day=resource_data['max_hours_per_day'],
+                exceptions=resource_data['exceptions']
+            )
+            
+            if self.data_manager.add_resource(resource):
+                self.parent_window._update_all_views()
+                self.parent_window.status_label.setText(f"Resource '{resource.name}' added successfully")
+            else:
+                QMessageBox.warning(self, "Duplicate Resource", 
+                                  "A resource with this name already exists.")
+
+    def _delete_resource(self):
+        """Delete selected resource"""
+        selected_items = self.resource_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", "Please select a resource to delete.")
+            return
+        
+        row = selected_items[0].row()
+        resource_name = self.resource_table.item(row, 0).text()
+        
+        reply = QMessageBox.question(self, "Confirm Delete", 
+                                    f"Delete resource '{resource_name}'?",
+                                    QMessageBox.StandardButton.Yes | 
+                                    QMessageBox.StandardButton.No)
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.data_manager.delete_resource(resource_name)
+            self.parent_window._update_all_views()
+            self.parent_window.status_label.setText("Resource deleted")
+
+    def _edit_resource_dialog(self):
+        """Show edit resource dialog"""
+        selected_items = self.resource_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", "Please select a resource to edit.")
+            return
+        
+        row = selected_items[0].row()
+        resource_name = self.resource_table.item(row, 0).text()
+        resource = self.data_manager.get_resource(resource_name)
+        
+        if resource:
+            dialog = ResourceDialog(self, resource)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                resource_data = dialog.get_resource_data()
+                
+                updated_resource = Resource(
+                    name=resource_data['name'],
+                    max_hours_per_day=resource_data['max_hours_per_day'],
+                    exceptions=resource_data['exceptions'],
+                    billing_rate=resource_data['billing_rate']
+                )
+                
+                self.data_manager.update_resource(resource_name, updated_resource)
+                self.parent_window._update_all_views()
+                self.parent_window.status_label.setText("Resource updated")
+
+    def _update_resource_delegates(self):
+        """Update the resource delegate with the latest list of resource names"""
+        resource_names = [r.name for r in self.data_manager.get_all_resources()]
+        if hasattr(self.parent_window, 'resource_delegate'):
+            self.parent_window.resource_delegate.update_resource_list(resource_names)
+
+    def update_summary(self):
+        """Update resource summary"""
+        self.resource_table.setRowCount(0)
+        
+        allocation = self.data_manager.get_resource_allocation()
+        
+        for resource in self.data_manager.get_all_resources():
+            row = self.resource_table.rowCount()
+            self.resource_table.insertRow(row)
+            
+            alloc = allocation.get(resource.name, {})
+            total_hours = alloc.get('total_hours', 0)
+            tasks_assigned = alloc.get('tasks_assigned', 0)
+            
+            # Determine status
+            status = "✓ OK"
+            warnings = self.data_manager.check_resource_overallocation()
+            if resource.name in warnings:
+                status = "⚠️ Over-allocated"
+            
+            self.resource_table.setItem(row, 0, QTableWidgetItem(resource.name))
+            self.resource_table.setItem(row, 1, QTableWidgetItem(str(resource.max_hours_per_day)))
+            self.resource_table.setItem(row, 2, QTableWidgetItem(f"{total_hours:.1f}"))
+            self.resource_table.setItem(row, 3, QTableWidgetItem(str(tasks_assigned)))
+            self.resource_table.setItem(row, 4, QTableWidgetItem(f"{resource.billing_rate:.2f}"))
+            self.resource_table.setItem(row, 5, QTableWidgetItem(f"{alloc.get('total_amount', 0.0):.2f}"))
+            self.resource_table.setItem(row, 6, QTableWidgetItem(status))
+        
+        # Update warnings
+        warnings = self.data_manager.check_resource_overallocation()
+        if warnings:
+            warning_text = "<h4 style='color: orange;'>Over-Allocation Detected:</h4>"
+            for resource_name, warning_list in warnings.items():
+                warning_text += f"<b>{resource_name}:</b><ul>"
+                for warning in warning_list[:5]:
+                    warning_text += f"<li>{warning}</li>"
+                if len(warning_list) > 5:
+                    warning_text += f"<li><i>...and {len(warning_list) - 5} more</i></li>"
+                warning_text += "</ul>"
+            self.resource_warnings.setHtml(warning_text)
+        else:
+            self.resource_warnings.setHtml("<p style='color: green;'>✓ No over-allocation issues detected.</p>")

@@ -20,7 +20,7 @@ def main():
     
     app = QApplication(sys.argv)
     app.setApplicationName("PlanIFlow - Project Planner")
-    app.setOrganizationName("PlanIFlow - ProjectPlanner")
+    app.setOrganizationName("PlanIFlow - Project Planner")
     
     # *** SET APPLICATION ICON ***
     icon_path = get_resource_path('images/logo.ico')

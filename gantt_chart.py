@@ -25,6 +25,8 @@ class GanttChart(FigureCanvas):
         self.dark_mode = dark_mode
         self.tasks: List[Task] = []
         self.data_manager: Optional[DataManager] = None
+        self.show_summary_tasks = True # New attribute
+        self.current_scale = "Days" # Default scale
         
         # Color scheme for status indicators
         self.status_colors = {
@@ -37,15 +39,24 @@ class GanttChart(FigureCanvas):
         # Configure interactive features
         self.fig.canvas.mpl_connect('scroll_event', self._on_scroll)
         self.fig.canvas.mpl_connect('motion_notify_event', self._on_hover)
+        self.fig.canvas.mpl_connect('button_press_event', self._on_press)
+        self.fig.canvas.mpl_connect('button_release_event', self._on_release)
+        self.fig.canvas.mpl_connect('motion_notify_event', self._on_motion)
         
         # Tooltip
         self.annotation = None
+        
+        # Panning variables
+        self.panning = False
+        self.press_x = None
+        self.press_y = None
         
         self._setup_chart()
     
     def _setup_chart(self):
         """Setup chart appearance"""
         self.ax.clear()
+        self.annotation = None # Reset annotation after clearing axes
         
         if self.dark_mode:
             self.fig.patch.set_facecolor('#2b2b2b')
@@ -117,11 +128,11 @@ class GanttChart(FigureCanvas):
             
             # *** ADD MILESTONE INDICATOR ***
             if task.is_milestone:
-                label = f"{indent}◆ {task.id}: {task.name}"
+                label = f"{indent}◆ {task.name}"
             elif task.is_summary:
-                label = f"{indent}▶ {task.id}: {task.name}"
+                label = f"{indent}▶ {task.name}"
             else:
-                label = f"{indent}{task.id}: {task.name}"
+                label = f"{indent}{task.name}"
             
             task_labels.append(label)
         
@@ -151,7 +162,7 @@ class GanttChart(FigureCanvas):
                 self._draw_regular_task(y, start_num, duration, status_color, task)
             
             # Draw progress overlay
-            if task.percent_complete > 0 and not task.is_summary:
+            if task.percent_complete > 0 and not task.is_summary and not task.is_milestone:
                 completed_duration = duration * (task.percent_complete / 100)
                 self.ax.barh(y, completed_duration, left=start_num,
                            height=0.3, color=status_color, alpha=1.0,
@@ -171,7 +182,8 @@ class GanttChart(FigureCanvas):
                         bbox=dict(boxstyle='round,pad=0.3', 
                                 facecolor=bg_color, 
                                 edgecolor='none', 
-                                alpha=0.7))
+                                alpha=0.7),
+                        clip_on=True, zorder=10)
         
         # Draw dependency arrows AFTER all bars are drawn
         self._draw_dependencies(display_tasks, y_pos)
@@ -179,13 +191,50 @@ class GanttChart(FigureCanvas):
         # Format axes
         self.ax.set_yticks(y_pos)
         self.ax.set_yticklabels(task_labels, fontsize=9)
+        
+        # Set y-axis limits with some padding
+        if y_pos:
+            self.ax.set_ylim(min(y_pos) - 1, max(y_pos) + 1) # Add padding above and below
         self.ax.set_xlabel('Timeline', fontsize=11, weight='bold')
         self.ax.set_ylabel('Tasks', fontsize=11, weight='bold')
         self.ax.set_title('Project Gantt Chart', fontsize=13, weight='bold', pad=20)
         
-        # Format x-axis dates
-        self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+        # Format x-axis dates based on current_scale
+        # Determine overall project span
+        if self.tasks:
+            min_date = min(task.start_date for task in self.tasks)
+            max_date = max(task.end_date for task in self.tasks)
+            total_days = (max_date - min_date).days
+        else:
+            min_date = datetime.now()
+            max_date = datetime.now() + timedelta(days=30)
+            total_days = 30
+
+        # Dynamic locator and formatter selection
+        if self.current_scale == "Hours" and total_days < 7:
+            self.ax.xaxis.set_major_locator(mdates.HourLocator(interval=6))
+            self.ax.xaxis.set_minor_locator(mdates.HourLocator(interval=1))
+            self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+        elif self.current_scale == "Days" and total_days < 90:
+            self.ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+            self.ax.xaxis.set_minor_locator(mdates.HourLocator(interval=6))
+            self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        elif self.current_scale == "Week" and total_days < 365:
+            self.ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MONDAY))
+            self.ax.xaxis.set_minor_locator(mdates.DayLocator())
+            self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        elif self.current_scale == "Month" and total_days < 365 * 5:
+            self.ax.xaxis.set_major_locator(mdates.MonthLocator())
+            self.ax.xaxis.set_minor_locator(mdates.DayLocator(interval=7))
+            self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        elif self.current_scale == "Year" or total_days >= 365 * 5: # Default to year for very long projects
+            self.ax.xaxis.set_major_locator(mdates.YearLocator())
+            self.ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=3))
+            self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        else: # Fallback to AutoDateLocator for other cases or very large spans
+            self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+            self.ax.xaxis.set_major_formatter(mdates.AutoDateFormatter(self.ax.xaxis.get_major_locator()))
+
         
         # Rotate date labels
         plt.setp(self.ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
@@ -203,33 +252,18 @@ class GanttChart(FigureCanvas):
         self.draw()
     
     def _draw_milestone(self, y: float, task: Task):
-        """Draw a milestone as a diamond marker"""
-        from matplotlib.patches import RegularPolygon
-        
+        """Draw a milestone as a star icon"""
         # Get milestone date
-        milestone_date = mdates.date2num(task.start_date)
+        milestone_date = mdates.date2num(task.end_date)
         
         # Choose color based on status
-        status_color = self.status_colors.get(task.get_status_color(), '#FFD700')
+        status_color = self.status_colors.get(task.get_status_color(), '#FFD700') # Default to gold
         
-        # Draw diamond
-        diamond = RegularPolygon(
-            (milestone_date, y),
-            numVertices=4,
-            radius=0.3,
-            orientation=np.pi/4,  # Rotate 45 degrees to make diamond
-            facecolor=status_color,
-            edgecolor='black' if not self.dark_mode else 'white',
-            linewidth=2,
-            alpha=0.9
-        )
-        self.ax.add_patch(diamond)
+        # Draw star marker
+        self.ax.plot(milestone_date, y, marker='*', markersize=15, \
+                     color=status_color, markeredgewidth=0, zorder=3)
         
-        # Add completion percentage next to diamond
-        text_color = 'white' if self.dark_mode else 'black'
-        self.ax.text(milestone_date + 0.5, y, f'{task.percent_complete}%',
-                    ha='left', va='center', fontsize=8,
-                    color=text_color, weight='bold')
+
     
     def _get_display_order(self, tasks: List[Task]) -> List[Task]:
         """Get tasks in hierarchical display order (depth-first)"""
@@ -239,7 +273,9 @@ class GanttChart(FigureCanvas):
         display_order = []
         
         def add_task_and_children(task: Task):
-            display_order.append(task)
+            # Only add summary tasks if show_summary_tasks is True
+            if not task.is_summary or self.show_summary_tasks:
+                display_order.append(task)
             children = self.data_manager.get_child_tasks(task.id)
             for child in sorted(children, key=lambda t: t.start_date):
                 add_task_and_children(child)
@@ -264,41 +300,11 @@ class GanttChart(FigureCanvas):
     
     def _draw_summary_task(self, y: float, start_num: float, duration: int, 
                           color: str, task: Task):
-        """Draw a summary task bar (thicker with triangular markers)"""
-        # Draw main bar (thicker)
-        edge_color = 'black' if not self.dark_mode else 'white'
-        
-        # Summary bar is darker
-        import matplotlib.colors as mcolors
-        rgb = mcolors.to_rgb(color)
-        darker_color = tuple(c * 0.7 for c in rgb)
-        
-        self.ax.barh(y, duration, left=start_num, 
-                    height=0.6, color=darker_color, alpha=0.9,
-                    edgecolor=edge_color,
-                    linewidth=2.0)
-        
-        # Add triangular markers at start and end
-        from matplotlib.patches import Polygon
-        
-        # Convert to axis coordinates
-        end_num = start_num + duration
-        
-        # Start triangle (pointing right)
-        start_triangle = Polygon([
-            (start_num, y - 0.5),
-            (start_num, y + 0.5),
-            (start_num + duration * 0.02, y)
-        ], closed=True, facecolor=edge_color, edgecolor=edge_color, linewidth=1)
-        self.ax.add_patch(start_triangle)
-        
-        # End triangle (pointing left)
-        end_triangle = Polygon([
-            (end_num, y - 0.5),
-            (end_num, y + 0.5),
-            (end_num - duration * 0.02, y)
-        ], closed=True, facecolor=edge_color, edgecolor=edge_color, linewidth=1)
-        self.ax.add_patch(end_triangle)
+        """Draw a summary task as a single line"""
+        # Draw a single horizontal line
+        self.ax.plot([start_num, start_num + duration], [y, y], 
+                     color=color, linewidth=4, solid_capstyle='butt', zorder=2)
+
     
     def _draw_dependencies(self, display_tasks: List[Task], y_pos: List[int]):
         """Draw dependency arrows with type indicators"""
@@ -313,7 +319,7 @@ class GanttChart(FigureCanvas):
             task_start = mdates.date2num(task.start_date)
             task_end = mdates.date2num(task.end_date)
             
-            for pred_id, dep_type_str in task.predecessors:
+            for pred_id, dep_type_str, lag_days in task.predecessors:
                 # Find predecessor in display list
                 pred_task = next((t for t in display_tasks if t.id == pred_id), None)
                 if not pred_task:
@@ -411,7 +417,8 @@ class GanttChart(FigureCanvas):
                             facecolor='white' if not self.dark_mode else '#2b2b2b',
                             edgecolor=arrow_color,
                             alpha=0.8),
-                    ha='center', va='center')
+                    ha='center', va='center',
+                    clip_on=True, zorder=10)
     
     def _add_legend(self):
         """Add status color legend"""
@@ -488,6 +495,11 @@ class GanttChart(FigureCanvas):
         
         self.ax.set_xlim(new_xlim)
         
+        # Dynamically adjust date formatters and locators after zoom
+        self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+        self.ax.xaxis.set_major_formatter(mdates.AutoDateFormatter(self.ax.xaxis.get_major_locator()))
+        self.fig.autofmt_xdate() # Auto-format date labels to prevent overlap
+        
         # Also zoom Y axis slightly
         ydata = event.ydata
         if ydata is not None:
@@ -526,12 +538,29 @@ class GanttChart(FigureCanvas):
             y = y_positions[i]
             distance = abs(event.ydata - y)
             
-            if distance < 0.5 and distance < min_distance:
+            # Determine vertical hover range based on task type
+            if task.is_milestone:
+                # For milestones, a small vertical range around the point
+                vertical_hit_range = 0.5
+            elif task.is_summary:
+                # For summary tasks, height is 0.6, so range is +/- 0.3 from center
+                vertical_hit_range = 0.3
+            else:
+                # For regular tasks, height is 0.4, so range is +/- 0.2 from center
+                vertical_hit_range = 0.2
+            
+            if abs(event.ydata - y) <= vertical_hit_range and distance < min_distance:
                 # Check if x is within task range
                 start_num = mdates.date2num(task.start_date)
                 end_num = mdates.date2num(task.end_date)
                 
-                if start_num <= event.xdata <= end_num:
+                # For milestones, expand the hover area slightly
+                if task.is_milestone:
+                    hover_end_num = end_num + 0.5 # Give it a small width for hovering
+                else:
+                    hover_end_num = end_num
+
+                if start_num <= event.xdata <= hover_end_num:
                     min_distance = distance
                     closest_task = (task, y)
         
@@ -557,21 +586,28 @@ class GanttChart(FigureCanvas):
             tooltip_text += f"Start: {task.start_date.strftime('%Y-%m-%d')}\n"
             tooltip_text += f"End: {task.end_date.strftime('%Y-%m-%d')}\n"
             tooltip_text += f"Duration: {task.duration} days\n"
-            tooltip_text += f"Complete: {task.percent_complete}%\n"
+            if not task.is_milestone:
+                tooltip_text += f"Complete: {task.percent_complete}%\n"
             tooltip_text += f"Status: {task.get_status_text()}"
             
             if task.is_summary:
                 tooltip_text += "\n[Summary Task]"
             
             if task.assigned_resources:
-                tooltip_text += f"\nResources: {', '.join(task.assigned_resources)}"
+                resource_texts = [f"{name} ({alloc}%)" for name, alloc in task.assigned_resources]
+                tooltip_text += f"\nResources: {', '.join(resource_texts)}"
             
             if task.predecessors:
-                pred_info = ', '.join([
-                    f"{pid} ({DependencyType[dt].name})" 
-                    for pid, dt in task.predecessors
-                ])
-                tooltip_text += f"\nPredecessors: {pred_info}"
+                pred_list = []
+                for pred_id, dep_type, lag_days in task.predecessors:
+                    lag_str = ""
+                    if lag_days > 0:
+                        lag_str = f"+{lag_days}d"
+                    elif lag_days < 0:
+                        lag_str = f"{lag_days}d"
+                    
+                    pred_list.append(f"{pred_id}{DependencyType[dep_type].name}{lag_str}")
+                tooltip_text += f"\nPredecessors: {', '.join(pred_list)}"
             
             self.annotation.set_text(tooltip_text)
             self.annotation.xy = (event.xdata, y)
@@ -582,6 +618,42 @@ class GanttChart(FigureCanvas):
                 self.annotation.set_visible(False)
                 self.draw_idle()
     
+    def _on_press(self, event):
+        """Handle mouse button press for panning"""
+        if event.inaxes != self.ax: # Only pan if click is within the axes
+            return
+        if event.button == 1:  # Left mouse button
+            self.panning = True
+            self.press_x = event.xdata
+            self.press_y = event.ydata
+
+    def _on_release(self, event):
+        """Handle mouse button release"""
+        self.panning = False
+        self.press_x = None
+        self.press_y = None
+
+    def _on_motion(self, event):
+        """Handle mouse motion for panning"""
+        if self.panning and event.inaxes == self.ax:
+            if event.xdata is None or event.ydata is None:
+                return
+            
+            dx = event.xdata - self.press_x
+            dy = event.ydata - self.press_y
+            
+            # Update x-axis limits
+            cur_xlim = self.ax.get_xlim()
+            new_xlim = [cur_xlim[0] - dx, cur_xlim[1] - dx]
+            self.ax.set_xlim(new_xlim)
+            
+            # Update y-axis limits
+            cur_ylim = self.ax.get_ylim()
+            new_ylim = [cur_ylim[0] - dy, cur_ylim[1] - dy]
+            self.ax.set_ylim(new_ylim)
+            
+            self.draw_idle() # Redraw the canvas efficiently
+
     def set_dark_mode(self, enabled: bool):
         """Toggle dark mode"""
         self.dark_mode = enabled
@@ -589,3 +661,19 @@ class GanttChart(FigureCanvas):
             self.update_chart(self.tasks, self.data_manager)
         else:
             self.update_chart(self.tasks)
+
+    def set_show_summary_tasks(self, show: bool):
+        """Set whether to show summary tasks and refresh the chart."""
+        if self.show_summary_tasks != show:
+            self.show_summary_tasks = show
+            if self.data_manager and self.tasks:
+                self.update_chart(self.tasks, self.data_manager)
+
+    def set_axis_scale(self, scale: str):
+        """Set the X-axis scale for the Gantt chart and refresh."""
+        if self.current_scale != scale:
+            self.current_scale = scale
+            if self.data_manager and self.tasks:
+                self.update_chart(self.tasks, self.data_manager)
+            elif self.tasks:
+                self.update_chart(self.tasks)

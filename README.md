@@ -30,6 +30,8 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 
 ## ✨ Features
 
+- **Modular UI Architecture**: A well-organized and extensible user interface, making it easier to navigate and manage project elements.
+- **Project Settings Management**: Dedicated interface for configuring project-specific settings and preferences.
 - **Task Management**: Create, edit, delete tasks with dependencies
 - **Inline Editing**: Directly edit task properties within the table for quick modifications.
 - **Context Menus**: Right-click on tasks for quick access to actions like edit, delete, indent, and outdent.
@@ -148,42 +150,57 @@ This project includes a set of batch scripts to automate common tasks on Windows
 
 | Script              | Purpose                                                                        |
 | ------------------- | ------------------------------------------------------------------------------ |
+| `quick-start.bat`   | A menu-driven script to quickly run any of the other scripts.                  |
 | `install.bat`       | One-click installer for first-time users.                                      |
 | `run.bat`           | Runs the application, creating a virtual environment and installing dependencies if needed. |
 | `build.bat`         | Builds a standalone `.exe` file of the application.                            |
 | `setup.bat`         | Sets up the virtual environment and installs dependencies.                     |
 | `clean.bat`         | Cleans up the project directory by removing build artifacts and cache files.   |
-| `quick-start.bat`   | A menu-driven script to quickly run any of the other scripts.                  |
 
 ## 🛠️ Building from Source
 
 To build a standalone executable from the source code, you can use the `build.bat` or `build-advance.bat` scripts.
 
 -   **`build.bat`**: Creates a single `.exe` file in the `dist` folder. This is the easiest way to create a distributable version of the application.
--   **`build-advance.bat`**: Provides more control over the build process, allowing you to create a one-folder build or a debug build.
 
 ## 📂 Project Structure
 
 ```
-ProjectPlanner\
-├───run.bat ⭐ Quick run
-├───build.bat ⭐ Build to EXE
-├───install.bat ⭐ One-click installer
-├───setup.bat 📦 Environment setup only
-├───clean.bat 🗑️ Clean build artifacts
+PlanIFlow_v1.1\
+├───build.bat
+├───clean.bat
+├───install.bat 
+├───quick-start.bat
+├───run.bat
+├───setup.bat 
+├───PlanIFlow_ProjectPlanner_v1.1.spec
+├───README.md
+├───requirements.txt
+├───__init__.py
 ├───calendar_manager.py
 ├───data_manager.py
 ├───exporter.py
 ├───gantt_chart.py
 ├───main.py
+├───settings_manager_new.py
 ├───settings_manager.py
 ├───themes.py
+├───ui_dashboard.py
+├───ui_delegates.py
+├───ui_helpers.py
 ├───ui_main.py
-├───readme.md
-├───requirements.txt
-└───images\
-   └───logo.ico
+├───ui_menu_toolbar.py
+├───ui_project_settings.py
+├───ui_resources.py
+├───ui_tasks.py
+├───images\
+│  └───logo.ico
+└───sample\
+   ├───Project_Replica_bkp.json
+   └───Project_Replica.xlsx
 ```
+
+**Note:** The `build` and `dist` directories are generated during the build process and contain the compiled application and its dependencies. 
 
 ## 🐛 Troubleshooting
 

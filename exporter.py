@@ -3,22 +3,35 @@ Exporter - Handles Excel and JSON import/export
 Enhanced with hierarchy, dependency types, project name, and backward compatibility
 """
 
+import re
 import pandas as pd
 import json
 from typing import Dict, Any, Tuple
 from datetime import datetime
 from data_manager import DataManager, Task, Resource, DependencyType, DurationUnit
 from calendar_manager import CalendarManager
+from settings_manager import DateFormat
 
 class Exporter:
     """Handles data import/export operations with enhanced features"""
     
+    @staticmethod
+    def _get_date_format_string(date_format: DateFormat) -> str:
+        if date_format == DateFormat.DD_MM_YYYY:
+            return '%d-%m-%Y %H:%M:%S'
+        elif date_format == DateFormat.DD_MMM_YYYY:
+            return '%d-%b-%Y %H:%M:%S'
+        else: # DateFormat.YYYY_MM_DD
+            return '%Y-%m-%dT%H:%M:%S'
+
     @staticmethod
     def export_to_excel(data_manager: DataManager, filepath: str) -> bool:
         """Export project to Excel file with hierarchy and dependency types"""
         try:
             # Get duration unit label
             duration_label = data_manager.settings.get_duration_label()
+            date_format_enum = data_manager.settings.default_date_format
+            date_format_str = Exporter._get_date_format_string(date_format_enum)
             
             # Prepare tasks dataframe with hierarchy
             tasks_data = []
@@ -29,20 +42,16 @@ class Exporter:
                 status = task.get_status_text()
                 status_color = task.get_status_color()
                 
-                # Format predecessors with dependency types
                 pred_text = ', '.join([
-                    f"{pred_id} ({DependencyType[dep_type].value})" 
-                    for pred_id, dep_type in task.predecessors
+                    f"{pred_id} ({DependencyType[dep_type].value}{f'{lag_days:+d}d' if lag_days != 0 else ''})" 
+                    for pred_id, dep_type, lag_days in task.predecessors
                 ])
+
+                # Format assigned resources with allocation
+                resources_text = ', '.join([f"{name} ({alloc}%)" for name, alloc in task.assigned_resources])
                 
-                # Indent task name based on level
-                indent = "  " * level
-                display_name = f"{indent}{task.name}"
-                # *** ADD MILESTONE INDICATOR ***
-                if task.is_milestone:
-                    display_name = f"{indent}◆ {task.name}"
-                elif task.is_summary:
-                    display_name = f"{indent}▶ {task.name}"
+                # Task name without indentation
+                display_name = task.name
                 
                 duration = task.get_duration(
                     data_manager.settings.duration_unit,
@@ -51,20 +60,21 @@ class Exporter:
                 
                 tasks_data.append({
                     'Task ID': task.id,
+                    'WBS': task.wbs,
                     'Task Name': display_name,
                     'Type': 'Milestone' if task.is_milestone else ('Summary' if task.is_summary else 'Task'),  # *** ADD TYPE COLUMN ***
                     'Level': level,
                     'Parent ID': task.parent_id if task.parent_id else '',
                     'Is Summary': 'Yes' if task.is_summary else 'No',
                     'Is Milestone': 'Yes' if task.is_milestone else 'No',  # *** ADD THIS ***
-                    'Start Date': task.start_date.strftime('%Y-%m-%d'),
-                    'End Date': task.end_date.strftime('%Y-%m-%d') if not task.is_milestone else 'Milestone',
+                    'Start Date': task.start_date.strftime(date_format_str),
+                    'End Date': task.end_date.strftime(date_format_str) if not task.is_milestone else task.start_date.strftime(date_format_str),
                     duration_label: 0 if task.is_milestone else (f"{duration:.1f}" if data_manager.settings.duration_unit == DurationUnit.HOURS else int(duration)),
                     '% Complete': task.percent_complete,
                     'Status': status,
                     'Status Color': status_color,
                     'Predecessors': pred_text,
-                    'Assigned Resources': ','.join(task.assigned_resources),
+                    'Assigned Resources': ', '.join([f"{name} ({alloc}%)" for name, alloc in task.assigned_resources]),
                     'Notes': task.notes
                 })
                 
@@ -104,13 +114,14 @@ class Exporter:
                     'Overall % Complete',
                     'Total Project Duration (days)',
                     'Export Date',
-                    'File Version'
+                    'File Version',
+                    'Date Format'
                 ],
                 'Value': [
                     data_manager.project_name,
-                    data_manager.get_project_start_date().strftime('%Y-%m-%d') 
+                    data_manager.get_project_start_date().strftime(date_format_str) 
                         if data_manager.get_project_start_date() else 'N/A',
-                    data_manager.get_project_end_date().strftime('%Y-%m-%d')
+                    data_manager.get_project_end_date().strftime(date_format_str)
                         if data_manager.get_project_end_date() else 'N/A',
                     len(data_manager.tasks),
                     sum(1 for t in data_manager.tasks if t.is_summary),
@@ -120,7 +131,8 @@ class Exporter:
                     (data_manager.get_project_end_date() - data_manager.get_project_start_date()).days + 1
                         if data_manager.get_project_start_date() and data_manager.get_project_end_date() else 'N/A',
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    '2.0'
+                    '2.2',
+                    date_format_enum.value
                 ]
             }
             
@@ -139,7 +151,7 @@ class Exporter:
             # Prepare dependency types breakdown
             dep_type_counts = {}
             for task in data_manager.tasks:
-                for _, dep_type in task.predecessors:
+                for pred_id, dep_type, lag_days in task.predecessors:
                     try:
                         dep_name = DependencyType[dep_type].value
                         dep_type_counts[dep_name] = dep_type_counts.get(dep_name, 0) + 1
@@ -225,17 +237,33 @@ class Exporter:
     def import_from_excel(filepath: str) -> Tuple[DataManager, bool]:
         """Import project from Excel file with backward compatibility"""
         data_manager = DataManager()
+        date_format_enum = DateFormat.YYYY_MM_DD # Default
         
         try:
-            # Try to read summary for project name
+            # Try to read summary for project name, project start date and date format
             try:
                 df_summary = pd.read_excel(filepath, sheet_name='Summary')
                 for _, row in df_summary.iterrows():
                     if row['Metric'] == 'Project Name':
                         data_manager.project_name = str(row['Value'])
-                        break
+                    elif row['Metric'] == 'Project Start Date':
+                        start_date_str = str(row['Value'])
+                        if start_date_str != 'N/A':
+                            # Attempt to parse with default YYYY-MM-DD first
+                            try:
+                                data_manager.settings.project_start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+                            except ValueError:
+                                # Fallback to isoformat if previous fails
+                                data_manager.settings.project_start_date = pd.to_datetime(start_date_str, dayfirst=False).to_pydatetime()
+                    elif row['Metric'] == 'Date Format':
+                        try:
+                            date_format_enum = DateFormat(str(row['Value']))
+                        except ValueError:
+                            date_format_enum = DateFormat.YYYY_MM_DD # Fallback
             except:
                 pass
+            
+            date_format_str = Exporter._get_date_format_string(date_format_enum)
             
             # Read tasks
             df_tasks = pd.read_excel(filepath, sheet_name='Tasks')
@@ -243,6 +271,7 @@ class Exporter:
             # Check if this is new format (with Level and Parent ID columns)
             has_hierarchy = 'Level' in df_tasks.columns and 'Parent ID' in df_tasks.columns
             has_is_summary = 'Is Summary' in df_tasks.columns
+            has_is_milestone = 'Is Milestone' in df_tasks.columns # Check for is_milestone column
             
             for _, row in df_tasks.iterrows():
                 # Parse predecessors with dependency types
@@ -259,8 +288,16 @@ class Exporter:
                                 # Extract ID and type
                                 parts = pred_item.split('(')
                                 pred_id = int(parts[0].strip())
-                                dep_type_text = parts[1].replace(')', '').strip()
-                                
+                                dep_type_text_raw = parts[1].replace(')', '').strip()
+                                dep_type_text = dep_type_text_raw
+                                lag_days = 0
+
+                                # Check for lag days
+                                lag_match = re.search(r'([+-]?\d+)d?$', dep_type_text_raw)
+                                if lag_match:
+                                    lag_days = int(lag_match.group(1))
+                                    dep_type_text = dep_type_text_raw[:lag_match.start()].strip() # Remove lag from dep_type_text
+
                                 # Convert text to enum name
                                 dep_type = None
                                 for dt in DependencyType:
@@ -271,12 +308,12 @@ class Exporter:
                                 if dep_type is None:
                                     dep_type = DependencyType.FS.name
                                 
-                                predecessors.append((pred_id, dep_type))
+                                predecessors.append((pred_id, dep_type, lag_days))
                             else:
                                 # Fallback: just ID, assume FS
                                 try:
                                     pred_id = int(pred_item.strip())
-                                    predecessors.append((pred_id, DependencyType.FS.name))
+                                    predecessors.append((pred_id, DependencyType.FS.name, 0))
                                 except:
                                     pass
                     else:
@@ -284,14 +321,22 @@ class Exporter:
                         for pred_id_str in pred_str.split(','):
                             try:
                                 pred_id = int(pred_id_str.strip())
-                                predecessors.append((pred_id, DependencyType.FS.name))
+                                predecessors.append((pred_id, DependencyType.FS.name, 0))
                             except:
                                 pass
                 
-                # Parse resources
+                # Parse resources with allocation
                 assigned_resources = []
                 if pd.notna(row.get('Assigned Resources', '')) and str(row['Assigned Resources']).strip():
-                    assigned_resources = [x.strip() for x in str(row['Assigned Resources']).split(',')]
+                    resources_str = str(row['Assigned Resources'])
+                    for r_item in resources_str.split(','):
+                        r_item = r_item.strip()
+                        match = re.match(r'(.+?)\s*\((\d+)\s*%\)', r_item)
+                        if match:
+                            assigned_resources.append((match.group(1).strip(), int(match.group(2))))
+                        else:
+                            # Backward compatibility: assume 100% if not specified
+                            assigned_resources.append((r_item, 100))
                 
                 # Get parent ID
                 parent_id = None
@@ -306,30 +351,62 @@ class Exporter:
                 if has_is_summary and pd.notna(row.get('Is Summary', '')):
                     is_summary = str(row['Is Summary']).lower() in ['yes', 'true', '1']
                 
-                # Clean task name (remove indentation and summary marker)
+                # Clean task name (remove summary marker, but preserve indentation if present)
                 task_name = str(row['Task Name']).strip()
-                task_name = task_name.lstrip(' ▶')
+                # Only remove the summary marker if it's at the very beginning
+                if task_name.startswith('▶'):
+                    task_name = task_name.lstrip('▶').strip()
                 
-                                # Get is_milestone flag
+                # Get is_milestone flag
                 is_milestone = False
                 if has_is_milestone and pd.notna(row.get('Is Milestone', '')):
                     is_milestone = str(row['Is Milestone']).lower() in ['yes', 'true', '1']
                 
+                start_date_val = row['Start Date']
+                end_date_val = row['End Date']
+
+                # Handle potential 'Milestone' string in End Date column for old exports
+                if isinstance(end_date_val, str) and end_date_val.lower() == 'milestone':
+                    end_date_val = start_date_val
+
                 task = Task(
                     name=task_name,
-                    start_date=pd.to_datetime(row['Start Date']).to_pydatetime(),
-                    end_date=pd.to_datetime(row['End Date']).to_pydatetime() if not is_milestone else pd.to_datetime(row['Start Date']).to_pydatetime(),
+                    start_date=datetime.strptime(str(start_date_val), date_format_str),
+                    end_date=datetime.strptime(str(end_date_val), date_format_str),
                     percent_complete=int(row.get('% Complete', 0)),
                     predecessors=predecessors,
                     assigned_resources=assigned_resources,
-                    notes=str(row.get('Notes', '')),
+                    notes=str(row.get('Notes', '')) if pd.notna(row.get('Notes', '')) else '',
                     task_id=int(row['Task ID']),
                     parent_id=parent_id,
                     is_summary=is_summary,
-                    is_milestone=is_milestone  # *** ADD THIS ***
+                    is_milestone=is_milestone,
+                    wbs=row.get('WBS')
                 )
                 data_manager.tasks.append(task)
             
+            # After all tasks are loaded, generate WBS and then determine summary/milestone status
+            data_manager._generate_wbs()
+
+            # Auto-identify milestones and summary tasks
+            for task in data_manager.tasks:
+                # Identify milestones: duration of 0
+                if task.get_duration(data_manager.settings.duration_unit, data_manager.calendar_manager) == 0:
+                    task.is_milestone = True
+                    task.end_date = task.start_date # Ensure end_date equals start_date for milestones
+
+                # Identify summary tasks: if it has children
+                if data_manager.get_child_tasks(task.id):
+                    task.is_summary = True
+
+            # If project_start_date was not loaded from summary, infer from earliest task
+            if data_manager.settings.project_start_date is None and data_manager.tasks:
+                earliest_start = min(task.start_date for task in data_manager.tasks)
+                data_manager.settings.project_start_date = earliest_start
+
+            # Set the default_date_format in data_manager.settings
+            data_manager.settings.default_date_format = date_format_enum
+
             # Read resources if sheet exists
             try:
                 df_resources = pd.read_excel(filepath, sheet_name='Resources')
@@ -345,8 +422,10 @@ class Exporter:
                         exceptions=exceptions
                     )
                     data_manager.resources.append(resource)
-            except:
-                pass
+            except Exception as e:
+                print(f"Error importing resources from Excel: {e}")
+                import traceback
+                traceback.print_exc()
             
             return data_manager, True
             
@@ -362,10 +441,11 @@ class Exporter:
         """Save project to JSON file with all enhanced features"""
         try:
             data = {
-                'version': '2.1',
+                'version': '2.2',
                 'project_name': data_manager.project_name,
                 'project_data': data_manager.to_dict(),
                 'calendar_settings': calendar_manager.to_dict(),
+                'project_settings': data_manager.settings.to_dict(), # Include project settings
                 'saved_at': datetime.now().isoformat(),
                 'metadata': {
                     'total_tasks': len(data_manager.tasks),
@@ -412,12 +492,19 @@ class Exporter:
                 filename = os.path.basename(filepath)
                 data_manager.project_name = os.path.splitext(filename)[0].replace('_', ' ')
             
+            # Load project settings (new in v2.2)
+            if 'project_settings' in data:
+                data_manager.settings.from_dict(data['project_settings'])
+
             # Load project data
             data_manager.from_dict(data.get('project_data', {}))
             
-            # Load calendar settings
-            calendar_manager.from_dict(data.get('calendar_settings', {}))
-            
+            # Backward compatibility for project_start_date if not loaded from settings
+            if data_manager.settings.project_start_date is None and data_manager.tasks:
+                # If no project_start_date in settings, use the earliest task start date
+                earliest_start = min(task.start_date for task in data_manager.tasks)
+                data_manager.settings.project_start_date = earliest_start
+
             # Set calendar manager reference
             data_manager.calendar_manager = calendar_manager
             
@@ -438,8 +525,8 @@ class Exporter:
             for task in sorted(data_manager.get_all_tasks(), key=lambda t: t.id):
                 # Format predecessors
                 pred_text = ', '.join([
-                    f"{pred_id} ({DependencyType[dep_type].value})" 
-                    for pred_id, dep_type in task.predecessors
+                    f"{pred_id}{DependencyType[dep_type].value}{f'{lag_days:+d}d' if lag_days != 0 else ''}" 
+                    for pred_id, dep_type, lag_days in task.predecessors
                 ])
                 
                 tasks_data.append({

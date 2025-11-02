@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.0 - Quick Run
+echo   PlanIFlow - Project Planner v1.1 - Quick Run
 echo ===============================================
 echo.
 
@@ -79,7 +79,7 @@ if errorlevel 1 (
 
 REM Run the application
 echo ===============================================
-echo   Launching PlanIFlow - Project Planner v1.0...
+echo   Launching PlanIFlow - Project Planner v1.1...
 echo ===============================================
 
 python main.py

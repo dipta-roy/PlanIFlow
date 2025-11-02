@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('images', 'images'), ('data_manager.py', '.'), ('calendar_manager.py', '.'), ('gantt_chart.py', '.'), ('exporter.py', '.'), ('themes.py', '.'), ('ui_main.py', '.'), ('settings_manager.py', '.')]
+datas = [('images', 'images'), ('data_manager.py', '.'), ('calendar_manager.py', '.'), ('gantt_chart.py', '.'), ('exporter.py', '.'), ('themes.py', '.'), ('ui_main.py', '.'), ('settings_manager.py', '.'), ('ui_dashboard.py', '.'), ('ui_menu_toolbar.py', '.'), ('ui_tasks.py', '.'), ('ui_resources.py', '.'), ('ui_project_settings.py', '.'), ('ui_delegates.py', '.'), ('settings_manager_new.py', '.'), ('ui_helpers.py', '.')]
 binaries = []
 hiddenimports = ['PyQt6', 'PyQt6.QtCore', 'PyQt6.QtGui', 'PyQt6.QtWidgets', 'matplotlib', 'matplotlib.backends.backend_qtagg', 'matplotlib.patches', 'pandas', 'openpyxl', 'openpyxl.styles']
 tmp_ret = collect_all('PyQt6')
@@ -31,7 +31,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='PlanIFlow_ProjectPlanner_v1.0',
+    name='PlanIFlow_ProjectPlanner_v1.1',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
