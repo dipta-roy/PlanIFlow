@@ -653,6 +653,11 @@ class DataManager:
     def _auto_calculate_dates_from_predecessors(self, task: Task):
         """Auto-calculate task dates based on predecessors and dependency types"""
         if not task.predecessors:
+            # If no predecessors, reset to original start date if available
+            if hasattr(task, '_original_start') and task._original_start:
+                task.start_date = task._original_start
+                duration = task.get_duration(self.settings.duration_unit, self.calendar_manager)
+                task.set_duration_and_update_end(duration, self.settings.duration_unit, self.calendar_manager)
             return
         
         # Find the most constraining predecessor

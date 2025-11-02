@@ -770,6 +770,7 @@ class MainWindow(QMainWindow):
                     if task.percent_complete != new_percent_complete:
                         task.percent_complete = new_percent_complete
                         changed = True
+                    item.setText(7, f"{task.percent_complete}%")
                 except ValueError as ve:
                     QMessageBox.critical(self, "Input Error", f"Invalid input for % Complete: {ve}")
                     self._revert_task_item_in_ui(item, original_task)
@@ -986,7 +987,7 @@ class MainWindow(QMainWindow):
         if task:
             dialog = TaskDialog(self, self.data_manager, task)
             if dialog.exec() == QDialog.DialogCode.Accepted:
-                task_data = dialog.get_task_data()
+                task_data = dialog.task_data
                 
                 updated_task = Task(
                     name=task_data['name'],
@@ -1674,19 +1675,25 @@ class MainWindow(QMainWindow):
     
     def _show_about(self):
         """Show about dialog"""
-        QMessageBox.about(self, "About PlanIFlow - Project Planner",
-                         f"<h2>PlanIFlow - Project Planner v1.1</h2>"
-                         f"<p><b>Developed by: Dipta Roy</b></p>"
-                         "<p>A desktop project management application</p>"
-                         "<p><b>New Features:</b></p>"
-                         "<ul>"
-                         "<li>Hierarchical Summary Tasks</li>"
-                         "<li>Dependency Types (FS, SS, FF, SF)</li>"
-                         "<li>Auto Date Calculation</li>"
-                         "<li>Status Color Indicators</li>"
-                         "<li>Project Name Management</li>"
-                         "<li>Enhanced Gantt Charts</li>"
-                         "</ul>")
+        about_box = QMessageBox(self)
+        about_box.setWindowTitle("About PlanIFlow - Project Planner")
+        about_box.setText(
+            f"<h2>PlanIFlow - Project Planner v1.1</h2>"
+            f"<p><b>Developed by: Dipta Roy</b></p>"
+            "<p>A desktop project management application</p>"
+            "<p><b>Key Features:</b></p>"
+            "<ul>"
+            "<li>Manage Tasks</li>"
+            "<li>Manage Task Dependencies</li>"
+            "<li>Estimate and Plan Project Timeline</li>"
+            "<li>Track Project Status</li>"
+            "<li>Visualize Project Timeline</li>"
+            "<li>Resource Management</li>"
+            "<li>Budget Management</li>"
+            "</ul>"
+        )
+        about_box.setMinimumWidth(400) # Set a minimum width
+        about_box.exec()
     
     # Utility Methods
     
@@ -1756,8 +1763,6 @@ class MainWindow(QMainWindow):
             self._update_all_views()
             self.status_label.setText("Date format settings updated")
                     
-
-
     def _show_project_settings_dialog(self):
         """Show project settings dialog"""
         dialog = ProjectSettingsDialog(self, self.data_manager)
@@ -1977,8 +1982,6 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.information(self, "No Expandable Task", 
                                   "Selected task(s) have no subtasks to expand.")
-
-
             return
         
         collapsed_count = 0
@@ -2295,6 +2298,7 @@ class TaskDialog(QDialog):
         self.task = task
         self.parent_task = parent_task
         self.is_edit = task is not None
+        self.task_data = None
         
         # Determine if this is a milestone
         if task:
@@ -2446,6 +2450,19 @@ class TaskDialog(QDialog):
         
         layout.addLayout(form_layout)
         
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(self.accept)
+        button_layout.addWidget(ok_button)
+        
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+        
+        layout.addLayout(button_layout)
+
         # Info label
         self.info_label = QLabel()
         self.info_label.setWordWrap(True)
@@ -2459,19 +2476,6 @@ class TaskDialog(QDialog):
             self.end_date_edit.setEnabled(False)
             if hasattr(self, 'duration_spin'):
                 self.duration_spin.setEnabled(False)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        
-        ok_button = QPushButton("OK")
-        ok_button.clicked.connect(self.accept)
-        button_layout.addWidget(ok_button)
-        
-        cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_button)
-        
-        layout.addLayout(button_layout)
     
     def _add_resource_row(self, resource_name="", allocation=100):
         """Add a resource assignment row to the table"""
@@ -2634,7 +2638,7 @@ class TaskDialog(QDialog):
     
     def _remove_predecessor_row(self, row_widget: QWidget):
         """Remove a predecessor row"""
-        self.predecessor_rows = [r for r in self.predecessor_rows if r[2] != row_widget]
+        self.predecessor_rows = [r for r in self.predecessor_rows if r[3] != row_widget]
         row_widget.deleteLater()
     
     def _populate_fields(self):
@@ -2672,8 +2676,13 @@ class TaskDialog(QDialog):
         for resource_name, allocation in self.task.assigned_resources:
             self._add_resource_row(resource_name, allocation)
     
-    def get_task_data(self):
-        """Get task data from form"""
+    def accept(self):
+        """Store data and accept the dialog"""
+        self._store_task_data()
+        super().accept()
+
+    def _store_task_data(self):
+        """Store task data from form into an instance variable"""
         # Get predecessors
         predecessors = []
         for task_combo, dep_type_combo, lag_spin, _ in self.predecessor_rows:
@@ -2700,7 +2709,7 @@ class TaskDialog(QDialog):
         else:
             end_date = self.end_date_edit.date()
         
-        return {
+        self.task_data = {
             'name': self.name_edit.text(),
             'start_date': datetime(start_date.year(), start_date.month(), start_date.day()),
             'end_date': datetime(end_date.year(), end_date.month(), end_date.day()),
@@ -2709,6 +2718,10 @@ class TaskDialog(QDialog):
             'assigned_resources': resources,
             'notes': self.notes_edit.toPlainText()
         }
+
+    def get_task_data(self):
+        """Get task data from the stored attribute"""
+        return self.task_data
 
 
 class ResourceDialog(QDialog):
