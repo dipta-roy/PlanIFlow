@@ -1,4 +1,4 @@
-# 📊 PlanIFlow - Project Planner - Desktop Project Management Application
+# 📊 PlanIFlow - Project Planner
 
 ![Python Version](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![Framework](https://img.shields.io/badge/Framework-PyQt6-blue.svg)
