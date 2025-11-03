@@ -104,6 +104,18 @@ class CalendarManager:
                 days_added += 1
         
         return current_date
+
+    def subtract_working_days(self, start_date: datetime, days: int) -> datetime:
+        """Subtract a number of working days from a date"""
+        current_date = start_date
+        days_subtracted = 0
+
+        while days_subtracted < days:
+            current_date -= timedelta(days=1)
+            if self.is_working_day(current_date):
+                days_subtracted += 1
+        
+        return current_date
     
     def to_dict(self) -> Dict[str, Any]:
         """Export calendar settings to dictionary"""

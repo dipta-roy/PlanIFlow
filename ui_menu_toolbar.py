@@ -178,7 +178,7 @@ def create_menu_bar(window):
 
     view_menu.addSeparator()
 
-    gantt_axis_menu = view_menu.addMenu("Gantt Chart Axis Settings")
+    gantt_axis_menu = view_menu.addMenu("Gantt Chart Axis View")
 
     hours_action = QAction("Hours", window)
     hours_action.triggered.connect(lambda: window._set_gantt_axis_scale("Hours"))
@@ -203,9 +203,7 @@ def create_menu_bar(window):
     # Settings Menu
     settings_menu = menubar.addMenu("&Settings")
 
-    duration_unit_action = QAction("&Duration Unit...", window)
-    duration_unit_action.triggered.connect(window._show_duration_unit_settings)
-    settings_menu.addAction(duration_unit_action)
+
 
     calendar_action = QAction("&Calendar Settings...", window)
     calendar_action.triggered.connect(window._show_calendar_settings)

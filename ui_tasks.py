@@ -206,11 +206,15 @@ def create_task_tree(main_window):
     tree.setSortingEnabled(True)
     tree.sortByColumn(1, Qt.SortOrder.AscendingOrder)
 
-    # Set column widths to allow interactive resizing
+    # Set column widths to allow interactive resizing and horizontal scrolling
     header = tree.header()
+    # First, resize all sections to their content
+    for i in range(tree.columnCount()):
+        header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+    # Then, allow interactive resizing
     for i in range(tree.columnCount()):
         header.setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive)
-    header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch) # Task Name column stretches
+    header.setStretchLastSection(False)
 
     # Set initial visibility for WBS column
     tree.setColumnHidden(2, not main_window.toggle_wbs_action.isChecked())
@@ -232,6 +236,7 @@ def create_task_tree(main_window):
     # Enable custom delegate for resources column
     main_window.resource_delegate = ResourceDelegate(main_window, main_window.data_manager)
     tree.setItemDelegateForColumn(9, main_window.resource_delegate) # Resources (shifted)
+    main_window.resource_delegate.update_resource_list([r.name for r in main_window.data_manager.get_all_resources()])
 
     # Enable inline editing (e.g., double-click or F2)
     tree.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.EditKeyPressed)
@@ -242,6 +247,7 @@ def create_task_tree(main_window):
     # Track expanded/collapsed state
     tree.itemExpanded.connect(main_window._on_item_expanded)
     tree.itemCollapsed.connect(main_window._on_item_collapsed)
+    tree.itemClicked.connect(main_window._on_task_item_clicked)
 
     # Context menu
     tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

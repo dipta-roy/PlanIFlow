@@ -26,6 +26,7 @@ class GanttChart(FigureCanvas):
         self.tasks: List[Task] = []
         self.data_manager: Optional[DataManager] = None
         self.show_summary_tasks = True # New attribute
+        self.show_critical_path = False # New attribute for critical path
         self.current_scale = "Days" # Default scale
         
         # Color scheme for status indicators
@@ -101,6 +102,14 @@ class GanttChart(FigureCanvas):
             self.draw()
             return
         
+        # Reset critical path flags for all tasks before potential recalculation
+        for task in self.tasks:
+            task.is_critical = False
+
+        # Calculate critical path if enabled
+        if self.show_critical_path and self.data_manager:
+            self.data_manager.calculate_critical_path()
+
         # Filter out summary tasks or show them differently
         # For now, we'll show all tasks but render summary tasks differently
         display_tasks = self._get_display_order(tasks)
@@ -149,17 +158,17 @@ class GanttChart(FigureCanvas):
             
             # Different rendering for summary vs regular tasks
             if task.is_milestone:
-                self._draw_milestone(y, task)
+                self._draw_milestone(y, task, task.is_critical)
             elif task.is_summary:
                 start_num = mdates.date2num(task.start_date)
                 duration = (task.end_date - task.start_date).days + 1
                 status_color = self.status_colors.get(task.get_status_color(), '#9E9E9E')
-                self._draw_summary_task(y, start_num, duration, status_color, task)
+                self._draw_summary_task(y, start_num, duration, status_color, task, task.is_critical)
             else:
                 start_num = mdates.date2num(task.start_date)
                 duration = (task.end_date - task.start_date).days + 1
                 status_color = self.status_colors.get(task.get_status_color(), '#9E9E9E')
-                self._draw_regular_task(y, start_num, duration, status_color, task)
+                self._draw_regular_task(y, start_num, duration, status_color, task, task.is_critical)
             
             # Draw progress overlay
             if task.percent_complete > 0 and not task.is_summary and not task.is_milestone:
@@ -251,7 +260,7 @@ class GanttChart(FigureCanvas):
         # Refresh canvas
         self.draw()
     
-    def _draw_milestone(self, y: float, task: Task):
+    def _draw_milestone(self, y: float, task: Task, is_critical: bool = False):
         """Draw a milestone as a star icon"""
         # Get milestone date
         milestone_date = mdates.date2num(task.end_date)
@@ -262,6 +271,11 @@ class GanttChart(FigureCanvas):
         # Draw star marker
         self.ax.plot(milestone_date, y, marker='*', markersize=15, \
                      color=status_color, markeredgewidth=0, zorder=3)
+        
+        if is_critical:
+            # Add a red circle around critical milestones
+            circle = mpatches.Circle((milestone_date, y), radius=0.4, color='red', fill=False, linewidth=2, zorder=4)
+            self.ax.add_patch(circle)
         
 
     
@@ -288,22 +302,33 @@ class GanttChart(FigureCanvas):
         return display_order
     
     def _draw_regular_task(self, y: float, start_num: float, duration: int, 
-                          color: str, task: Task):
+                          color: str, task: Task, is_critical: bool = False):
         """Draw a regular task bar"""
         # Main task bar with border
         edge_color = 'black' if not self.dark_mode else 'white'
+        linewidth = 1.0
+        
+        if is_critical:
+            edge_color = 'red'
+            linewidth = 2.5
         
         self.ax.barh(y, duration, left=start_num, 
                     height=0.4, color=color, alpha=0.7,
                     edgecolor=edge_color,
-                    linewidth=1.0)
+                    linewidth=linewidth)
     
     def _draw_summary_task(self, y: float, start_num: float, duration: int, 
-                          color: str, task: Task):
+                          color: str, task: Task, is_critical: bool = False):
         """Draw a summary task as a single line"""
         # Draw a single horizontal line
+        linewidth = 4
+        line_color = color
+        if is_critical:
+            linewidth = 6
+            line_color = 'red'
+
         self.ax.plot([start_num, start_num + duration], [y, y], 
-                     color=color, linewidth=4, solid_capstyle='butt', zorder=2)
+                     color=line_color, linewidth=linewidth, solid_capstyle='butt', zorder=2)
 
     
     def _draw_dependencies(self, display_tasks: List[Task], y_pos: List[int]):
@@ -575,10 +600,12 @@ class GanttChart(FigureCanvas):
                     bbox=dict(boxstyle='round,pad=0.5', 
                             facecolor='yellow' if not self.dark_mode else '#444444',
                             edgecolor='black',
-                            alpha=0.95),
+                            alpha=0.95,
+                            zorder=11), # <--- Add zorder here
                     fontsize=9,
                     color=self.text_color
                 )
+            self.annotation.set_zorder(11) # <--- Also set zorder for the annotation text
             
             # Format tooltip text
             tooltip_text = f"Task: {task.name}\n"
@@ -668,6 +695,15 @@ class GanttChart(FigureCanvas):
             self.show_summary_tasks = show
             if self.data_manager and self.tasks:
                 self.update_chart(self.tasks, self.data_manager)
+
+    def set_show_critical_path(self, show: bool):
+        """Set whether to show the critical path and refresh the chart."""
+        if self.show_critical_path != show:
+            self.show_critical_path = show
+            if self.data_manager and self.tasks:
+                self.update_chart(self.tasks, self.data_manager)
+            elif self.tasks:
+                self.update_chart(self.tasks)
 
     def set_axis_scale(self, scale: str):
         """Set the X-axis scale for the Gantt chart and refresh."""

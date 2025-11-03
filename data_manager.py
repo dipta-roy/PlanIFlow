@@ -93,6 +93,14 @@ class Task:
         self.is_summary = is_summary
         self._original_start = start_date  # Store original for summary tasks
         self._original_end = end_date
+
+        # Critical Path Analysis fields
+        self.early_start: Optional[datetime] = None
+        self.early_finish: Optional[datetime] = None
+        self.late_start: Optional[datetime] = None
+        self.late_finish: Optional[datetime] = None
+        self.slack: Optional[timedelta] = None
+        self.is_critical: bool = False
     
     @property
     def duration(self) -> int:
@@ -367,7 +375,7 @@ class DataManager:
     
     def __init__(self, calendar_manager=None):
         self.tasks: List[Task] = []
-        self.resources: List[Resource] = [Resource(name="Default Resource", max_hours_per_day=8.0, billing_rate=50.0)] # Add a default resource
+        self.resources: List[Resource] = [] # Initialize as empty, from_dict will handle default if needed
         self.calendar_manager = calendar_manager
         self.project_name: str = "Untitled Project"
         self.settings = ProjectSettings()
@@ -674,12 +682,15 @@ class DataManager:
 
             if dep_type == DependencyType.FS:
                 # Finish-to-Start: task starts after predecessor ends
-                constraint_start = predecessor.end_date + timedelta(days=1) + lag
                 if self.calendar_manager:
-                    # Move to next working day
-                    while not self.calendar_manager.is_working_day(constraint_start):
-                        constraint_start += timedelta(days=1)
-                
+                    if lag_days >= 0:
+                        constraint_start = self.calendar_manager.add_working_days(predecessor.end_date, lag_days + 1)
+                    else:
+                        # For negative lag (lead), subtract working days from predecessor's end date
+                        constraint_start = self.calendar_manager.subtract_working_days(predecessor.end_date, abs(lag_days) - 1)
+                else:
+                    constraint_start = predecessor.end_date + timedelta(days=1) + lag
+
                 if latest_start is None or constraint_start > latest_start:
                     latest_start = constraint_start
             
@@ -1204,6 +1215,166 @@ class DataManager:
             if task.parent_id in id_mapping:
                 task.parent_id = id_mapping[task.parent_id]
     
+    def get_next_available_id(self) -> int:
+        """Get the next available task ID"""
+        if not self.tasks:
+            return 1
+        return max(t.id for t in self.tasks) + 1
+
+    def calculate_critical_path(self):
+        """Calculates the critical path for all tasks in the project."""
+        if not self.tasks:
+            return
+
+        # 1. Initialize ES/EF for all tasks
+        for task in self.tasks:
+            task.early_start = None
+            task.early_finish = None
+            task.late_start = None
+            task.late_finish = None
+            task.slack = None
+            task.is_critical = False
+
+        # 2. Forward Pass: Calculate Early Start (ES) and Early Finish (EF)
+        # Process tasks in topological order (or by ID for simplicity, assuming no circular deps)
+        sorted_tasks = sorted(self.tasks, key=lambda t: t.id)
+
+        for task in sorted_tasks:
+            if not task.predecessors:
+                task.early_start = task.start_date  # Use its own start date if no predecessors
+            else:
+                max_pred_ef = None
+                for pred_id, dep_type_str, lag_days in task.predecessors:
+                    predecessor = self.get_task(pred_id)
+                    if not predecessor or not predecessor.early_finish:
+                        continue # Skip if predecessor not found or not processed yet
+
+                    dep_type = DependencyType[dep_type_str]
+                    lag = timedelta(days=lag_days)
+
+                    if dep_type == DependencyType.FS:
+                        # FS: Successor starts after predecessor finishes
+                        if self.calendar_manager:
+                            if lag_days >= 0:
+                                pred_constraint_date = self.calendar_manager.add_working_days(predecessor.early_finish, lag_days + 1)
+                            else:
+                                pred_constraint_date = self.calendar_manager.subtract_working_days(predecessor.early_finish, abs(lag_days) - 1)
+                        else:
+                            pred_constraint_date = predecessor.early_finish + timedelta(days=1) + lag
+                    elif dep_type == DependencyType.SS:
+                        # SS: Successor starts when predecessor starts
+                        pred_constraint_date = predecessor.early_start + lag
+                    elif dep_type == DependencyType.FF:
+                        # FF: Successor finishes when predecessor finishes (this affects EF, not ES directly)
+                        # We'll handle this by calculating ES from EF later
+                        pred_constraint_date = predecessor.early_finish + lag
+                    elif dep_type == DependencyType.SF:
+                        # SF: Successor finishes when predecessor starts (this affects EF, not ES directly)
+                        # We'll handle this by calculating ES from EF later
+                        pred_constraint_date = predecessor.early_start + lag
+                    else:
+                        pred_constraint_date = predecessor.early_finish + timedelta(days=1) + lag # Default to FS
+
+                    if max_pred_ef is None or pred_constraint_date > max_pred_ef:
+                        max_pred_ef = pred_constraint_date
+
+                if max_pred_ef: # If there were valid predecessors
+                    task.early_start = max_pred_ef
+                else:
+                    task.early_start = task.start_date # Fallback if no valid predecessors or first task
+
+            # Calculate Early Finish
+            if task.early_start:
+                if task.is_milestone:
+                    task.early_finish = task.early_start
+                else:
+                    duration_days = task.calculate_duration_days(self.calendar_manager)
+                    if self.calendar_manager:
+                        task.early_finish = self.calendar_manager.add_working_days(task.early_start, duration_days - 1)
+                    else:
+                        task.early_finish = task.early_start + timedelta(days=duration_days - 1)
+
+        # 3. Backward Pass: Calculate Late Start (LS) and Late Finish (LF)
+        # Determine project finish date (latest EF of all tasks)
+        project_finish_date = max(t.early_finish for t in self.tasks if t.early_finish) if self.tasks else datetime.now()
+
+        # Initialize LF for tasks with no successors to project_finish_date
+        for task in self.tasks:
+            if not self.get_successors(task.id):
+                task.late_finish = project_finish_date
+            else:
+                task.late_finish = None # Will be calculated from successors
+
+        # Process tasks in reverse topological order (or by ID descending)
+        sorted_tasks_reverse = sorted(self.tasks, key=lambda t: t.id, reverse=True)
+
+        for task in sorted_tasks_reverse:
+            if not self.get_successors(task.id):
+                # Already set to project_finish_date or its own EF if it's the last task
+                if not task.late_finish:
+                    task.late_finish = task.early_finish # Fallback if no successors and not project end
+            else:
+                min_succ_ls = None
+                for successor in self.get_successors(task.id):
+                    if not successor.late_start:
+                        continue # Successor not processed yet
+
+                    # Find the dependency type from task to successor
+                    dep_info = next(((pid, dt, ld) for pid, dt, ld in successor.predecessors if pid == task.id), None)
+                    if not dep_info:
+                        continue
+
+                    _, dep_type_str, lag_days = dep_info
+                    dep_type = DependencyType[dep_type_str]
+                    lag = timedelta(days=lag_days)
+
+                    if dep_type == DependencyType.FS:
+                        # FS: Successor starts after predecessor finishes
+                        if self.calendar_manager:
+                            if lag_days >= 0:
+                                succ_constraint_date = self.calendar_manager.subtract_working_days(successor.late_start, lag_days + 1)
+                            else:
+                                succ_constraint_date = self.calendar_manager.add_working_days(successor.late_start, abs(lag_days) - 1)
+                        else:
+                            succ_constraint_date = successor.late_start - timedelta(days=1) - lag
+                    elif dep_type == DependencyType.SS:
+                        # SS: Successor starts when predecessor starts
+                        succ_constraint_date = successor.late_start - lag
+                    elif dep_type == DependencyType.FF:
+                        # FF: Successor finishes when predecessor finishes
+                        succ_constraint_date = successor.late_finish - lag
+                    elif dep_type == DependencyType.SF:
+                        # SF: Successor finishes when predecessor starts
+                        succ_constraint_date = successor.late_finish - lag
+                    else:
+                        succ_constraint_date = successor.late_start - timedelta(days=1) - lag # Default to FS
+
+                    if min_succ_ls is None or succ_constraint_date < min_succ_ls:
+                        min_succ_ls = succ_constraint_date
+
+                if min_succ_ls: # If there were valid successors
+                    task.late_finish = min_succ_ls
+                else:
+                    task.late_finish = task.early_finish # Fallback if no valid successors
+
+            # Calculate Late Start
+            if task.late_finish:
+                if task.is_milestone:
+                    task.late_start = task.late_finish
+                else:
+                    duration_days = task.calculate_duration_days(self.calendar_manager)
+                    if self.calendar_manager:
+                        task.late_start = self.calendar_manager.subtract_working_days(task.late_finish, duration_days - 1)
+                    else:
+                        task.late_start = task.late_finish - timedelta(days=duration_days - 1)
+
+        # 4. Calculate Slack and Identify Critical Tasks
+        for task in self.tasks:
+            if task.early_start and task.late_start:
+                task.slack = task.late_start - task.early_start
+                # A task is critical if its slack is zero or negative (due to lag)
+                task.is_critical = (task.slack <= timedelta(days=0))
+
     def get_next_available_id(self) -> int:
         """Get the next available task ID"""
         if not self.tasks:

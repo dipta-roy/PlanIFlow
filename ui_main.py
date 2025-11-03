@@ -296,7 +296,7 @@ class MainWindow(QMainWindow):
         # Help Menu
         help_menu = menubar.addMenu("&Help")
         
-        legend_action = QAction("Status &Legend", self)
+        legend_action = QAction("&Legends", self)
         legend_action.triggered.connect(self._show_status_legend)
         help_menu.addAction(legend_action)
         
@@ -497,12 +497,21 @@ class MainWindow(QMainWindow):
         gantt_tab_widget = QWidget()
         gantt_tab_layout = QVBoxLayout(gantt_tab_widget)
         
-        # Checkbox for summary tasks
+        # Checkboxes for Gantt chart options
+        gantt_options_layout = QHBoxLayout()
+
         self.show_summary_tasks_checkbox = QCheckBox("Show Summary Tasks")
         self.show_summary_tasks_checkbox.setChecked(True) # Default to showing summary tasks
         self.show_summary_tasks_checkbox.stateChanged.connect(self._toggle_gantt_summary_tasks)
-        
-        gantt_tab_layout.addWidget(self.show_summary_tasks_checkbox)
+        gantt_options_layout.addWidget(self.show_summary_tasks_checkbox)
+
+        self.show_critical_path_checkbox = QCheckBox("Show Critical Path")
+        self.show_critical_path_checkbox.setChecked(False) # Default to not showing critical path
+        self.show_critical_path_checkbox.stateChanged.connect(self._toggle_gantt_critical_path)
+        gantt_options_layout.addWidget(self.show_critical_path_checkbox)
+        gantt_options_layout.addStretch() # Push checkboxes to the left
+
+        gantt_tab_layout.addLayout(gantt_options_layout)
         
         self.gantt_chart = GanttChart(dark_mode=self.dark_mode)
         
@@ -622,12 +631,18 @@ class MainWindow(QMainWindow):
         menu.exec(self.task_tree.mapToGlobal(position))
         
     def _on_tree_clicked(self, index):
-        """Handle click on tree item"""
-        # Check if clicked on expand/collapse column
-        if index.column() == 0:
-            item = self.task_tree.itemFromIndex(index)
-            if item and item.childCount() > 0:
+        """Handle click on tree item to toggle expand/collapse for summary tasks"""
+        item = self.task_tree.itemFromIndex(index)
+        if item:
+            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task = self.data_manager.get_task(task_id)
+
+            if task and task.is_summary:
                 item.setExpanded(not item.isExpanded())
+                if item.isExpanded():
+                    self.expanded_tasks.add(task_id)
+                else:
+                    self.expanded_tasks.discard(task_id)
     def _show_header_context_menu(self, position):
         """Show context menu on header right-click"""
         header = self.task_tree.header()
@@ -711,6 +726,18 @@ class MainWindow(QMainWindow):
         task_id = item.data(1, Qt.ItemDataRole.UserRole)
         if task_id:
             self.expanded_tasks.discard(task_id)
+
+    def _on_task_item_clicked(self, item: QTreeWidgetItem, column: int):
+        """Handle single click on tree item to toggle expand/collapse for summary tasks"""
+        # Check if the clicked item has children (i.e., it's a summary task)
+        if item.childCount() > 0:
+            item.setExpanded(not item.isExpanded())
+            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            if task_id:
+                if item.isExpanded():
+                    self.expanded_tasks.add(task_id)
+                else:
+                    self.expanded_tasks.discard(task_id)
     
     def _on_task_item_changed(self, item: QTreeWidgetItem, column: int):
         """Handle inline editing of task properties"""
@@ -1644,6 +1671,12 @@ class MainWindow(QMainWindow):
         self.gantt_chart.set_show_summary_tasks(show)
         self.status_label.setText(f"✓ Summary tasks visibility: {'Shown' if show else 'Hidden'}")
 
+    def _toggle_gantt_critical_path(self, state):
+        """Toggle visibility of critical path in Gantt chart"""
+        show = state == Qt.CheckState.Checked.value
+        self.gantt_chart.set_show_critical_path(show)
+        self.status_label.setText(f"✓ Critical path visibility: {'Shown' if show else 'Hidden'}")
+
     def _set_gantt_axis_scale(self, scale: str):
         """Set the X-axis scale for the Gantt chart"""
         self.gantt_chart.set_axis_scale(scale)
@@ -1658,7 +1691,7 @@ class MainWindow(QMainWindow):
     def _show_status_legend(self):
         """Show status indicator legend"""
         legend = QMessageBox(self)
-        legend.setWindowTitle("Task Status Legend")
+        legend.setWindowTitle("Legends")
         legend.setText(
             "<h3>Task Status Indicators</h3>"
             "<p><b style='color: red;'>🔴 Overdue:</b> End date passed and not 100% complete</p>"
@@ -1678,7 +1711,8 @@ class MainWindow(QMainWindow):
         about_box = QMessageBox(self)
         about_box.setWindowTitle("About PlanIFlow - Project Planner")
         about_box.setText(
-            f"<h2>PlanIFlow - Project Planner v1.1</h2>"
+            f"<h2>PlanIFlow - Project Planner</h2>"
+            f"<p>App Version: 1.2</p>"
             f"<p><b>Developed by: Dipta Roy</b></p>"
             "<p>A desktop project management application</p>"
             "<p><b>Key Features:</b></p>"

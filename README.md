@@ -166,14 +166,14 @@ To build a standalone executable from the source code, you can use the `build.ba
 ## 📂 Project Structure
 
 ```
-PlanIFlow_v1.1\
+PlanIFlow_v1.2\
 ├───build.bat
 ├───clean.bat
 ├───install.bat 
 ├───quick-start.bat
 ├───run.bat
 ├───setup.bat 
-├───PlanIFlow_ProjectPlanner_v1.1.spec
+├───PlanIFlow_ProjectPlanner_v1.2.spec
 ├───README.md
 ├───requirements.txt
 ├───__init__.py

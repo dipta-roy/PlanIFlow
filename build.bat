@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.1 - Build to EXE
+echo   PlanIFlow - Project Planner v1.2 - Build to EXE
 echo ===============================================
 echo.
 
@@ -88,11 +88,11 @@ echo.
 
 REM Build the executable
 echo ===============================================
-echo   Building PlanIFlow - ProjectPlanner v1.1
+echo   Building PlanIFlow - ProjectPlanner v1.2
 echo ===============================================
 echo.
 
-pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.1" ^
+pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.2" ^
     %ICON_OPTION% ^
     --add-data="images;images" ^
     --add-data="data_manager.py;." ^
@@ -137,12 +137,12 @@ echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
 echo.
-echo [SUCCESS] Executable created: dist\PlanIFlow_ProjectPlanner_v1.1.exe
+echo [SUCCESS] Executable created: dist\PlanIFlow_ProjectPlanner_v1.2.exe
 echo [INFO] Icon has been embedded in the executable
 echo.
 
 REM Display file info
-for %%A in ("dist\PlanIFlow_ProjectPlanner_v1.1.exe") do (
+for %%A in ("dist\PlanIFlow_ProjectPlanner_v1.2.exe") do (
     set size=%%~zA
     set /a sizeMB=!size! / 1048576
     echo [INFO] File size: !sizeMB! MB
@@ -152,7 +152,7 @@ echo.
 set /p TEST_EXE="Do you want to test the executable now? (Y/N): "
 if /i "!TEST_EXE!"=="Y" (
     echo.
-    echo [INFO] Launching PlanIFlow_ProjectPlanner_v1.1.exe...
+    echo [INFO] Launching PlanIFlow_ProjectPlanner_v1.2.exe...
     start "" "dist\PlanIFlow_ProjectPlanner_v1.1.exe"
 )
 
