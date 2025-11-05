@@ -78,7 +78,8 @@ Data Layer:
    ├── settings_manager_new.py (Settings: Duration, Themes)
    └── settings_manager.py (Deprecated: Old Settings)
 I/O:
-   └── exporter.py (JSON/Excel: Full State)
+   ├── exporter.py (JSON/Excel: Full State)
+   └── pdf_exporter.py (PDF Report)
 Utilities:
    ├── ui_helpers.py (Icons, Paths)
    ├── ui_delegates.py (Editors: Date, Resource)
@@ -124,7 +125,7 @@ This script will activate the virtual environment and start the application.
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download `PlanIFlow_1.2_Portable_Signed.zip`:
+Download `PlanIFlow_1.3_Portable_Signed.zip`:
 
 ```
 1. Unzip the distribution package.
@@ -133,7 +134,7 @@ Download `PlanIFlow_1.2_Portable_Signed.zip`:
 4. Select: "Current User"
 5. Choose: "Place all certificates in the following store"
 6. Browse -> "Trusted People" -> OK -> Next -> Finish
-7. Run: PlanIFlow_v1.2_Portable.exe -> NO WARNINGS!
+7. Run: PlanIFlow_v1.3_Portable_Signed.exe -> NO WARNINGS!
 ```
 
 ## 💻 Usage
@@ -254,7 +255,6 @@ PlanIFlow_v1.3\
 ```
 
 **Note:** The `build` and `dist` directories are generated during the build process and contain the compiled application and its dependencies. 
-
 
 
 ## 🐛 Troubleshooting
