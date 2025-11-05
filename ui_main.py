@@ -31,6 +31,7 @@ from ui_helpers import get_resource_path, set_application_icon
 from ui_menu_toolbar import create_menu_bar, create_toolbar
 from ui_dashboard import update_dashboard
 from ui_resources import ResourceSheet
+from pdf_exporter import PDFExporter
 
 
 # Constants for ColorDelegate
@@ -160,6 +161,18 @@ class MainWindow(QMainWindow):
         export_excel_action = QAction("Export to E&xcel...", self)
         export_excel_action.triggered.connect(self._export_excel)
         file_menu.addAction(export_excel_action)
+
+        export_pdf_action = QAction("Export to &PDF...", self)
+        export_pdf_action.triggered.connect(self._export_pdf)
+        file_menu.addAction(export_pdf_action)
+
+        export_pdf_action = QAction("Export to &PDF...", self)
+        export_pdf_action.triggered.connect(self._export_pdf)
+        file_menu.addAction(export_pdf_action)
+
+        export_pdf_action = QAction("Export to &PDF...", self)
+        export_pdf_action.triggered.connect(self._export_pdf)
+        file_menu.addAction(export_pdf_action)
         
         file_menu.addSeparator()
         
@@ -442,6 +455,11 @@ class MainWindow(QMainWindow):
         save_btn = QAction("💾 Save", self)
         save_btn.triggered.connect(self._save_project)
         toolbar.addAction(save_btn)
+
+        # Export PDF
+        export_pdf_btn = QAction("📄 Export PDF", self)
+        export_pdf_btn.triggered.connect(self._export_pdf)
+        toolbar.addAction(export_pdf_btn)
         
         # Export
         export_btn = QAction("📊 Export Excel", self)
@@ -1642,6 +1660,27 @@ class MainWindow(QMainWindow):
                                       f"Project exported successfully to:\n{file_path}")
             else:
                 QMessageBox.critical(self, "Error", "Failed to export to Excel.")
+
+    def _export_pdf(self):
+        """Export project to PDF"""
+        suggested_name = self.data_manager.project_name.replace(" ", "_") + ".pdf"
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export to PDF", suggested_name, "PDF Files (*.pdf)"
+        )
+        
+        if file_path:
+            if not file_path.endswith('.pdf'):
+                file_path += '.pdf'
+            
+            try:
+                exporter = PDFExporter(self.data_manager, file_path, self.calendar_manager)
+                exporter.export()
+                self.status_label.setText("Exported to PDF")
+                QMessageBox.information(self, "Success", 
+                                      f"Project exported successfully to:\n{file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to export to PDF: {e}")
     
     # Settings
     

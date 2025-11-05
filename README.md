@@ -42,6 +42,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - **Dynamic Gantt Charts**: Real-time visualization with dependencies
 - **Excel Import/Export**: Share plans via Excel files
 - **JSON Import/Export**: Save and load projects in JSON format.
+- **PDF Import/Export**: Save and load projects in PDF format.
 - **Calendar Management**: Custom work hours and holidays
 - **Dark Mode**: Toggle between light and dark themes
 - **Resource Allocation Tracking**: Detect over-allocation
@@ -57,6 +58,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - Pandas
 - Matplotlib
 - Openpyxl
+- Reportlab
 
 ## Architecture Overview
 
@@ -175,6 +177,7 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 
 - **JSON**: Save and load your projects using the `.json` format. This is the recommended format for saving your work.
 - **Excel**: Import and export your projects to and from Excel files. This is useful for sharing your project with others who may not have the application.
+- **Excel**: Export your projects to and from PDF report.
 
 ## ⌨️ Shortcuts
 
@@ -215,14 +218,14 @@ To build a standalone executable from the source code, you can use the `build.ba
 ## 📂 Project Structure
 
 ```
-PlanIFlow_v1.2\
+PlanIFlow_v1.3\
 ├───build.bat
 ├───clean.bat
 ├───install.bat 
 ├───quick-start.bat
 ├───run.bat
 ├───setup.bat 
-├───PlanIFlow_ProjectPlanner_v1.2.spec
+├───PlanIFlow_ProjectPlanner_v1.3.spec
 ├───README.md
 ├───requirements.txt
 ├───__init__.py
@@ -242,6 +245,7 @@ PlanIFlow_v1.2\
 ├───ui_project_settings.py
 ├───ui_resources.py
 ├───ui_tasks.py
+├───pdf_exporter.py
 ├───images\
 │  └───logo.ico
 └───sample\

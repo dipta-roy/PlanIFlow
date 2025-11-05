@@ -1,7 +1,7 @@
 # **PlanIFlow - Formal Security Assessment Report**  
-## **PlanIFlow v1.2 – Offline Desktop Project Management Application**  
+## **PlanIFlow v1.3 – Offline Desktop Project Management Application**  
 **Assessment Conducted:** November 05, 2025  
-**Scope:** All 17 Python source files (`*.py`)  
+**Scope:** All 18 Python source files (`*.py`)  
 **Methodology:** Static code analysis, data flow tracing, threat modeling  
 **Classification:** **LOW RISK – SECURE FOR INTENDED USE**
 
@@ -20,7 +20,7 @@ The application is **secure by design** for its intended use case: **single-user
 
 | Item 						| Details 													|
 |---------------------------|-----------------------------------------------------------|
-| **Files Analyzed** 		| 17 `.py` files  											|
+| **Files Analyzed** 		| 18 `.py` files  											|
 | **Analysis Type** 		| White-box static analysis 								|
 | **Tools Used** 			| Manual code review, data flow mapping, threat modeling 	|
 | **Threat Model** 			| Local user, malicious file input, resource exhaustion 	|
@@ -108,6 +108,7 @@ wb = load_workbook(filepath, data_only=True)  # No macro execution
 | pandas 		| 2.x 		| None 				| Low 	|
 | matplotlib 	| 3.x 		| None 				| Low 	|
 | openpyxl 		| 3.x 		| None 				| Low 	|
+| reportlab 	| 4.x 		| None 				| Low 	|
 
 **All dependencies are secure and appropriate**
 

@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   Project Planner v1.1 - Clean Build Files
+echo   Project Planner v1.3 - Clean Build Files
 echo ===============================================
 echo.
 

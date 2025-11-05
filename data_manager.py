@@ -1375,6 +1375,89 @@ class DataManager:
                 # A task is critical if its slack is zero or negative (due to lag)
                 task.is_critical = (task.slack <= timedelta(days=0))
 
+    def get_cost_breakdown_data(self) -> Dict[str, Any]:
+        """
+        Calculates and returns monthly/daily cost breakdown data.
+        Returns a dictionary with 'headers' (list of strings) and 'rows' (list of lists of strings).
+        """
+        if not self.get_project_start_date() or not self.get_project_end_date():
+            return {'headers': ["Period", "Total"], 'rows': []}
+
+        start_date = self.get_project_start_date()
+        end_date = self.get_project_end_date()
+
+        headers = []
+        period_type = ""
+
+        # Determine if duration is less than a month
+        if (end_date - start_date).days < 30:
+            period_type = "Daily"
+            delta = timedelta(days=1)
+            current_date = start_date
+            while current_date <= end_date:
+                headers.append(current_date.strftime("%d-%b"))
+                current_date += delta
+        else:
+            period_type = "Monthly"
+            current_date = start_date.replace(day=1)
+            while current_date <= end_date:
+                headers.append(current_date.strftime("%b-%Y"))
+                current_date = (current_date + timedelta(days=32)).replace(day=1)
+
+        column_headers = ["Period", "Total"] + [resource.name for resource in self.resources]
+        rows = []
+
+        for i, period_str in enumerate(headers):
+            row_data = [period_str]
+            
+            period_start_dt = None
+            period_end_dt = None
+
+            if period_type == "Daily":
+                period_start_dt = start_date + timedelta(days=i)
+                period_end_dt = period_start_dt
+            else: # Monthly breakdown
+                period_start_dt = datetime.strptime(period_str, "%b-%Y")
+                period_end_dt = (period_start_dt + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                # Ensure period_end_dt does not exceed project_end_date
+                if period_end_dt > end_date:
+                    period_end_dt = end_date
+
+            period_total_cost = 0
+            resource_costs_in_period = {res.name: 0.0 for res in self.resources}
+
+            for task in self.tasks:
+                if task.is_summary: # Skip summary tasks
+                    continue
+
+                # Determine overlap between task and current period
+                overlap_start = max(task.start_date, period_start_dt)
+                overlap_end = min(task.end_date, period_end_dt)
+
+                if overlap_start <= overlap_end:
+                    for resource_name, allocation_percent in task.assigned_resources:
+                        resource = self.get_resource(resource_name)
+                        if resource:
+                            # Calculate working hours in the overlap period for this specific resource
+                            overlap_working_hours = self.calendar_manager.calculate_working_hours(overlap_start, overlap_end, resource_exceptions=resource.exceptions)
+                            # Calculate resource's allocated hours for this overlap
+                            allocated_hours_in_overlap = overlap_working_hours * (allocation_percent / 100.0)
+                            cost_for_resource_in_overlap = allocated_hours_in_overlap * resource.billing_rate
+                            resource_costs_in_period[resource_name] += cost_for_resource_in_overlap            
+            
+            # Add Total column
+            for resource_name, cost in resource_costs_in_period.items():
+                period_total_cost += cost
+            row_data.append(f"${period_total_cost:.2f}")
+
+            # Add individual resource columns
+            for resource in self.resources:
+                cost = resource_costs_in_period[resource.name]
+                row_data.append(f"${cost:.2f}")
+            rows.append(row_data)
+        
+        return {'headers': column_headers, 'rows': rows}
+
     def get_next_available_id(self) -> int:
         """Get the next available task ID"""
         if not self.tasks:

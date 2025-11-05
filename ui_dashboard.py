@@ -320,86 +320,30 @@ def update_dashboard(main_window):
 
     # Update monthly/daily cost breakdown table
     main_window.cost_breakdown_table.clear()
-    if data_manager.get_project_start_date() and data_manager.get_project_end_date():
-        start_date = data_manager.get_project_start_date()
-        end_date = data_manager.get_project_end_date()
-        
-        # Determine if duration is less than a month
-        if (end_date - start_date).days < 30:
-            # Display by day
-            delta = timedelta(days=1)
-            current_date = start_date
-            headers = []
-            while current_date <= end_date:
-                headers.append(current_date.strftime("%d-%b"))
-                current_date += delta
-        else:
-            # Display by month
-            current_date = start_date.replace(day=1)
-            headers = []
-            while current_date <= end_date:
-                headers.append(current_date.strftime("%b-%Y"))
-                current_date = (current_date + timedelta(days=32)).replace(day=1)
-        
-        # Add resource names to headers
-        column_headers = ["Period", "Total"] + [resource.name for resource in data_manager.resources]
-        main_window.cost_breakdown_table.setColumnCount(len(column_headers))
-        main_window.cost_breakdown_table.setHorizontalHeaderLabels(column_headers)
-        
-        # Set resize mode for columns to Fixed and set a default width
-        for col_idx in range(len(column_headers)):
-            main_window.cost_breakdown_table.horizontalHeader().setSectionResizeMode(col_idx, QHeaderView.ResizeMode.Fixed)
-            main_window.cost_breakdown_table.setColumnWidth(col_idx, 120) # Default fixed width, adjust as needed
+    
+    breakdown_data = data_manager.get_cost_breakdown_data()
+    headers = breakdown_data['headers']
+    rows = breakdown_data['rows']
 
-        # Populate table with costs
-        main_window.cost_breakdown_table.setRowCount(len(headers))
-        for i, period_str in enumerate(headers):
-            main_window.cost_breakdown_table.setItem(i, 0, QTableWidgetItem(period_str))
-            
-            period_start_dt = None
-            period_end_dt = None
+    if not rows:
+        main_window.cost_breakdown_table.setRowCount(0)
+        main_window.cost_breakdown_table.setColumnCount(0)
+        main_window.cost_breakdown_table.setHorizontalHeaderLabels([])
+        return
 
-            if (end_date - start_date).days < 30: # Daily breakdown
-                period_start_dt = start_date + timedelta(days=i)
-                period_end_dt = period_start_dt
-            else: # Monthly breakdown
-                period_start_dt = datetime.strptime(period_str, "%b-%Y")
-                period_end_dt = (period_start_dt + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-                # Ensure period_end_dt does not exceed project_end_date
-                if period_end_dt > end_date:
-                    period_end_dt = end_date
+    main_window.cost_breakdown_table.setColumnCount(len(headers))
+    main_window.cost_breakdown_table.setHorizontalHeaderLabels(headers)
+    
+    # Set resize mode for columns to Fixed and set a default width
+    for col_idx in range(len(headers)):
+        main_window.cost_breakdown_table.horizontalHeader().setSectionResizeMode(col_idx, QHeaderView.ResizeMode.Fixed)
+        main_window.cost_breakdown_table.setColumnWidth(col_idx, 120) # Default fixed width, adjust as needed
 
-            period_total_cost = 0
-            resource_costs_in_period = {res.name: 0.0 for res in data_manager.resources}
+    main_window.cost_breakdown_table.setRowCount(len(rows))
+    for i, row_data in enumerate(rows):
+        for j, item in enumerate(row_data):
+            main_window.cost_breakdown_table.setItem(i, j, QTableWidgetItem(item))
 
-            for task in data_manager.tasks:
-                if task.is_summary: # Skip summary tasks
-                    continue
-
-                # Determine overlap between task and current period
-                overlap_start = max(task.start_date, period_start_dt)
-                overlap_end = min(task.end_date, period_end_dt)
-
-                if overlap_start <= overlap_end:
-                    for resource_name, allocation_percent in task.assigned_resources:
-                        resource = data_manager.get_resource(resource_name)
-                        if resource:
-                            # Calculate working hours in the overlap period for this specific resource
-                            overlap_working_hours = data_manager.calendar_manager.calculate_working_hours(overlap_start, overlap_end, resource_exceptions=resource.exceptions)
-                            # Calculate resource's allocated hours for this overlap
-                            allocated_hours_in_overlap = overlap_working_hours * (allocation_percent / 100.0)
-                            cost_for_resource_in_overlap = allocated_hours_in_overlap * resource.billing_rate
-                            resource_costs_in_period[resource_name] += cost_for_resource_in_overlap            
-            
-            # Populate Total column (index 1)
-            for resource_name, cost in resource_costs_in_period.items():
-                period_total_cost += cost
-            main_window.cost_breakdown_table.setItem(i, 1, QTableWidgetItem(f"${period_total_cost:.2f}"))
-
-            # Populate individual resource columns (starting from index 2)
-            for j, resource in enumerate(data_manager.resources):
-                cost = resource_costs_in_period[resource.name]
-                main_window.cost_breakdown_table.setItem(i, j + 2, QTableWidgetItem(f"${cost:.2f}"))
 
 def update_task_status_pie_chart(main_window, upcoming_count, in_progress_count, completed_count, overdue_count, total_work_tasks):
     main_window.task_status_figure.clear()

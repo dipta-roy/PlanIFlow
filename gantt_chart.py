@@ -713,3 +713,7 @@ class GanttChart(FigureCanvas):
                 self.update_chart(self.tasks, self.data_manager)
             elif self.tasks:
                 self.update_chart(self.tasks)
+
+    def save_chart(self, file_path: str):
+        """Save the Gantt chart to a file."""
+        self.fig.savefig(file_path, bbox_inches='tight')

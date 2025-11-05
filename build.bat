@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.2 - Build to EXE
+echo   PlanIFlow - Project Planner v1.3 - Build to EXE
 echo ===============================================
 echo.
 
@@ -88,11 +88,11 @@ echo.
 
 REM Build the executable
 echo ===============================================
-echo   Building PlanIFlow - ProjectPlanner v1.2
+echo   Building PlanIFlow - ProjectPlanner v1.3
 echo ===============================================
 echo.
 
-pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.2" ^
+pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.3" ^
     %ICON_OPTION% ^
     --add-data="images;images" ^
     --add-data="data_manager.py;." ^
@@ -110,6 +110,7 @@ pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.2" ^
     --add-data="ui_delegates.py;." ^
     --add-data="settings_manager_new.py;." ^
     --add-data="ui_helpers.py;." ^
+    --add-data="pdf_exporter.py;." ^
     --hidden-import=PyQt6 ^
     --hidden-import=PyQt6.QtCore ^
     --hidden-import=PyQt6.QtGui ^
@@ -120,6 +121,11 @@ pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.2" ^
     --hidden-import=pandas ^
     --hidden-import=openpyxl ^
     --hidden-import=openpyxl.styles ^
+    --hidden-import=reportlab ^
+    --hidden-import=reportlab.platypus ^
+    --hidden-import=PIL ^
+    --hidden-import=reportlab.lib ^
+    --hidden-import=reportlab.platypus.tableofcontents ^
     --collect-all PyQt6 ^
     --collect-all matplotlib ^
     --noconsole ^
@@ -137,12 +143,12 @@ echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
 echo.
-echo [SUCCESS] Executable created: dist\PlanIFlow_ProjectPlanner_v1.2.exe
+echo [SUCCESS] Executable created: dist\PlanIFlow_ProjectPlanner_v1.3.exe
 echo [INFO] Icon has been embedded in the executable
 echo.
 
 REM Display file info
-for %%A in ("dist\PlanIFlow_ProjectPlanner_v1.2.exe") do (
+for %%A in ("dist\PlanIFlow_ProjectPlanner_v1.3.exe") do (
     set size=%%~zA
     set /a sizeMB=!size! / 1048576
     echo [INFO] File size: !sizeMB! MB
@@ -152,7 +158,7 @@ echo.
 set /p TEST_EXE="Do you want to test the executable now? (Y/N): "
 if /i "!TEST_EXE!"=="Y" (
     echo.
-    echo [INFO] Launching PlanIFlow_ProjectPlanner_v1.2.exe...
+    echo [INFO] Launching PlanIFlow_ProjectPlanner_v1.3.exe...
     start "" "dist\PlanIFlow_ProjectPlanner_v1.1.exe"
 )
 

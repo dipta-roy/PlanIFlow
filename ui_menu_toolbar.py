@@ -52,6 +52,10 @@ def create_menu_bar(window):
     export_excel_action.triggered.connect(window._export_excel)
     file_menu.addAction(export_excel_action)
 
+    export_pdf_action = QAction("Export to &PDF...", window)
+    export_pdf_action.triggered.connect(window._export_pdf)
+    file_menu.addAction(export_pdf_action)
+
     file_menu.addSeparator()
 
     exit_action = QAction("E&xit", window)
@@ -269,6 +273,11 @@ def create_toolbar(window):
     export_btn.setToolTip("Export to Excel")
     export_btn.triggered.connect(window._export_excel)
     toolbar.addAction(export_btn)
+
+    export_pdf_btn = QAction("📄", window)
+    export_pdf_btn.setToolTip("Export to PDF")
+    export_pdf_btn.triggered.connect(window._export_pdf)
+    toolbar.addAction(export_pdf_btn)
 
     toolbar.addSeparator()
 
