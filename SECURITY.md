@@ -1,4 +1,4 @@
-# **Formal Security Assessment Report**  
+# **PlanIFlow - Formal Security Assessment Report**  
 ## **PlanIFlow v1.2 – Offline Desktop Project Management Application**  
 **Assessment Conducted:** November 05, 2025  
 **Scope:** All 17 Python source files (`*.py`)  

@@ -9,6 +9,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 
 - [Features](#-features)
 - [Technologies Used](#️-technologies-used)
+- [Architecture Overview](#-architecture-overview)
 - [Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
@@ -26,7 +27,8 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - [License](#-license)
 - [Project Structure](#-project-structure)
 - [Troubleshooting](#-troubleshooting)
-
+- [Security and Distribution](#-security-and-distribution)
+- [Acknowledgments](#-acknowledgments)
 
 ## ✨ Features
 
@@ -56,6 +58,32 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - Matplotlib
 - Openpyxl
 
+## Architecture Overview
+
+```
+main.py (Entry)
+   ↓
+ui_main.py (MainWindow: Tabs, Menus, TreeView)
+   ├── ui_tasks.py (Task Tree: Hierarchy, Dependencies)
+   ├── gantt_chart.py (Gantt: Arrows, Critical Toggle)
+   ├── ui_resources.py (Resource Table: Allocation, Warnings)
+   ├── ui_dashboard.py (Metrics: Charts, Status Cards)
+   ├── ui_project_settings.py (Settings Dialog)
+   └── ui_menu_toolbar.py (Actions, Shortcuts)
+Data Layer:
+   ├── data_manager.py (Tasks/Resources: CPM, Costs)
+   ├── calendar_manager.py (Holidays, Working Days)
+   ├── settings_manager_new.py (Settings: Duration, Themes)
+   └── settings_manager.py (Deprecated: Old Settings)
+I/O:
+   └── exporter.py (JSON/Excel: Full State)
+Utilities:
+   ├── ui_helpers.py (Icons, Paths)
+   ├── ui_delegates.py (Editors: Date, Resource)
+   ├── themes.py (Light/Dark)
+   └── __init__.py (Empty)
+```
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -65,15 +93,20 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 
 ### Installation
 
-For a quick and easy setup, simply run the `install.bat` script. This will:
-
-1.  Check if Python is installed and in your PATH.
-2.  Create a virtual environment.
-3.  Install all the required dependencies from `requirements.txt`.
-4.  Verify the installation.
-
-```bash
+#### Windows (One-Click)
+```bat
+git clone https://github.com/dipta-roy/PlanIFlow.git
+cd PlanIFlow
 install.bat
+run.bat
+```
+
+#### macOS/Linux (Terminal)
+```bash
+git clone https://github.com/dipta-roy/PlanIFlow.git
+cd PlanIFlow
+pip install -r requirements.txt
+python main.py
 ```
 
 ### Running the Application
@@ -86,6 +119,21 @@ run.bat
 
 This script will activate the virtual environment and start the application.
 
+### Using Standalone Executables
+
+#### Windows (.exe)
+Download `PlanIFlow_1.2_Portable_Signed.zip`:
+
+```
+1. Unzip the distribution package.
+2. Double-click: PlanIFlow_Public.cer
+3. Click: "Open" -> "Install Certificate..."
+4. Select: "Current User"
+5. Choose: "Place all certificates in the following store"
+6. Browse -> "Trusted People" -> OK -> Next -> Finish
+7. Run: PlanIFlow_v1.2_Portable.exe -> NO WARNINGS!
+```
+
 ## 💻 Usage
 
 ### Creating a New Project
@@ -97,10 +145,10 @@ This script will activate the virtual environment and start the application.
 
 - **Add Resources**: Click the `👤 Add Resource` button in the toolbar to add resources like team members or equipment. You can now also specify a billing rate for each resource.
 - **Add Tasks**: Click the `➕ Add Task` button to create a new task. You can set the start and end dates, assign resources, and add notes.
+- **Sub-tasks**: Select a task and click `➕ Add Subtask` to create a child task.
 
 ### Managing Tasks
 
-- **Sub-tasks**: Select a task and click `➕ Add Subtask` to create a child task.
 - **Inline Editing**: Double-click on a task field (e.g., Task Name, Start Date, End Date, Duration, % Complete, Dependencies, Resources, Notes) to directly edit its value. Press `Enter` to save changes or `Esc` to cancel.
   - **Date Fields**: Use the calendar dropdown for Start Date and End Date.
   - **Resources Field**: Select from a dropdown of existing resources or type new ones.
@@ -111,6 +159,7 @@ This script will activate the virtual environment and start the application.
 ### Gantt Chart
 
 The **Gantt Chart** tab provides a visual representation of your project timeline. Dependency lines are drawn between tasks, and the chart is updated in real-time.
+- **Show Critical Path**: Check the checkbox → red highlights for zero-slack tasks.
 
 ### Dashboard
 
@@ -121,7 +170,7 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 -   Overall project completion percentage
 -   Task status breakdown
 -   **Total Project Cost**: A summary of the estimated cost across all resources.
-
+- 	Scroll for Budget and cost tables.
 ### Importing and Exporting Data
 
 - **JSON**: Save and load your projects using the `.json` format. This is the recommended format for saving your work.
@@ -159,7 +208,7 @@ This project includes a set of batch scripts to automate common tasks on Windows
 
 ## 🛠️ Building from Source
 
-To build a standalone executable from the source code, you can use the `build.bat` or `build-advance.bat` scripts.
+To build a standalone executable from the source code, you can use the `build.bat` scripts.
 
 -   **`build.bat`**: Creates a single `.exe` file in the `dist` folder. This is the easiest way to create a distributable version of the application.
 
@@ -202,6 +251,8 @@ PlanIFlow_v1.2\
 
 **Note:** The `build` and `dist` directories are generated during the build process and contain the compiled application and its dependencies. 
 
+
+
 ## 🐛 Troubleshooting
 
 -   **Application does not start**: Ensure you have Python 3.10 or higher installed and that it is in your system's PATH. Try running `install.bat` again.
@@ -210,3 +261,14 @@ PlanIFlow_v1.2\
 ## 📄 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+
+## 📈 Security and Distribution
+
+- **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
+- **Distribution**: Use signed builds; include .cer for trust.
+
+## 🙏 Acknowledgments
+
+- Built by [Dipta Roy](https://github.com/dipta-roy).
+- Icons: [Flaticon](https://flaticon.com).
+- Thanks to PyQt6 & Matplotlib communities.
