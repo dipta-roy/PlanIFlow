@@ -1,6 +1,6 @@
 @echo off
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.1 - Quick Start
+echo   PlanIFlow - Project Planner v1.3 - Quick Start
 echo ===============================================
 echo.
 echo Choose an option:
