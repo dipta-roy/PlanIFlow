@@ -30,6 +30,3 @@ def set_application_icon(window, logo_path):
         app = QApplication.instance()
         if app:
             app.setWindowIcon(icon)
-    else:
-        print(f"Warning: Logo file not found at {path}")
-

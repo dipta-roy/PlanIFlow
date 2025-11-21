@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "2.2",
   "project_name": "Project Replica",
   "project_data": {
     "project_name": "Project Replica",
@@ -8,7 +8,7 @@
         "id": 1,
         "name": "Project Name",
         "start_date": "2025-10-30T00:00:00",
-        "end_date": "2025-11-26T00:00:00",
+        "end_date": "2027-05-27T00:00:00",
         "percent_complete": 0,
         "predecessors": [],
         "assigned_resources": [],
@@ -41,7 +41,7 @@
         "id": 3,
         "name": "Requirements",
         "start_date": "2025-10-31T00:00:00",
-        "end_date": "2025-11-26T00:00:00",
+        "end_date": "2027-05-27T00:00:00",
         "percent_complete": 0,
         "predecessors": [],
         "assigned_resources": [],
@@ -55,7 +55,7 @@
         "id": 4,
         "name": "Find Scope",
         "start_date": "2025-10-31T00:00:00",
-        "end_date": "2025-11-06T00:00:00",
+        "end_date": "2026-02-05T00:00:00",
         "percent_complete": 0,
         "predecessors": [
           [
@@ -83,8 +83,8 @@
       {
         "id": 5,
         "name": "Create Plan",
-        "start_date": "2025-11-07T00:00:00",
-        "end_date": "2025-11-17T00:00:00",
+        "start_date": "2026-02-06T00:00:00",
+        "end_date": "2027-02-04T00:00:00",
         "percent_complete": 0,
         "predecessors": [
           [
@@ -108,8 +108,8 @@
       {
         "id": 6,
         "name": "Get Plan Approval",
-        "start_date": "2025-11-18T00:00:00",
-        "end_date": "2025-11-26T00:00:00",
+        "start_date": "2027-02-05T00:00:00",
+        "end_date": "2027-05-27T00:00:00",
         "percent_complete": 0,
         "predecessors": [
           [
@@ -133,8 +133,8 @@
       {
         "id": 7,
         "name": "Project End",
-        "start_date": "2025-11-27T00:00:00",
-        "end_date": "2025-11-26T00:00:00",
+        "start_date": "2027-05-28T00:00:00",
+        "end_date": "2027-05-27T00:00:00",
         "percent_complete": 0,
         "predecessors": [
           [
@@ -167,7 +167,7 @@
       },
       {
         "name": "Project",
-        "max_hours_per_day": 8.0,
+        "max_hours_per_day": 8,
         "exceptions": [],
         "billing_rate": 20.0
       },
@@ -218,6 +218,30 @@
         "max_hours_per_day": 8.0,
         "exceptions": [],
         "billing_rate": 0.0
+      },
+      {
+        "name": "t9",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "t10",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "t11",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
+      },
+      {
+        "name": "t12",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 0.0
       }
     ]
   },
@@ -237,12 +261,12 @@
     "default_date_format": "yyyy-mm-dd",
     "project_start_date": "2025-10-30T00:00:00"
   },
-  "saved_at": "2025-11-02T05:14:39.181457",
+  "saved_at": "2025-11-05T22:21:35.043846",
   "metadata": {
     "total_tasks": 7,
     "summary_tasks": 2,
     "work_tasks": 5,
-    "total_resources": 10,
+    "total_resources": 14,
     "overall_completion": 0.0,
     "duration_unit": "days"
   }

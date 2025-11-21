@@ -32,23 +32,46 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
 
         column = tree.sortColumn()
 
-        # Column 0: Status (text)
+        # Column 0: Schedule Type (text)
         if column == 0:
             return self.text(0).lower() < other.text(0).lower()
 
-        # Column 1: ID (integer) - CRITICAL FIX
+        # Column 1: Status (custom sort by color/priority)
         elif column == 1:
+            status_order = {
+                'red': 0,    # Overdue
+                'green': 1,  # In Progress
+                'grey': 2,   # Upcoming
+                'blue': 3    # Completed
+            }
+            self_status_color = self.data(1, Qt.ItemDataRole.UserRole)
+            other_status_color = other.data(1, Qt.ItemDataRole.UserRole)
+            
+            self_order = status_order.get(self_status_color, 99)
+            other_order = status_order.get(other_status_color, 99)
+            
+            if self_order != other_order:
+                return self_order < other_order
+            else:
+                # Secondary sort by ID
+                try:
+                    return int(self.text(2)) < int(other.text(2))
+                except:
+                    return False
+
+        # Column 2: ID (integer)
+        elif column == 2:
             try:
                 # Try to get integer from UserRole first
-                val1 = self.data(1, Qt.ItemDataRole.UserRole)
-                val2 = other.data(1, Qt.ItemDataRole.UserRole)
+                val1 = self.data(2, Qt.ItemDataRole.UserRole)
+                val2 = other.data(2, Qt.ItemDataRole.UserRole)
 
                 if val1 is not None and val2 is not None:
                     return int(val1) < int(val2)
 
                 # Fallback: parse from text
-                text1 = self.text(1).strip()
-                text2 = other.text(1).strip()
+                text1 = self.text(2).strip()
+                text2 = other.text(2).strip()
 
                 if text1.isdigit() and text2.isdigit():
                     return int(text1) < int(text2)
@@ -58,71 +81,85 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
                 logging.error(f"ID sort error: {e}")
                 return False
 
-        # Column 2: WBS (text)
-        elif column == 2:
-            return self.text(2).lower() < other.text(2).lower()
-
-        # Column 3: Task Name (text, ignore symbols and spaces)
+        # Column 3: WBS (text)
         elif column == 3:
-            text1 = self.text(3).replace('▶', '').replace('◆', '').strip().lstrip()
-            text2 = other.text(3).replace('▶', '').replace('◆', '').strip().lstrip()
+            # Simple string comparison for WBS works for 1.1 vs 1.2, but 1.10 vs 1.2 is tricky.
+            # For now, standard string sort is usually acceptable or we can implement version sort.
+            # Let's stick to string sort as per original intent, but maybe split by dots if needed.
+            # Actually, WBS 1.2 vs 1.10: "1.2" > "1.10" in string? No, "1.2" > "1.1" but "1.2" vs "1.10" -> '2' > '1'.
+            # So "1.10" comes before "1.2" in string sort? No. '1' == '1', '.' == '.', '1' < '2'. So "1.10" < "1.2".
+            # Wait. "1.2" vs "1.10". '2' > '1'. So "1.2" > "1.10". Correct order should be 1.2, ..., 1.9, 1.10.
+            # So "1.2" should be LESS than "1.10" if we treat them as numbers.
+            # But string sort says "1.2" > "1.10".
+            # Let's try to do a proper version sort.
+            try:
+                parts1 = [int(x) for x in self.text(3).split('.') if x.isdigit()]
+                parts2 = [int(x) for x in other.text(3).split('.') if x.isdigit()]
+                return parts1 < parts2
+            except:
+                return self.text(3).lower() < other.text(3).lower()
+
+        # Column 4: Task Name (text, ignore symbols and spaces)
+        elif column == 4:
+            text1 = self.text(4).replace('▶', '').replace('◆', '').strip().lstrip()
+            text2 = other.text(4).replace('▶', '').replace('◆', '').strip().lstrip()
             return text1.lower() < text2.lower()
 
-        # Column 4: Start Date
-        elif column == 4:
-            try:
-                # Access main_window from the item itself
-                main_window = self.main_window
-                if main_window:
-                    date_format_str = main_window._get_strftime_format_string()
-                    date1 = datetime.strptime(self.text(4), date_format_str)
-                    date2 = datetime.strptime(other.text(4), date_format_str)
-                    return date1 < date2
-                else:
-                    logging.warning("main_window not available for date sorting in SortableTreeWidgetItem.")
-                    return self.text(4) < other.text(4)
-            except ValueError:
-                logging.warning(f"Could not parse start date for sorting: {self.text(4)} or {other.text(4)}")
-                return self.text(4) < other.text(4)
-
-        # Column 5: End Date
+        # Column 5: Start Date
         elif column == 5:
             try:
                 # Access main_window from the item itself
                 main_window = self.main_window
                 if main_window:
                     date_format_str = main_window._get_strftime_format_string()
-                    text1 = self.text(5) if self.text(5) != "Milestone" else self.text(4)
-                    text2 = other.text(5) if other.text(5) != "Milestone" else other.text(4)
-                    date1 = datetime.strptime(text1, date_format_str)
-                    date2 = datetime.strptime(text2, date_format_str)
+                    date1 = datetime.strptime(self.text(5), date_format_str)
+                    date2 = datetime.strptime(other.text(5), date_format_str)
                     return date1 < date2
                 else:
                     logging.warning("main_window not available for date sorting in SortableTreeWidgetItem.")
                     return self.text(5) < other.text(5)
             except ValueError:
-                logging.warning(f"Could not parse end date for sorting: {self.text(5)} or {other.text(5)}")
+                # logging.warning(f"Could not parse start date for sorting: {self.text(5)} or {other.text(5)}")
                 return self.text(5) < other.text(5)
 
-        # Column 6: Duration (numeric)
+        # Column 6: End Date
         elif column == 6:
             try:
-                val1 = float(self.text(6)) if self.text(6) else 0
-                val2 = float(other.text(6)) if other.text(6) else 0
-                return val1 < val2
+                # Access main_window from the item itself
+                main_window = self.main_window
+                if main_window:
+                    date_format_str = main_window._get_strftime_format_string()
+                    text1 = self.text(6) if self.text(6) != "Milestone" else self.text(5)
+                    text2 = other.text(6) if other.text(6) != "Milestone" else other.text(5)
+                    date1 = datetime.strptime(text1, date_format_str)
+                    date2 = datetime.strptime(text2, date_format_str)
+                    return date1 < date2
+                else:
+                    logging.warning("main_window not available for date sorting in SortableTreeWidgetItem.")
+                    return self.text(6) < other.text(6)
             except ValueError:
-                logging.warning(f"Could not parse duration for sorting: {self.text(6)} or {other.text(6)}")
+                # logging.warning(f"Could not parse end date for sorting: {self.text(6)} or {other.text(6)}")
                 return self.text(6) < other.text(6)
 
-        # Column 7: % Complete (numeric)
+        # Column 7: Duration (numeric)
         elif column == 7:
             try:
-                val1 = int(self.text(7).replace('%', '').strip())
-                val2 = int(other.text(7).replace('%', '').strip())
+                val1 = float(self.text(7)) if self.text(7) else 0
+                val2 = float(other.text(7)) if other.text(7) else 0
                 return val1 < val2
             except ValueError:
-                logging.warning(f"Could not parse percent complete for sorting: {self.text(7)} or {other.text(7)}")
+                # logging.warning(f"Could not parse duration for sorting: {self.text(7)} or {other.text(7)}")
                 return self.text(7) < other.text(7)
+
+        # Column 8: % Complete (numeric)
+        elif column == 8:
+            try:
+                val1 = int(self.text(8).replace('%', '').strip())
+                val2 = int(other.text(8).replace('%', '').strip())
+                return val1 < val2
+            except ValueError:
+                # logging.warning(f"Could not parse percent complete for sorting: {self.text(8)} or {other.text(8)}")
+                return self.text(8) < other.text(8)
 
         # Default: text comparison
         else:

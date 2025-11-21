@@ -19,7 +19,7 @@ import sys
 import json
 import logging
 import re
-from data_manager import DataManager, Task, Resource, DependencyType, TaskStatus
+from data_manager import DataManager, Task, Resource, DependencyType, TaskStatus, ScheduleType
 from calendar_manager import CalendarManager
 from gantt_chart import GanttChart
 from exporter import Exporter
@@ -32,6 +32,9 @@ from ui_menu_toolbar import create_menu_bar, create_toolbar
 from ui_dashboard import update_dashboard
 from ui_resources import ResourceSheet
 from pdf_exporter import PDFExporter
+from ui_task_dialog import TaskDialog
+from ui_resource_dialog import ResourceDialog
+from ui_calendar_settings_dialog import CalendarSettingsDialog
 
 
 # Constants for ColorDelegate
@@ -103,8 +106,6 @@ class MainWindow(QMainWindow):
             app = QApplication.instance()
             if app:
                 app.setWindowIcon(icon)
-        else:
-            print(f"Warning: Logo file not found at {icon_path}")
             
     def _auto_refresh(self):
         """Auto-refresh with smarter logic"""
@@ -266,27 +267,27 @@ class MainWindow(QMainWindow):
         sort_menu = view_menu.addMenu("&Sort By")
         
         sort_id_action = QAction("Task &ID", self)
-        sort_id_action.triggered.connect(lambda: self._sort_by_column(1))
+        sort_id_action.triggered.connect(lambda: self._sort_by_column(3))
         sort_menu.addAction(sort_id_action)
         
         sort_name_action = QAction("Task &Name", self)
-        sort_name_action.triggered.connect(lambda: self._sort_by_column(2))
+        sort_name_action.triggered.connect(lambda: self._sort_by_column(5))
         sort_menu.addAction(sort_name_action)
         
         sort_start_action = QAction("&Start Date", self)
-        sort_start_action.triggered.connect(lambda: self._sort_by_column(3))
+        sort_start_action.triggered.connect(lambda: self._sort_by_column(6))
         sort_menu.addAction(sort_start_action)
         
         sort_end_action = QAction("&End Date", self)
-        sort_end_action.triggered.connect(lambda: self._sort_by_column(4))
+        sort_end_action.triggered.connect(lambda: self._sort_by_column(7))
         sort_menu.addAction(sort_end_action)
         
         sort_duration_action = QAction("&Duration", self)
-        sort_duration_action.triggered.connect(lambda: self._sort_by_column(5))
+        sort_duration_action.triggered.connect(lambda: self._sort_by_column(8))
         sort_menu.addAction(sort_duration_action)
         
         sort_complete_action = QAction("% &Complete", self)
-        sort_complete_action.triggered.connect(lambda: self._sort_by_column(6))
+        sort_complete_action.triggered.connect(lambda: self._sort_by_column(9))
         sort_menu.addAction(sort_complete_action)
         
         # Settings Menu
@@ -320,7 +321,7 @@ class MainWindow(QMainWindow):
     def _toggle_wbs_column_visibility(self):
         """Toggle visibility of the WBS column"""
         is_visible = self.toggle_wbs_action.isChecked()
-        self.task_tree.setColumnHidden(2, not is_visible)
+        self.task_tree.setColumnHidden(3, not is_visible)
         self.status_label.setText(f"✓ WBS column visibility toggled: {is_visible}")
 
     def _sort_by_column(self, column: int):
@@ -477,9 +478,27 @@ class MainWindow(QMainWindow):
         # Search/Filter bar
         filter_layout = QHBoxLayout()
         
+        # Quick Add Task field
+        filter_layout.addWidget(QLabel("Quick Add Task:"))
+        self.quick_add_task_input = QLineEdit()
+        self.quick_add_task_input.setPlaceholderText("Enter task name and press Enter...")
+        self.quick_add_task_input.setMaximumWidth(250)
+        self.quick_add_task_input.returnPressed.connect(self._quick_add_task)
+        filter_layout.addWidget(self.quick_add_task_input)
+        
+        # Add a vertical separator
+        separator = QWidget()
+        separator.setFixedWidth(2)
+        separator.setStyleSheet("background-color: #cccccc;")
+        separator.setFixedHeight(30)
+        filter_layout.addSpacing(20)
+        filter_layout.addWidget(separator)
+        filter_layout.addSpacing(20)
+        
         filter_layout.addWidget(QLabel("Search:"))
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search tasks by name...")
+        self.search_box.setMaximumWidth(250)
         self.search_box.textChanged.connect(self._filter_tasks)
         filter_layout.addWidget(self.search_box)
         
@@ -564,8 +583,8 @@ class MainWindow(QMainWindow):
         if not item:
             return
         
-        # Get task ID from column 1
-        task_id = item.data(1, Qt.ItemDataRole.UserRole)
+        # Get task ID from column 2
+        task_id = item.data(2, Qt.ItemDataRole.UserRole)
         task = self.data_manager.get_task(task_id) if task_id else None
         
         menu = QMenu(self)
@@ -652,7 +671,7 @@ class MainWindow(QMainWindow):
         """Handle click on tree item to toggle expand/collapse for summary tasks"""
         item = self.task_tree.itemFromIndex(index)
         if item:
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             task = self.data_manager.get_task(task_id)
 
             if task and task.is_summary:
@@ -733,15 +752,15 @@ class MainWindow(QMainWindow):
 
     def _on_item_expanded(self, item: QTreeWidgetItem):
         """Track expanded items"""
-        # Get task ID from column 1
-        task_id = item.data(1, Qt.ItemDataRole.UserRole)
+        # Get task ID from column 2
+        task_id = item.data(2, Qt.ItemDataRole.UserRole)
         if task_id:
             self.expanded_tasks.add(task_id)
     
     def _on_item_collapsed(self, item: QTreeWidgetItem):
         """Track collapsed items"""
-        # Get task ID from column 1
-        task_id = item.data(1, Qt.ItemDataRole.UserRole)
+        # Get task ID from column 2
+        task_id = item.data(2, Qt.ItemDataRole.UserRole)
         if task_id:
             self.expanded_tasks.discard(task_id)
 
@@ -750,7 +769,7 @@ class MainWindow(QMainWindow):
         # Check if the clicked item has children (i.e., it's a summary task)
         if item.childCount() > 0:
             item.setExpanded(not item.isExpanded())
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             if task_id:
                 if item.isExpanded():
                     self.expanded_tasks.add(task_id)
@@ -762,7 +781,7 @@ class MainWindow(QMainWindow):
         # Block signals to prevent recursive calls during update
         self.task_tree.blockSignals(True)
 
-        task_id = item.data(1, Qt.ItemDataRole.UserRole) # Task ID is in column 1
+        task_id = item.data(2, Qt.ItemDataRole.UserRole) # Task ID is in column 2
         task = self.data_manager.get_task(task_id)
 
         if not task:
@@ -775,24 +794,43 @@ class MainWindow(QMainWindow):
             new_value = item.text(column)
             changed = False
 
-            if column == 3:  # Task Name
+            if column == 0: # Schedule Type
+                try:
+                    new_schedule_type = ScheduleType(new_value)
+                    # Validation: Summary tasks must always be Auto Scheduled
+                    if task.is_summary and new_schedule_type == ScheduleType.MANUALLY_SCHEDULED:
+                        QMessageBox.warning(self, "Validation Error",
+                                            "Summary tasks must always be 'Auto Scheduled'. Reverting change.")
+                        item.setText(0, task.schedule_type.value) # Revert UI
+                        self.task_tree.blockSignals(False)
+                        return
+                    
+                    if task.schedule_type != new_schedule_type:
+                        task.schedule_type = new_schedule_type
+                        changed = True
+                except ValueError:
+                    QMessageBox.critical(self, "Input Error", f"Invalid Schedule Type: {new_value}")
+                    self._revert_task_item_in_ui(item, original_task)
+                    self.task_tree.blockSignals(False)
+                    return
+            elif column == 4:  # Task Name
                 # Clean up display markers before saving to actual task name
                 cleaned_name = new_value.lstrip(' ▶◆')
                 if task.name != cleaned_name:
                     task.name = cleaned_name
                     changed = True
-            elif column == 4:  # Start Date
+            elif column == 5:  # Start Date
                 new_start_date = datetime.strptime(new_value, self._get_strftime_format_string())
                 if task.start_date.date() != new_start_date.date():
                     task.start_date = new_start_date
                     changed = True
-            elif column == 5:  # End Date
+            elif column == 6:  # End Date
                 if not task.is_milestone: # Milestones have fixed end date
                     new_end_date = datetime.strptime(new_value, self._get_strftime_format_string())
                     if task.end_date.date() != new_end_date.date():
                         task.end_date = new_end_date
                         changed = True
-            elif column == 6:  # Duration
+            elif column == 7:  # Duration
                 new_duration = float(new_value)
                 if task.is_milestone and new_duration > 0:
                     task.is_milestone = False
@@ -807,7 +845,7 @@ class MainWindow(QMainWindow):
                     if abs(task.get_duration(current_duration_unit, self.calendar_manager) - new_duration) > 0.01:
                         task.set_duration_and_update_end(new_duration, current_duration_unit, self.calendar_manager)
                         changed = True
-            elif column == 7:  # % Complete
+            elif column == 8:  # % Complete
                 try:
                     new_percent_complete = int(new_value.strip('%'))
                     if not (0 <= new_percent_complete <= 100):
@@ -815,13 +853,13 @@ class MainWindow(QMainWindow):
                     if task.percent_complete != new_percent_complete:
                         task.percent_complete = new_percent_complete
                         changed = True
-                    item.setText(7, f"{task.percent_complete}%")
+                    item.setText(8, f"{task.percent_complete}%")
                 except ValueError as ve:
                     QMessageBox.critical(self, "Input Error", f"Invalid input for % Complete: {ve}")
                     self._revert_task_item_in_ui(item, original_task)
                     self.task_tree.blockSignals(False)
                     return
-            elif column == 8:  # Dependencies
+            elif column == 9:  # Dependencies
                 new_predecessors = []
                 if new_value.strip():
                     for pred_str in new_value.split(','):
@@ -865,8 +903,8 @@ class MainWindow(QMainWindow):
                     elif lag_days < 0:
                         lag_str = f"{lag_days}d"
                     formatted_predecessors.append(f"{pred_id}{dep_type}{lag_str}")
-                item.setText(8, ", ".join(formatted_predecessors))
-            elif column == 9:  # Resources
+                item.setText(9, ", ".join(formatted_predecessors))
+            elif column == 10:  # Resources
                 new_resources = []
                 if new_value.strip():
                     for r_str in new_value.split(','):
@@ -879,7 +917,7 @@ class MainWindow(QMainWindow):
                 if task.assigned_resources != new_resources:
                     task.assigned_resources = new_resources
                     changed = True
-            elif column == 10:  # Notes
+            elif column == 11:  # Notes
                 if task.notes != new_value:
                     task.notes = new_value
                     changed = True
@@ -907,12 +945,13 @@ class MainWindow(QMainWindow):
         self.task_tree.blockSignals(True)
 
         # Update each column with original data
-        item.setText(3, original_task.name) # Task Name
-        item.setText(4, original_task.start_date.strftime(self._get_strftime_format_string())) # Start Date
+        item.setText(0, original_task.schedule_type.value) # Schedule Type
+        item.setText(4, original_task.name) # Task Name
+        item.setText(5, original_task.start_date.strftime(self._get_strftime_format_string())) # Start Date
         if original_task.is_milestone:
-            item.setText(5, original_task.start_date.strftime(self._get_strftime_format_string()))
+            item.setText(6, original_task.start_date.strftime(self._get_strftime_format_string()))
         else:
-            item.setText(5, original_task.end_date.strftime(self._get_strftime_format_string())) # End Date
+            item.setText(6, original_task.end_date.strftime(self._get_strftime_format_string())) # End Date
         
         # Duration
         duration = original_task.get_duration(
@@ -920,13 +959,13 @@ class MainWindow(QMainWindow):
             self.calendar_manager
         )
         if original_task.is_milestone:
-            item.setText(6, "0")
+            item.setText(7, "0")
         elif self.data_manager.settings.duration_unit == DurationUnit.HOURS:
-            item.setText(6, f"{duration:.1f}")
+            item.setText(7, f"{duration:.1f}")
         else:
-            item.setText(6, str(int(duration)))
+            item.setText(7, str(int(duration)))
 
-        item.setText(7, f"{original_task.percent_complete}%") # % Complete
+        item.setText(8, f"{original_task.percent_complete}%") # % Complete
         
         pred_texts = []
         for pred_id, dep_type, lag_days in original_task.predecessors:
@@ -937,10 +976,10 @@ class MainWindow(QMainWindow):
                 lag_str = f"{lag_days}d"
             
             pred_texts.append(f"{pred_id}{dep_type}{lag_str}")
-        item.setText(8, ", ".join(pred_texts)) # Dependencies
+        item.setText(9, ", ".join(pred_texts)) # Dependencies
         resource_texts = [f"{name} ({alloc}%)" for name, alloc in original_task.assigned_resources]
-        item.setText(9, ", ".join(resource_texts)) # Resources
-        item.setText(10, original_task.notes) # Notes
+        item.setText(10, ", ".join(resource_texts)) # Resources
+        item.setText(11, original_task.notes) # Notes
 
         self.task_tree.blockSignals(False)
 
@@ -960,9 +999,39 @@ class MainWindow(QMainWindow):
     
     # Dialog Methods
     
+    
+    def _quick_add_task(self):
+        """Quickly add a task with just the name from the quick add input field"""
+        task_name = self.quick_add_task_input.text().strip()
+        
+        if not task_name:
+            return
+        
+        # Create task with default values
+        from datetime import datetime, timedelta
+        
+        task = Task(
+            name=task_name,
+            start_date=datetime.now(),
+            end_date=datetime.now() + timedelta(days=1),
+            percent_complete=0,
+            predecessors=[],
+            assigned_resources=[],
+            notes="",
+            schedule_type=ScheduleType.AUTO_SCHEDULED
+        )
+        
+        if self.data_manager.add_task(task):
+            self._update_all_views()
+            self.status_label.setText(f"Task '{task.name}' added successfully")
+            self.quick_add_task_input.clear()
+        else:
+            QMessageBox.warning(self, "Validation Error", 
+                              "Task could not be added.")
+    
     def _add_task_dialog(self):
         """Show add task dialog"""
-        dialog = TaskDialog(self, self.data_manager)
+        dialog = TaskDialog(self, self.data_manager, is_milestone=False)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             task_data = dialog.get_task_data()
             
@@ -973,7 +1042,8 @@ class MainWindow(QMainWindow):
                 percent_complete=task_data['percent_complete'],
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
-                notes=task_data['notes']
+                notes=task_data['notes'],
+                schedule_type=task_data['schedule_type']
             )
             
             if self.data_manager.add_task(task):
@@ -992,13 +1062,13 @@ class MainWindow(QMainWindow):
                                   "Please select a parent task first.")
             return
         
-        parent_id = selected_items[0].data(1, Qt.ItemDataRole.UserRole)
+        parent_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
         parent_task = self.data_manager.get_task(parent_id)
         
         if not parent_task:
             return
         
-        dialog = TaskDialog(self, self.data_manager, parent_task=parent_task)
+        dialog = TaskDialog(self, self.data_manager, parent_task=parent_task, is_milestone=False)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             task_data = dialog.get_task_data()
             
@@ -1009,7 +1079,8 @@ class MainWindow(QMainWindow):
                 percent_complete=task_data['percent_complete'],
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
-                notes=task_data['notes']
+                notes=task_data['notes'],
+                schedule_type=task_data['schedule_type']
             )
             
             if self.data_manager.add_task(task, parent_id=parent_id):
@@ -1026,31 +1097,37 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "No Selection", "Please select a task to edit.")
             return
         
-        task_id = selected_items[0].data(1, Qt.ItemDataRole.UserRole)
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
         task = self.data_manager.get_task(task_id)
         
         if task:
-            dialog = TaskDialog(self, self.data_manager, task)
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                task_data = dialog.task_data
-                
-                updated_task = Task(
-                    name=task_data['name'],
-                    start_date=task_data['start_date'],
-                    end_date=task_data['end_date'],
-                    percent_complete=task_data['percent_complete'],
-                    predecessors=task_data['predecessors'],
-                    assigned_resources=task_data['assigned_resources'],
-                    notes=task_data['notes'],
-                    task_id=task.id
-                )
-                
-                if self.data_manager.update_task(task_id, updated_task):
-                    self._update_all_views()
-                    self.status_label.setText(f"Task '{updated_task.name}' updated successfully")
-                else:
-                    QMessageBox.warning(self, "Validation Error", 
-                                      "Task update failed due to circular dependencies.")
+            try:
+                dialog = TaskDialog(self, self.data_manager, task, is_milestone=task.is_milestone)
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    task_data = dialog.task_data
+                    
+                    updated_task = Task(
+                        name=task_data['name'],
+                        start_date=task_data['start_date'],
+                        end_date=task_data['end_date'],
+                        percent_complete=task_data['percent_complete'],
+                        predecessors=task_data['predecessors'],
+                        assigned_resources=task_data['assigned_resources'],
+                        notes=task_data['notes'],
+                        task_id=task.id,
+                        schedule_type=task_data['schedule_type']
+                    )
+                    
+                    if self.data_manager.update_task(task_id, updated_task):
+                        self._update_all_views()
+                        self.status_label.setText(f"Task '{updated_task.name}' updated successfully")
+                    else:
+                        QMessageBox.warning(self, "Validation Error", 
+                                          "Task update failed due to circular dependencies.")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to open task dialog: {e}")
+                import traceback
+                traceback.print_exc() # Print full traceback to console
     
     def _delete_task(self):
         """Delete selected task"""
@@ -1059,7 +1136,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "No Selection", "Please select a task to delete.")
             return
         
-        task_id = selected_items[0].data(1, Qt.ItemDataRole.UserRole)
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
         task = self.data_manager.get_task(task_id)
         
         if task:
@@ -1087,7 +1164,7 @@ class MainWindow(QMainWindow):
             return
         
         current_item = selected_items[0]
-        task_id = current_item.data(1, Qt.ItemDataRole.UserRole)
+        task_id = current_item.data(2, Qt.ItemDataRole.UserRole)
         
         if task_id is None:
             QMessageBox.warning(self, "Error", "Could not identify selected task.")
@@ -1130,7 +1207,7 @@ class MainWindow(QMainWindow):
             previous_item = parent_item.child(index - 1)
         
         # Get the task ID of the previous item
-        previous_task_id = previous_item.data(1, Qt.ItemDataRole.UserRole)
+        previous_task_id = previous_item.data(2, Qt.ItemDataRole.UserRole)
         if previous_task_id is None:
             QMessageBox.warning(self, "Error", "Could not identify previous task.")
             return
@@ -1159,7 +1236,7 @@ class MainWindow(QMainWindow):
             return
         
         current_item = selected_items[0]
-        task_id = current_item.data(1, Qt.ItemDataRole.UserRole)
+        task_id = current_item.data(2, Qt.ItemDataRole.UserRole)
         
         if task_id is None:
             QMessageBox.warning(self, "Error", "Could not identify selected task.")
@@ -1341,28 +1418,35 @@ class MainWindow(QMainWindow):
             item = SortableTreeWidgetItem(main_window=self)
             
             # Set flags for editability for each column
+            # Column 0: Schedule Type (editable)
+            # Column 1: Status (not editable)
+            # Column 2: ID (not editable)
+            # Column 3: WBS (not editable)
+            # Other columns are generally editable
             for col_idx in range(self.task_tree.columnCount()):
-                if col_idx == 0 or col_idx == 1 or col_idx == 2:  # Status, ID, and WBS columns
+                if col_idx in [1, 2, 3]:  # Status, ID, WBS columns
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 else:
                     item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
+            # COLUMN 0: Schedule Type
+            item.setText(0, task.schedule_type.value)
             
-            # COLUMN 0: Status
+            # COLUMN 1: Status
             status_color = task.get_status_color()
             status_text = task.get_status_text()
-            item.setText(0, status_text)
-            item.setData(0, Qt.ItemDataRole.UserRole, status_color)
+            item.setText(1, status_text)
+            item.setData(1, Qt.ItemDataRole.UserRole, status_color)
             
-            # COLUMN 1: Task ID (not editable)
-            item.setText(1, str(task.id))
-            item.setData(1, Qt.ItemDataRole.UserRole, task.id)
-            item.setData(1, Qt.ItemDataRole.DisplayRole, task.id)  # Store as int, display as string
+            # COLUMN 2: Task ID (not editable)
+            item.setText(2, str(task.id))
+            item.setData(2, Qt.ItemDataRole.UserRole, task.id)
+            item.setData(2, Qt.ItemDataRole.DisplayRole, task.id)  # Store as int, display as string
             
-            # COLUMN 2: WBS (not editable)
-            item.setText(2, task.wbs if task.wbs else "")
+            # COLUMN 3: WBS (not editable)
+            item.setText(3, task.wbs if task.wbs else "")
 
-            # COLUMN 3: Task Name WITH MANUAL INDENTATION
+            # COLUMN 4: Task Name WITH MANUAL INDENTATION
             is_milestone = getattr(task, 'is_milestone', False)
             is_summary = getattr(task, 'is_summary', False)
             
@@ -1376,42 +1460,42 @@ class MainWindow(QMainWindow):
             else:
                 display_name = f"{indent}{task.name}"
             
-            item.setText(3, display_name)
+            item.setText(4, display_name)
             
             # Apply font styling
-            font = item.font(3)
+            font = item.font(4)
             if is_milestone:
                 font.setItalic(True)
             elif is_summary:
                 font.setBold(True)
-            item.setFont(3, font)
+            item.setFont(4, font)
             
-            # COLUMN 4: Start Date
-            item.setText(4, task.start_date.strftime(self._get_strftime_format_string()))
+            # COLUMN 5: Start Date
+            item.setText(5, task.start_date.strftime(self._get_strftime_format_string()))
             
-            # COLUMN 5: End Date
+            # COLUMN 6: End Date
             if is_milestone:
-                item.setText(5, task.start_date.strftime(self._get_strftime_format_string()))
+                item.setText(6, task.start_date.strftime(self._get_strftime_format_string()))
             else:
-                item.setText(5, task.end_date.strftime(self._get_strftime_format_string()))
+                item.setText(6, task.end_date.strftime(self._get_strftime_format_string()))
             
-            # COLUMN 6: Duration
+            # COLUMN 7: Duration
             duration = task.get_duration(
                 self.data_manager.settings.duration_unit,
                 self.calendar_manager
             )
             
             if is_milestone:
-                item.setText(6, "0")
+                item.setText(7, "0")
             elif self.data_manager.settings.duration_unit == DurationUnit.HOURS:
-                item.setText(6, f"{duration:.1f}")
+                item.setText(7, f"{duration:.1f}")
             else:
-                item.setText(6, str(int(duration)))
+                item.setText(7, str(int(duration)))
             
-            # COLUMN 7: % Complete
-            item.setText(7, f"{task.percent_complete}%")
+            # COLUMN 8: % Complete
+            item.setText(8, f"{task.percent_complete}%")
             
-            # COLUMN 8: Predecessors
+            # COLUMN 9: Predecessors
             pred_texts = []
             for pred_id, dep_type, lag_days in task.predecessors:
                 lag_str = ""
@@ -1421,14 +1505,14 @@ class MainWindow(QMainWindow):
                     lag_str = f"{lag_days}d"
                 
                 pred_texts.append(f"{pred_id}{dep_type}{lag_str}")
-            item.setText(8, ", ".join(pred_texts))
+            item.setText(9, ", ".join(pred_texts))
             
-            # COLUMN 9: Resources
+            # COLUMN 10: Resources
             resource_texts = [f"{name} ({alloc} %)" for name, alloc in task.assigned_resources]
-            item.setText(9, ", ".join(resource_texts))
+            item.setText(10, ", ".join(resource_texts))
             
-            # COLUMN 10: Notes
-            item.setText(10, task.notes)
+            # COLUMN 11: Notes
+            item.setText(11, task.notes)
             
             # Set row color based on status
             color_map = {
@@ -1441,14 +1525,14 @@ class MainWindow(QMainWindow):
             # Special color for milestones
             if is_milestone:
                 milestone_color = QColor(255, 255, 200)  # Light yellow
-                for col in range(10):
+                for col in range(self.task_tree.columnCount()):
                     item.setBackground(col, QBrush(milestone_color))
             elif not self.dark_mode:
                 bg_color = color_map.get(status_color, QColor(255, 255, 255))
                 # SLIGHTLY LIGHTER BACKGROUND FOR DEEPER LEVELS
                 if level > 0:
                     bg_color = bg_color.lighter(100 + (level * 2))
-                for col in range(10):
+                for col in range(self.task_tree.columnCount()):
                     item.setBackground(col, QBrush(bg_color))
             
             # Add to tree
@@ -1478,7 +1562,7 @@ class MainWindow(QMainWindow):
         self.task_tree.blockSignals(False)
         
         # Set WBS column visibility
-        self.task_tree.setColumnHidden(2, not self.toggle_wbs_action.isChecked())
+        self.task_tree.setColumnHidden(3, not self.toggle_wbs_action.isChecked())
         
         # Auto-adjust column widths to content after population
         self.task_tree.header().resizeSections(QHeaderView.ResizeMode.ResizeToContents)
@@ -1487,6 +1571,9 @@ class MainWindow(QMainWindow):
         self.task_tree.setSortingEnabled(True)
         if current_sort_column >= 0:
             self.task_tree.sortByColumn(current_sort_column, current_sort_order)
+        else:
+            # Default sort by ID (column 2) if no previous sort column
+            self.task_tree.sortByColumn(2, Qt.SortOrder.AscendingOrder)
 
     def _update_gantt_chart(self):
         """Update Gantt chart"""
@@ -1751,7 +1838,7 @@ class MainWindow(QMainWindow):
         about_box.setWindowTitle("About PlanIFlow - Project Planner")
         about_box.setText(
             f"<h2>PlanIFlow - Project Planner</h2>"
-            f"<p>App Version: 1.2</p>"
+            f"<p>App Version: 1.4</p>"
             f"<p><b>Developed by: Dipta Roy</b></p>"
             "<p>A desktop project management application</p>"
             "<p><b>Key Features:</b></p>"
@@ -1858,14 +1945,14 @@ class MainWindow(QMainWindow):
         """Handle settings changes"""
         # Update task tree header
         header_labels = [
-            "Status", "ID", "WBS", "Task Name", "Start Date", "End Date", 
+            "Schedule Type", "Status", "ID", "WBS", "Task Name", "Start Date", "End Date", 
             self.data_manager.settings.get_duration_label(),
             "% Complete", "Dependencies", "Resources", "Notes"
         ]
         self.task_tree.setHeaderLabels(header_labels)
         
         # Ensure WBS column visibility is respected after header update
-        self.task_tree.setColumnHidden(2, not self.toggle_wbs_action.isChecked())
+        self.task_tree.setColumnHidden(3, not self.toggle_wbs_action.isChecked())
         
         # Convert tasks
         self.data_manager.convert_all_tasks_to_unit(new_unit)
@@ -1884,7 +1971,7 @@ class MainWindow(QMainWindow):
         # Get task IDs
         task_ids = []
         for item in selected_items:
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             if task_id is not None:
                 task_ids.append(task_id)
         
@@ -1911,7 +1998,7 @@ class MainWindow(QMainWindow):
         # Get task IDs
         task_ids = []
         for item in selected_items:
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             if task_id is not None:
                 task_ids.append(task_id)
         
@@ -1937,7 +2024,7 @@ class MainWindow(QMainWindow):
         
         expanded_count = 0
         for item in selected_items:
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             if task_id is not None:
                 task = self.data_manager.get_task(task_id)
                 if task and task.is_summary:
@@ -2411,6 +2498,9 @@ class TaskDialog(QDialog):
             else:
                 self.start_date_edit.setDate(QDate.currentDate())
         
+        # Initial state for schedule type
+        self._on_schedule_type_changed()
+
     def _create_ui(self):
         """Create the UI elements for the task dialog"""
         layout = QVBoxLayout(self)
@@ -2419,6 +2509,13 @@ class TaskDialog(QDialog):
         # Task Name
         self.name_edit = QLineEdit()
         form_layout.addRow("Task Name:", self.name_edit)
+
+        # Schedule Type
+        self.schedule_type_combo = QComboBox()
+        self.schedule_type_combo.addItem(ScheduleType.AUTO_SCHEDULED.value)
+        self.schedule_type_combo.addItem(ScheduleType.MANUALLY_SCHEDULED.value)
+        self.schedule_type_combo.currentIndexChanged.connect(self._on_schedule_type_changed)
+        form_layout.addRow("Schedule Type:", self.schedule_type_combo)
 
         # Start Date
         self.start_date_edit = QDateEdit()
@@ -2544,11 +2641,13 @@ class TaskDialog(QDialog):
         
         # Show info for summary tasks
         if self.task and getattr(self.task, 'is_summary', False):
-            self.info_label.setText("ℹ️ This is a summary task. Dates are auto-calculated from subtasks.")
+            self.info_label.setText("ℹ️ This is a summary task. Dates are auto-calculated from subtasks and cannot be manually scheduled.")
             self.start_date_edit.setEnabled(False)
             self.end_date_edit.setEnabled(False)
             if hasattr(self, 'duration_spin'):
                 self.duration_spin.setEnabled(False)
+            self.schedule_type_combo.setCurrentText(ScheduleType.AUTO_SCHEDULED.value)
+            self.schedule_type_combo.setEnabled(False)
     
     def _add_resource_row(self, resource_name="", allocation=100):
         """Add a resource assignment row to the table"""
@@ -2714,9 +2813,40 @@ class TaskDialog(QDialog):
         self.predecessor_rows = [r for r in self.predecessor_rows if r[3] != row_widget]
         row_widget.deleteLater()
     
+    def _on_schedule_type_changed(self):
+        """Enable/disable date fields based on schedule type"""
+        selected_type = self.schedule_type_combo.currentText()
+        is_manually_scheduled = (selected_type == ScheduleType.MANUALLY_SCHEDULED.value)
+
+        # Summary tasks cannot be manually scheduled
+        if self.task and self.task.is_summary and is_manually_scheduled:
+            QMessageBox.warning(self, "Validation Error",
+                                "Summary tasks must always be 'Auto Scheduled'. Reverting change.")
+            self.schedule_type_combo.setCurrentText(ScheduleType.AUTO_SCHEDULED.value)
+            is_manually_scheduled = False # Ensure it remains auto-scheduled
+
+        self.start_date_edit.setEnabled(is_manually_scheduled)
+        self.end_date_edit.setEnabled(is_manually_scheduled)
+        
+        # Duration spinbox should also be disabled if auto-scheduled
+        if hasattr(self, 'duration_spin'):
+            self.duration_spin.setEnabled(is_manually_scheduled)
+
+        if is_manually_scheduled:
+            self.info_label.setText("ℹ️ This task is Manually Scheduled. Dates and duration will not update automatically.")
+            self.info_label.setStyleSheet("color: orange; padding: 5px;")
+        else:
+            if self.task and self.task.is_summary:
+                self.info_label.setText("ℹ️ This is a summary task. Dates are auto-calculated from subtasks and cannot be manually scheduled.")
+                self.info_label.setStyleSheet("color: blue; padding: 5px;")
+            else:
+                self.info_label.setText("ℹ️ This task is Auto Scheduled. Dates and duration will update automatically based on dependencies.")
+                self.info_label.setStyleSheet("color: green; padding: 5px;")
+
     def _populate_fields(self):
         """Populate fields when editing"""
         self.name_edit.setText(self.task.name)
+        self.schedule_type_combo.setCurrentText(self.task.schedule_type.value)
         self.start_date_edit.setDate(QDate(self.task.start_date.year, 
                                            self.task.start_date.month, 
                                            self.task.start_date.day))
@@ -2748,6 +2878,9 @@ class TaskDialog(QDialog):
         # Populate assigned resources
         for resource_name, allocation in self.task.assigned_resources:
             self._add_resource_row(resource_name, allocation)
+        
+        # After populating, ensure the schedule type logic is applied
+        self._on_schedule_type_changed()
     
     def accept(self):
         """Store data and accept the dialog"""
@@ -2789,7 +2922,8 @@ class TaskDialog(QDialog):
             'percent_complete': self.percent_spin.value(),
             'predecessors': predecessors,
             'assigned_resources': resources,
-            'notes': self.notes_edit.toPlainText()
+            'notes': self.notes_edit.toPlainText(),
+            'schedule_type': ScheduleType(self.schedule_type_combo.currentText())
         }
 
     def get_task_data(self):

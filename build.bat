@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.3 - Build to EXE
+echo   PlanIFlow - Project Planner v1.4 - Build to EXE
 echo ===============================================
 echo.
 
@@ -88,11 +88,11 @@ echo.
 
 REM Build the executable
 echo ===============================================
-echo   Building PlanIFlow - ProjectPlanner v1.3
+echo   Building PlanIFlow - ProjectPlanner v1.4
 echo ===============================================
 echo.
 
-pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.3" ^
+pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.4" ^
     %ICON_OPTION% ^
     --add-data="images;images" ^
     --add-data="data_manager.py;." ^
@@ -108,9 +108,12 @@ pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.3" ^
     --add-data="ui_resources.py;." ^
     --add-data="ui_project_settings.py;." ^
     --add-data="ui_delegates.py;." ^
-    --add-data="settings_manager_new.py;." ^
+    --add-data="settings_manager_new_del.py;." ^
     --add-data="ui_helpers.py;." ^
     --add-data="pdf_exporter.py;." ^
+    --add-data="ui_task_dialog.py;." ^
+    --add-data="ui_resource_dialog.py;." ^
+    --add-data="ui_calendar_settings_dialog.py;." ^
     --hidden-import=PyQt6 ^
     --hidden-import=PyQt6.QtCore ^
     --hidden-import=PyQt6.QtGui ^
@@ -143,29 +146,15 @@ echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
 echo.
-echo [SUCCESS] Executable created: dist\PlanIFlow_ProjectPlanner_v1.3.exe
+echo [SUCCESS] Executable created: dist\PlanIFlow_ProjectPlanner_v1.4.exe
 echo [INFO] Icon has been embedded in the executable
 echo.
 
 REM Display file info
-for %%A in ("dist\PlanIFlow_ProjectPlanner_v1.3.exe") do (
+for %%A in ("dist\PlanIFlow_ProjectPlanner_v1.4.exe") do (
     set size=%%~zA
     set /a sizeMB=!size! / 1048576
     echo [INFO] File size: !sizeMB! MB
-)
-
-echo.
-set /p TEST_EXE="Do you want to test the executable now? (Y/N): "
-if /i "!TEST_EXE!"=="Y" (
-    echo.
-    echo [INFO] Launching PlanIFlow_ProjectPlanner_v1.3.exe...
-    start "" "dist\PlanIFlow_ProjectPlanner_v1.1.exe"
-)
-
-call venv\Scripts\deactivate.bat
-
-echo.
-echo ===============================================
 echo   Build process complete!
 echo ===============================================
 pause

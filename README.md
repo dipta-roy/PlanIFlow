@@ -75,11 +75,10 @@ ui_main.py (MainWindow: Tabs, Menus, TreeView)
 Data Layer:
    ├── data_manager.py (Tasks/Resources: CPM, Costs)
    ├── calendar_manager.py (Holidays, Working Days)
-   ├── settings_manager_new.py (Settings: Duration, Themes)
+   ├── settings_manager_new_del.py (Settings: Duration, Themes)
    └── settings_manager.py (Deprecated: Old Settings)
 I/O:
-   ├── exporter.py (JSON/Excel: Full State)
-   └── pdf_exporter.py (PDF Report)
+   └── exporter.py (JSON/Excel: Full State)
 Utilities:
    ├── ui_helpers.py (Icons, Paths)
    ├── ui_delegates.py (Editors: Date, Resource)
@@ -125,7 +124,7 @@ This script will activate the virtual environment and start the application.
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download `PlanIFlow_1.3_Portable_Signed.zip`:
+Download `PlanIFlow_1.4_Portable_Signed.zip`:
 
 ```
 1. Unzip the distribution package.
@@ -134,7 +133,7 @@ Download `PlanIFlow_1.3_Portable_Signed.zip`:
 4. Select: "Current User"
 5. Choose: "Place all certificates in the following store"
 6. Browse -> "Trusted People" -> OK -> Next -> Finish
-7. Run: PlanIFlow_v1.3_Portable_Signed.exe -> NO WARNINGS!
+7. Run: PlanIFlow 1.4 Portable.exe -> NO WARNINGS!
 ```
 
 ## 💻 Usage
@@ -219,14 +218,13 @@ To build a standalone executable from the source code, you can use the `build.ba
 ## 📂 Project Structure
 
 ```
-PlanIFlow_v1.3\
+PlanIFlow_v1.4\
 ├───build.bat
 ├───clean.bat
 ├───install.bat 
 ├───quick-start.bat
 ├───run.bat
 ├───setup.bat 
-├───PlanIFlow_ProjectPlanner_v1.3.spec
 ├───README.md
 ├───requirements.txt
 ├───__init__.py
@@ -235,7 +233,7 @@ PlanIFlow_v1.3\
 ├───exporter.py
 ├───gantt_chart.py
 ├───main.py
-├───settings_manager_new.py
+├───settings_manager_new_del.py
 ├───settings_manager.py
 ├───themes.py
 ├───ui_dashboard.py
@@ -255,6 +253,7 @@ PlanIFlow_v1.3\
 ```
 
 **Note:** The `build` and `dist` directories are generated during the build process and contain the compiled application and its dependencies. 
+
 
 
 ## 🐛 Troubleshooting

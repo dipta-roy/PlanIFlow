@@ -22,6 +22,11 @@ class TaskStatus(Enum):
     UPCOMING = ("grey", "Upcoming")
     COMPLETED = ("blue", "Completed")
 
+class ScheduleType(Enum):
+    """Scheduling type for tasks"""
+    AUTO_SCHEDULED = "Auto Scheduled"
+    MANUALLY_SCHEDULED = "Manually Scheduled"
+
 class Task:
     """Task data model with hierarchy and dependency types"""
     
@@ -31,7 +36,8 @@ class Task:
                  percent_complete: int = 0,                  predecessors: List[Tuple[int, str, int]] = None,
                  assigned_resources: List[str] = None, notes: str = "",
                  task_id: int = None, parent_id: int = None, is_summary: bool = False,
-                 is_milestone: bool = False, wbs: str = None):
+                 is_milestone: bool = False, wbs: str = None,
+                 schedule_type: ScheduleType = ScheduleType.AUTO_SCHEDULED):
         """
         Initialize task with hierarchy support
         
@@ -50,6 +56,7 @@ class Task:
         self.is_summary = is_summary
         self.parent_id = parent_id
         self.wbs = wbs
+        self.schedule_type = schedule_type
         
         # Now set other attributes
         self.name = name
@@ -171,7 +178,8 @@ class Task:
             'parent_id': self.parent_id,
             'is_summary': self.is_summary,
             'is_milestone': self.is_milestone,
-            'wbs': self.wbs
+            'wbs': self.wbs,
+            'schedule_type': self.schedule_type.value
         }
     
     @staticmethod
@@ -236,6 +244,12 @@ class Task:
         if parsed_end_date is None:
             raise ValueError(f"Could not parse end date '{end_date_str}' with any known format.")
 
+        schedule_type_str = data.get('schedule_type', ScheduleType.AUTO_SCHEDULED.value)
+        try:
+            schedule_type = ScheduleType(schedule_type_str)
+        except ValueError:
+            schedule_type = ScheduleType.AUTO_SCHEDULED # Default fallback
+            
         return Task(
             name=data['name'],
             start_date=parsed_start_date,
@@ -248,7 +262,8 @@ class Task:
             parent_id=data.get('parent_id'), # Pass parent_id from data
             is_summary=data.get('is_summary', False), # Pass is_summary from data
             is_milestone=data.get('is_milestone', False), # Pass is_milestone from data
-            wbs=data.get('wbs') # Pass wbs from data
+            wbs=data.get('wbs'), # Pass wbs from data
+            schedule_type=schedule_type
         )
     def calculate_duration_days(self, calendar_manager=None) -> int:
         """Calculate duration in working days"""
@@ -448,14 +463,28 @@ class DataManager:
         
         for i, task in enumerate(self.tasks):
             if task.id == task_id:
+                # Validation: Summary tasks must always be Auto Scheduled
+                if updated_task.is_summary and updated_task.schedule_type == ScheduleType.MANUALLY_SCHEDULED:
+                    # Revert to Auto Scheduled if an attempt is made to set a summary task to Manual
+                    updated_task.schedule_type = ScheduleType.AUTO_SCHEDULED
+                    # Optionally, log a warning or return False to indicate validation failure
+                    # For now, we'll just force it to Auto Scheduled
+
                 if not self._validate_predecessors(updated_task, exclude_id=task_id):
                     return False
                 
-                # The updated_task should already have its dates correctly set (by user or duration change)
-                # We no longer auto-calculate dates from predecessors for the updated_task itself here
-                # self._auto_calculate_dates_from_predecessors(updated_task) # Removed this line
+                # If schedule type changed from Manual to Auto, recalculate dates
+                if old_task.schedule_type == ScheduleType.MANUALLY_SCHEDULED and \
+                   updated_task.schedule_type == ScheduleType.AUTO_SCHEDULED:
+                    self._auto_calculate_dates_from_predecessors(updated_task)
+                # If an auto-scheduled task's duration is manually changed, switch to manually scheduled
+
+                # If it's still Auto Scheduled, or changed from Auto to Manual,
+                # _auto_calculate_dates_from_predecessors will be called by _auto_adjust_dependent_tasks
+                # if needed, or skipped if it's Manual.
                 
                 self.tasks[i] = updated_task
+
                 self._generate_wbs()
                 
                 # Update summary task if this has a parent
@@ -660,6 +689,8 @@ class DataManager:
     
     def _auto_calculate_dates_from_predecessors(self, task: Task):
         """Auto-calculate task dates based on predecessors and dependency types"""
+        if task.schedule_type == ScheduleType.MANUALLY_SCHEDULED:
+            return
         if not task.predecessors:
             # If no predecessors, reset to original start date if available
             if hasattr(task, '_original_start') and task._original_start:
@@ -755,6 +786,11 @@ class DataManager:
             if not task or task_id in finalized_ids:
                 continue
 
+            # Only auto-adjust AUTO_SCHEDULED tasks
+            if task.schedule_type == ScheduleType.MANUALLY_SCHEDULED:
+                finalized_ids.add(task_id) # Mark as finalized to prevent re-processing
+                continue
+
             original_start = task.start_date
             original_end = task.end_date
 
@@ -771,7 +807,8 @@ class DataManager:
                 
                 # Add all direct successors to the queue for re-evaluation
                 for successor in self.get_successors(task.id):
-                    if successor.id not in queued_ids:
+                    # Only add AUTO_SCHEDULED successors to the queue
+                    if successor.schedule_type == ScheduleType.AUTO_SCHEDULED and successor.id not in queued_ids:
                         queue.append(successor.id)
                         queued_ids.add(successor.id)
 

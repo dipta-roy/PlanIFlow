@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.3 - Quick Run
+echo   PlanIFlow - Project Planner v1.4 - Quick Run
 echo ===============================================
 echo.
 
@@ -79,10 +79,11 @@ if errorlevel 1 (
 
 REM Run the application
 echo ===============================================
-echo   Launching PlanIFlow - Project Planner v1.3...
+echo   Launching PlanIFlow - Project Planner v1.4...
 echo ===============================================
 
-python main.py
+python.exe main.py
+pause  REM Added to keep console open after main.py execution
 
 REM Deactivate virtual environment on exit
 call venv\Scripts\deactivate.bat

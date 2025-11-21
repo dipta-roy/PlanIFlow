@@ -5,9 +5,13 @@ A desktop project management application similar to Microsoft Project
 
 import sys
 import os
+
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 from PyQt6.QtGui import QIcon, QPixmap
 from ui_main import MainWindow, get_resource_path
+from ui_task_dialog import TaskDialog
+from ui_resource_dialog import ResourceDialog
+from ui_calendar_settings_dialog import CalendarSettingsDialog
 from PyQt6.QtCore import Qt, QTimer
 
 
