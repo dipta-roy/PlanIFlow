@@ -124,7 +124,7 @@ This script will activate the virtual environment and start the application.
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download `PlanIFlow_1.4_Portable_Signed.zip`:
+Download `PlanIFlow_1.5 _Portable.zip`:
 
 ```
 1. Unzip the distribution package.
@@ -133,7 +133,7 @@ Download `PlanIFlow_1.4_Portable_Signed.zip`:
 4. Select: "Current User"
 5. Choose: "Place all certificates in the following store"
 6. Browse -> "Trusted People" -> OK -> Next -> Finish
-7. Run: PlanIFlow 1.4 Portable.exe -> NO WARNINGS!
+7. Run: PlanIFlow_v1.5_Portable.exe -> NO WARNINGS!
 ```
 
 ## 💻 Usage
@@ -218,7 +218,7 @@ To build a standalone executable from the source code, you can use the `build.ba
 ## 📂 Project Structure
 
 ```
-PlanIFlow_v1.4\
+PlanIFlow_v1.5\
 ├───build.bat
 ├───clean.bat
 ├───install.bat 

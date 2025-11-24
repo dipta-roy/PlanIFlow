@@ -142,7 +142,26 @@ class PDFExporter:
             self.story.append(PageBreak())
             return
 
-        table_data = [headers] + rows
+        # Create header style for wrapping
+        header_style = self.styles['Normal'].clone('header_style')
+        header_style.textColor = colors.whitesmoke
+        header_style.alignment = 1 # CENTER
+        header_style.fontName = 'Helvetica-Bold'
+        
+        # Wrap headers in Paragraph objects to allow word wrapping
+        wrapped_headers = [Paragraph(h, header_style) for h in headers]
+
+        # Create cell style for wrapping content
+        cell_style = self.styles['Normal'].clone('cell_style')
+        cell_style.alignment = 1 # CENTER
+
+        # Wrap row content in Paragraph objects
+        wrapped_rows = []
+        for row in rows:
+            wrapped_row = [Paragraph(str(cell), cell_style) for cell in row]
+            wrapped_rows.append(wrapped_row)
+
+        table_data = [wrapped_headers] + wrapped_rows
 
         # Calculate column widths dynamically with maximum width
         # Period column: fixed width
@@ -168,9 +187,9 @@ class PDFExporter:
         table = Table(table_data, colWidths=col_widths)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')), # Green header
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            # TEXTCOLOR for headers is handled by Paragraph style
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            # FONTNAME for headers is handled by Paragraph style
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#E8F5E9')), # Light green rows
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
