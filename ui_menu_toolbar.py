@@ -5,12 +5,9 @@ from PyQt6.QtWidgets import QLabel, QToolBar, QMenu, QStatusBar, QApplication, Q
 from PyQt6.QtGui import QAction, QPixmap
 from ui_delegates import get_resource_path
 import os
+import base64
 from PyQt6.QtCore import Qt, QSize
 
-LOGO_PATH = 'images/logo.ico'
-
-def create_menu_bar(window):
-    """Create menu bar"""
 def create_menu_bar(window):
     """Create menu bar"""
     menubar = window.menuBar()
@@ -241,17 +238,26 @@ def create_toolbar(window):
     toolbar.setIconSize(QSize(32, 32))
     toolbar.setStyleSheet("QToolButton { padding: 5px; }")
 
-    logo_path = get_resource_path(LOGO_PATH)
-    if os.path.exists(logo_path):
-        logo_label = QLabel()
-        logo_pixmap = QPixmap(logo_path).scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, 
-                                                 Qt.TransformationMode.SmoothTransformation)
-        logo_label.setPixmap(logo_pixmap)
-        logo_label.setStyleSheet("padding: 5px;")
-        toolbar.addWidget(logo_label)
+    # Load logo from base64
+    from app_images import LOGO_ICO_BASE64
+    try:
+        logo_bytes = base64.b64decode(LOGO_ICO_BASE64)
+        logo_pixmap = QPixmap()
+        logo_pixmap.loadFromData(logo_bytes)
         
-        # Add separator after logo
-        toolbar.addSeparator()
+        if not logo_pixmap.isNull():
+            logo_label = QLabel()
+            logo_pixmap = logo_pixmap.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, 
+                                             Qt.TransformationMode.SmoothTransformation)
+            logo_label.setPixmap(logo_pixmap)
+            logo_label.setStyleSheet("padding: 5px;")
+            toolbar.addWidget(logo_label)
+            
+            # Add separator after logo
+            toolbar.addSeparator()
+    except Exception as e:
+        print(f"Error loading logo: {e}")
+        
     # Project Name Display
     toolbar.addWidget(QLabel("Project: "))
     window.project_name_label = QLabel(window.data_manager.project_name)

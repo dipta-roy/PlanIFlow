@@ -92,9 +92,10 @@ echo   Building PlanIFlow - ProjectPlanner v1.5
 echo ===============================================
 echo.
 
-pyinstaller --onefile --windowed --name="PlanIFlow_ProjectPlanner_v1.5" ^
+pyinstaller --onefile --windowed --name="PlanIFlow_1.5.exe" ^
     %ICON_OPTION% ^
     --add-data="images;images" ^
+    --add-data="app_images.py;." ^
     --add-data="data_manager.py;." ^
     --add-data="calendar_manager.py;." ^
     --add-data="gantt_chart.py;." ^
@@ -146,15 +147,17 @@ echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
 echo.
-echo [SUCCESS] Executable created: dist\PlanIFlow_ProjectPlanner_v1.5.exe
+echo [SUCCESS] Executable created: dist\PlanIFlow_1.5.exe
 echo [INFO] Icon has been embedded in the executable
 echo.
 
 REM Display file info
-for %%A in ("dist\PlanIFlow_ProjectPlanner_v1.5.exe") do (
+for %%A in ("dist\PlanIFlow_1.5.exe") do (
     set size=%%~zA
     set /a sizeMB=!size! / 1048576
     echo [INFO] File size: !sizeMB! MB
+)
+echo.
 echo   Build process complete!
 echo ===============================================
 pause

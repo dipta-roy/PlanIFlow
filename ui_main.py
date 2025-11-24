@@ -49,16 +49,13 @@ STATUS_IN_PROGRESS = "In Progress"
 STATUS_UPCOMING = "Upcoming"
 STATUS_COMPLETED = "Completed"
 
-# Constants for resource paths
-LOGO_PATH = 'images/logo.ico'
-
 class MainWindow(QMainWindow):
     """Main application window with enhanced features"""
     
     def __init__(self):
         super().__init__()
         
-        set_application_icon(self, LOGO_PATH)
+        set_application_icon(self)
         
         # Initialize managers
         self.calendar_manager = CalendarManager()

@@ -113,7 +113,5 @@ echo.
 echo Next steps:
 echo   - Run application:    run.bat
 echo   - Build executable:   build.bat
-echo   - Development mode:   dev.bat
-echo   - Run tests:          test.bat
 echo.
 pause
