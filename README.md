@@ -78,6 +78,7 @@ Data Layer:
    ├── settings_manager_new_del.py (Settings: Duration, Themes)
    └── settings_manager.py (Deprecated: Old Settings)
 I/O:
+   ├── pdf_exporter.py (PDF report Export)
    └── exporter.py (JSON/Excel: Full State)
 Utilities:
    ├── ui_helpers.py (Icons, Paths)
@@ -124,16 +125,29 @@ This script will activate the virtual environment and start the application.
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download `PlanIFlow_1.5 _Portable.zip`:
-
+Download PlanIFlow `PlanIFlow_1.5.zip`:
+Download Code Verification Certificate: [Dipta Roy](https://github.com/dipta-roy/dipta-roy.github.io/blob/main/downloads/Code%20Verifying%20Certificates.zip).
 ```
+- HOW TO TRUST
+
 1. Unzip the distribution package.
-2. Double-click: PlanIFlow_Public.cer
+2. Double-click: Signed_By_Dipta_CodeSigningPublicKey.cer
 3. Click: "Open" -> "Install Certificate..."
 4. Select: "Current User"
 5. Choose: "Place all certificates in the following store"
 6. Browse -> "Trusted People" -> OK -> Next -> Finish
-7. Run: PlanIFlow_v1.5_Portable.exe -> NO WARNINGS!
+
+- VERIFY APPLICATION AUTHENTICITY
+
+1. To confirm the application is genuine, open its Properties.
+2. Go to the Digital Signatures tab.
+3. Select "Signed_By_Dipta" from the Embedded Signatures list, then choose Details.
+4. In the General tab, you should see the message "This digital signature is OK." which confirms the app was signed by Dipta using the listed certificates.
+```
+
+Once verified,
+```
+Run: PlanIFlow_1.5.exe
 ```
 
 ## 💻 Usage
@@ -228,6 +242,7 @@ PlanIFlow_v1.5\
 ├───README.md
 ├───requirements.txt
 ├───__init__.py
+├───app_images.py
 ├───calendar_manager.py
 ├───data_manager.py
 ├───exporter.py
@@ -253,8 +268,6 @@ PlanIFlow_v1.5\
 ```
 
 **Note:** The `build` and `dist` directories are generated during the build process and contain the compiled application and its dependencies. 
-
-
 
 ## 🐛 Troubleshooting
 
