@@ -154,27 +154,27 @@ def create_menu_bar(window):
     sort_menu = view_menu.addMenu("&Sort By")
 
     sort_id_action = QAction("Task &ID", window)
-    sort_id_action.triggered.connect(lambda: window._sort_by_column(1))
+    sort_id_action.triggered.connect(lambda: window._sort_by_column(2))
     sort_menu.addAction(sort_id_action)
 
     sort_name_action = QAction("Task &Name", window)
-    sort_name_action.triggered.connect(lambda: window._sort_by_column(2))
+    sort_name_action.triggered.connect(lambda: window._sort_by_column(4))
     sort_menu.addAction(sort_name_action)
 
     sort_start_action = QAction("&Start Date", window)
-    sort_start_action.triggered.connect(lambda: window._sort_by_column(3))
+    sort_start_action.triggered.connect(lambda: window._sort_by_column(5))
     sort_menu.addAction(sort_start_action)
 
     sort_end_action = QAction("&End Date", window)
-    sort_end_action.triggered.connect(lambda: window._sort_by_column(4))
+    sort_end_action.triggered.connect(lambda: window._sort_by_column(6))
     sort_menu.addAction(sort_end_action)
 
     sort_duration_action = QAction("&Duration", window)
-    sort_duration_action.triggered.connect(lambda: window._sort_by_column(5))
+    sort_duration_action.triggered.connect(lambda: window._sort_by_column(7))
     sort_menu.addAction(sort_duration_action)
 
     sort_complete_action = QAction("% &Complete", window)
-    sort_complete_action.triggered.connect(lambda: window._sort_by_column(6))
+    sort_complete_action.triggered.connect(lambda: window._sort_by_column(8))
     sort_menu.addAction(sort_complete_action)
 
     view_menu.addSeparator()

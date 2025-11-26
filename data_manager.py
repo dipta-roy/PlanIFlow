@@ -544,8 +544,8 @@ class DataManager:
         return self.tasks.copy()
     
     def get_child_tasks(self, parent_id: int) -> List[Task]:
-        """Get all direct children of a task"""
-        return [t for t in self.tasks if t.parent_id == parent_id]
+        """Get all direct children of a task, sorted by ID"""
+        return sorted([t for t in self.tasks if t.parent_id == parent_id], key=lambda t: t.id)
     
     def get_all_descendants(self, task_id: int) -> List[Task]:
         """Get all descendants (children, grandchildren, etc.) of a task"""
@@ -559,8 +559,8 @@ class DataManager:
         return descendants
     
     def get_top_level_tasks(self) -> List[Task]:
-        """Get all tasks without parents"""
-        return [t for t in self.tasks if t.parent_id is None]
+        """Get all tasks without parents, sorted by ID"""
+        return sorted([t for t in self.tasks if t.parent_id is None], key=lambda t: t.id)
     
     def move_task(self, task_id: int, new_parent_id: int = None) -> bool:
         """Move a task to a new parent"""

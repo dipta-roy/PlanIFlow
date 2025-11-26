@@ -20,57 +20,7 @@ CIRCLE_SIZE = 10
 LEFT_PADDING = 8
 TEXT_SHIFT = 15
 
-class SortableTreeWidgetItem(QTreeWidgetItem):
-    """Custom QTreeWidgetItem that allows sorting by data role and controls editability"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
 
-
-    def __lt__(self, other_item):
-        column = self.treeWidget().sortColumn()
-        
-        # Custom sorting for the "Status" column (column 1)
-        if column == 1: # Status column
-            status_order = {
-                'red': 0,    # Overdue
-                'green': 1,  # In Progress
-                'grey': 2,   # Upcoming
-                'blue': 3    # Completed
-            }
-            self_status_color = self.data(column, Qt.ItemDataRole.UserRole)
-            other_status_color = other_item.data(column, Qt.ItemDataRole.UserRole)
-            
-            self_order = status_order.get(self_status_color, 99)
-            other_order = status_order.get(other_status_color, 99)
-            
-            if self_order != other_order:
-                return self_order < other_order
-            else:
-                # If status is the same, sort by task ID (column 2) as a secondary sort
-                self_id = self.data(2, Qt.ItemDataRole.UserRole)
-                other_id = other_item.data(2, Qt.ItemDataRole.UserRole)
-                return self_id < other_id
-        
-        # Default sorting for other columns
-        try:
-            self_data = self.data(column, Qt.ItemDataRole.DisplayRole)
-            other_data = other_item.data(column, Qt.ItemDataRole.DisplayRole)
-            
-            # Handle numeric columns
-            if column in [2, 7, 8]: # ID, Duration, % Complete
-                return float(self_data) < float(other_data)
-            
-            # Handle date columns
-            if column in [5, 6]: # Start Date, End Date
-                # Assuming date format is consistent, e.g., "yyyy-MM-dd"
-                self_date = QDate.fromString(self_data, "yyyy-MM-dd")
-                other_date = QDate.fromString(other_data, "yyyy-MM-dd")
-                return self_date < other_date
-            
-            return str(self_data) < str(other_data)
-        except (TypeError, ValueError):
-            # Fallback to string comparison if direct comparison fails
-            return str(self.data(column, Qt.ItemDataRole.DisplayRole)) < str(other_item.data(column, Qt.ItemDataRole.DisplayRole))
 
 class ColorDelegate(QStyledItemDelegate):
     """Custom delegate to show colored status indicators"""
@@ -370,13 +320,16 @@ def create_task_tree(main_window):
         header.setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive)
     header.setStretchLastSection(False)
 
+    # Set default width for ID column
+    tree.setColumnWidth(2, 100)
+
     # Set initial visibility for WBS column
     tree.setColumnHidden(3, not main_window.toggle_wbs_action.isChecked())
 
     # Make header interactive
     header.setSectionsClickable(True)
     header.setSortIndicatorShown(True)
-    header.sectionClicked.connect(main_window._on_header_clicked)
+    # header.sectionClicked.connect(main_window._on_header_clicked)
 
     # Enable custom delegate for schedule type column
     main_window.schedule_type_delegate = ScheduleTypeDelegate(main_window, main_window)

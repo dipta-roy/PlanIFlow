@@ -264,27 +264,27 @@ class MainWindow(QMainWindow):
         sort_menu = view_menu.addMenu("&Sort By")
         
         sort_id_action = QAction("Task &ID", self)
-        sort_id_action.triggered.connect(lambda: self._sort_by_column(3))
+        sort_id_action.triggered.connect(lambda: self._sort_by_column(2))
         sort_menu.addAction(sort_id_action)
         
         sort_name_action = QAction("Task &Name", self)
-        sort_name_action.triggered.connect(lambda: self._sort_by_column(5))
+        sort_name_action.triggered.connect(lambda: self._sort_by_column(4))
         sort_menu.addAction(sort_name_action)
         
         sort_start_action = QAction("&Start Date", self)
-        sort_start_action.triggered.connect(lambda: self._sort_by_column(6))
+        sort_start_action.triggered.connect(lambda: self._sort_by_column(5))
         sort_menu.addAction(sort_start_action)
         
         sort_end_action = QAction("&End Date", self)
-        sort_end_action.triggered.connect(lambda: self._sort_by_column(7))
+        sort_end_action.triggered.connect(lambda: self._sort_by_column(6))
         sort_menu.addAction(sort_end_action)
         
         sort_duration_action = QAction("&Duration", self)
-        sort_duration_action.triggered.connect(lambda: self._sort_by_column(8))
+        sort_duration_action.triggered.connect(lambda: self._sort_by_column(7))
         sort_menu.addAction(sort_duration_action)
         
         sort_complete_action = QAction("% &Complete", self)
-        sort_complete_action.triggered.connect(lambda: self._sort_by_column(9))
+        sort_complete_action.triggered.connect(lambda: self._sort_by_column(8))
         sort_menu.addAction(sort_complete_action)
         
         # Settings Menu
@@ -677,6 +677,7 @@ class MainWindow(QMainWindow):
                     self.expanded_tasks.add(task_id)
                 else:
                     self.expanded_tasks.discard(task_id)
+    
     def _show_header_context_menu(self, position):
         """Show context menu on header right-click"""
         header = self.task_tree.header()
@@ -698,7 +699,7 @@ class MainWindow(QMainWindow):
         
         # Reset to default (ID ascending)
         reset_action = QAction("Reset to Default (ID)", self)
-        reset_action.triggered.connect(lambda: self.task_tree.sortByColumn(1, Qt.SortOrder.AscendingOrder))
+        reset_action.triggered.connect(lambda: self.task_tree.sortByColumn(2, Qt.SortOrder.AscendingOrder))
         menu.addAction(reset_action)
         
         menu.exec(header.mapToGlobal(position))
@@ -715,7 +716,6 @@ class MainWindow(QMainWindow):
     def _create_resource_summary(self):
         self.resource_summary = ResourceSheet(self, self.data_manager)
         return self.resource_summary
-
 
     def _create_dashboard(self):
         from ui_dashboard import create_dashboard
@@ -734,7 +734,6 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.save_time_label)
     
     # Tree View Methods
-    
     def eventFilter(self, obj, event):
         """Event filter to catch Tab and Shift+Tab for indent/outdent"""
         if obj == self.task_tree and event.type() == QEvent.Type.KeyPress:
@@ -995,8 +994,6 @@ class MainWindow(QMainWindow):
         self.expanded_tasks.clear()
     
     # Dialog Methods
-    
-    
     def _quick_add_task(self):
         """Quickly add a task with just the name from the quick add input field"""
         task_name = self.quick_add_task_input.text().strip()
@@ -1289,7 +1286,6 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Duplicate Resource", 
                                   "A resource with this name already exists.")
     
-    
     def _delete_resource(self):
         """Delete selected resource"""
         selected_items = self.resource_table.selectedItems()
@@ -1310,8 +1306,8 @@ class MainWindow(QMainWindow):
             self._update_all_views()
             self.resource_summary._update_resource_delegates()
             self.status_label.setText("Resource deleted")    
-    # Update Methods
     
+    # Update Methods
     def _get_strftime_format_string(self) -> str:
         """Converts the DateFormat enum to a strftime compatible format string."""
         date_format_enum = self.data_manager.settings.default_date_format
@@ -1324,9 +1320,6 @@ class MainWindow(QMainWindow):
 
     def _update_all_views(self):
         """Update all UI views"""
-        # For very large projects, consider adding QApplication.processEvents()
-        # or moving heavy updates to a separate thread to maintain UI responsiveness.
-
         self._update_task_tree()
         self._update_gantt_chart()
         
@@ -1343,10 +1336,10 @@ class MainWindow(QMainWindow):
     
     def _update_task_tree(self):
         """Update hierarchical task tree"""
-        # Store current sort column and order
-        current_sort_column = self.task_tree.sortColumn()
+        # Capture current sort state
+        current_sort_col = self.task_tree.header().sortIndicatorSection()
         current_sort_order = self.task_tree.header().sortIndicatorOrder()
-        
+
         # Disable sorting during update
         self.task_tree.setSortingEnabled(False)
         self.task_tree.blockSignals(True)
@@ -1564,24 +1557,23 @@ class MainWindow(QMainWindow):
         # Auto-adjust column widths to content after population
         self.task_tree.header().resizeSections(QHeaderView.ResizeMode.ResizeToContents)
         
-        # Re-enable sorting
-        self.task_tree.setSortingEnabled(True)
-        if current_sort_column >= 0:
-            self.task_tree.sortByColumn(current_sort_column, current_sort_order)
+        # Restore sort state
+        if current_sort_col != -1:
+            self.task_tree.header().setSortIndicator(current_sort_col, current_sort_order)
         else:
-            # Default sort by ID (column 2) if no previous sort column
-            self.task_tree.sortByColumn(2, Qt.SortOrder.AscendingOrder)
+            # Default to ID sort if no previous sort
+            self.task_tree.header().setSortIndicator(2, Qt.SortOrder.AscendingOrder)
+            
+        self.task_tree.setSortingEnabled(True)
 
     def _update_gantt_chart(self):
         """Update Gantt chart"""
         tasks = self.data_manager.get_all_tasks()
         self.gantt_chart.update_chart(tasks, self.data_manager)
     
-
     def _update_resource_summary(self):
         """Update resource summary"""
         self.resource_summary.update_summary()
-
 
     def _update_dashboard(self):
         """Update dashboard"""
@@ -1601,7 +1593,6 @@ class MainWindow(QMainWindow):
             self.resource_filter.setCurrentIndex(index)
     
     # Filter Methods
-    
     def _filter_tasks(self):
         """Apply filters to task tree"""
         self._update_task_tree()
@@ -1614,7 +1605,6 @@ class MainWindow(QMainWindow):
         self._update_task_tree()
     
     # File Operations
-    
     def _new_project(self):
         """Create new project"""
         reply = QMessageBox.question(self, "New Project", 
@@ -1767,7 +1757,6 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to export to PDF: {e}")
     
     # Settings
-    
     def _show_calendar_settings(self):
         """Show calendar settings dialog"""
         dialog = CalendarSettingsDialog(self, self.calendar_manager)
@@ -1835,7 +1824,7 @@ class MainWindow(QMainWindow):
         about_box.setWindowTitle("About PlanIFlow - Project Planner")
         about_box.setText(
             f"<h2>PlanIFlow - Project Planner</h2>"
-            f"<p>App Version: 1.5</p>"
+            f"<p>App Version: 1.6</p>"
             f"<p><b>Developed by: Dipta Roy</b></p>"
             "<p>A desktop project management application</p>"
             "<p><b>Key Features:</b></p>"
@@ -1853,7 +1842,6 @@ class MainWindow(QMainWindow):
         about_box.exec()
     
     # Utility Methods
-    
     def _save_last_project_path(self, path: str):
         """Save last opened project path"""
         try:
@@ -2057,7 +2045,7 @@ class MainWindow(QMainWindow):
         
         expanded_count = 0
         for item in selected_items:
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             if task_id is not None:
                 if item.childCount() > 0:
                     item.setExpanded(True)
@@ -2080,8 +2068,8 @@ class MainWindow(QMainWindow):
         
         collapsed_count = 0
         for item in selected_items:
-            # Get task ID from column 1
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            # Get task ID from column 2
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             
             if task_id is not None:
                 item.setExpanded(False)
@@ -2101,7 +2089,7 @@ class MainWindow(QMainWindow):
         
         expanded_count = 0
         for item in selected_items:
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             if task_id is not None:
                 if item.childCount() > 0:
                     item.setExpanded(True)
@@ -2115,8 +2103,8 @@ class MainWindow(QMainWindow):
                                   "Selected task(s) have no subtasks to expand.")
         collapsed_count = 0
         for item in selected_items:
-            # Get task ID from column 1
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            # Get task ID from column 2
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             
             if task_id is not None:
                 item.setExpanded(False)
@@ -2127,7 +2115,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText(f"✓ Collapsed {collapsed_count} task(s)")
         expanded_count = 0
         for item in selected_items:
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             if task_id is not None:
                 if item.childCount() > 0:
                     item.setExpanded(True)
@@ -2143,8 +2131,8 @@ class MainWindow(QMainWindow):
         
         collapsed_count = 0
         for item in selected_items:
-            # Get task ID from column 1
-            task_id = item.data(1, Qt.ItemDataRole.UserRole)
+            # Get task ID from column 2
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
             
             if task_id is not None:
                 item.setExpanded(False)
@@ -2248,7 +2236,7 @@ class MainWindow(QMainWindow):
             return
         
         # Get selected task
-        task_id = selected_items[0].data(1, Qt.ItemDataRole.UserRole)
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
         selected_task = self.data_manager.get_task(task_id)
         
         if not selected_task:
@@ -2311,7 +2299,7 @@ class MainWindow(QMainWindow):
             return
         
         # Get selected task
-        task_id = selected_items[0].data(1, Qt.ItemDataRole.UserRole)
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
         selected_task = self.data_manager.get_task(task_id)
         
         if not selected_task:
@@ -2384,7 +2372,7 @@ class MainWindow(QMainWindow):
                                   "Please select a task to convert.")
             return
         
-        task_id = selected_items[0].data(1, Qt.ItemDataRole.UserRole)
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
         task = self.data_manager.get_task(task_id)
         
         if not task:

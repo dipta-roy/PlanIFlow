@@ -24,6 +24,16 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
         super().__init__(parent)
         self.main_window = main_window
 
+    def _get_id(self):
+        """Helper to get ID safely"""
+        try:
+            val = self.data(2, Qt.ItemDataRole.UserRole)
+            if val is not None:
+                return int(val)
+            return int(self.text(2))
+        except (ValueError, TypeError):
+            return 0
+
     def __lt__(self, other):
         """Custom less-than comparison for sorting"""
         tree = self.treeWidget()
@@ -31,10 +41,22 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
             return False
 
         column = tree.sortColumn()
+        
+        # Debug logging to file
+        # with open("debug_sort.txt", "a") as f:
+        #     f.write(f"Sort Column: {column}\n")
+        
+        # Helper for secondary sort by ID
+        def sort_by_id_secondary():
+            return self._get_id() < other._get_id()
 
         # Column 0: Schedule Type (text)
         if column == 0:
-            return self.text(0).lower() < other.text(0).lower()
+            t1 = self.text(0).lower()
+            t2 = other.text(0).lower()
+            if t1 != t2:
+                return t1 < t2
+            return sort_by_id_secondary()
 
         # Column 1: Status (custom sort by color/priority)
         elif column == 1:
@@ -52,80 +74,57 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
             
             if self_order != other_order:
                 return self_order < other_order
-            else:
-                # Secondary sort by ID
-                try:
-                    return int(self.text(2)) < int(other.text(2))
-                except:
-                    return False
+            return sort_by_id_secondary()
 
         # Column 2: ID (integer)
         elif column == 2:
-            try:
-                # Try to get integer from UserRole first
-                val1 = self.data(2, Qt.ItemDataRole.UserRole)
-                val2 = other.data(2, Qt.ItemDataRole.UserRole)
-
-                if val1 is not None and val2 is not None:
-                    return int(val1) < int(val2)
-
-                # Fallback: parse from text
-                text1 = self.text(2).strip()
-                text2 = other.text(2).strip()
-
-                if text1.isdigit() and text2.isdigit():
-                    return int(text1) < int(text2)
-
-                return text1 < text2
-            except (ValueError, TypeError) as e:
-                logging.error(f"ID sort error: {e}")
-                return False
+            id1 = self._get_id()
+            id2 = other._get_id()
+            return id1 < id2
 
         # Column 3: WBS (text)
         elif column == 3:
-            # Simple string comparison for WBS works for 1.1 vs 1.2, but 1.10 vs 1.2 is tricky.
-            # For now, standard string sort is usually acceptable or we can implement version sort.
-            # Let's stick to string sort as per original intent, but maybe split by dots if needed.
-            # Actually, WBS 1.2 vs 1.10: "1.2" > "1.10" in string? No, "1.2" > "1.1" but "1.2" vs "1.10" -> '2' > '1'.
-            # So "1.10" comes before "1.2" in string sort? No. '1' == '1', '.' == '.', '1' < '2'. So "1.10" < "1.2".
-            # Wait. "1.2" vs "1.10". '2' > '1'. So "1.2" > "1.10". Correct order should be 1.2, ..., 1.9, 1.10.
-            # So "1.2" should be LESS than "1.10" if we treat them as numbers.
-            # But string sort says "1.2" > "1.10".
-            # Let's try to do a proper version sort.
             try:
                 parts1 = [int(x) for x in self.text(3).split('.') if x.isdigit()]
                 parts2 = [int(x) for x in other.text(3).split('.') if x.isdigit()]
-                return parts1 < parts2
+                if parts1 != parts2:
+                    return parts1 < parts2
             except:
-                return self.text(3).lower() < other.text(3).lower()
+                t1 = self.text(3).lower()
+                t2 = other.text(3).lower()
+                if t1 != t2:
+                    return t1 < t2
+            return sort_by_id_secondary()
 
         # Column 4: Task Name (text, ignore symbols and spaces)
         elif column == 4:
             text1 = self.text(4).replace('▶', '').replace('◆', '').strip().lstrip()
             text2 = other.text(4).replace('▶', '').replace('◆', '').strip().lstrip()
-            return text1.lower() < text2.lower()
+            if text1.lower() != text2.lower():
+                return text1.lower() < text2.lower()
+            return sort_by_id_secondary()
 
         # Column 5: Start Date
         elif column == 5:
             try:
-                # Access main_window from the item itself
                 main_window = self.main_window
                 if main_window:
                     date_format_str = main_window._get_strftime_format_string()
                     date1 = datetime.strptime(self.text(5), date_format_str)
                     date2 = datetime.strptime(other.text(5), date_format_str)
-                    return date1 < date2
+                    if date1 != date2:
+                        return date1 < date2
                 else:
-                    logging.warning("main_window not available for date sorting in SortableTreeWidgetItem.")
-                    return self.text(5) < other.text(5)
+                    if self.text(5) != other.text(5):
+                        return self.text(5) < other.text(5)
             except ValueError:
-                # logging.warning(f"Could not parse start date for sorting: {self.text(5)} or {other.text(5)}")
-                return self.text(5) < other.text(5)
+                if self.text(5) != other.text(5):
+                    return self.text(5) < other.text(5)
+            return sort_by_id_secondary()
 
         # Column 6: End Date
         elif column == 6:
             try:
-                # Access main_window from the item itself
                 main_window = self.main_window
                 if main_window:
                     date_format_str = main_window._get_strftime_format_string()
@@ -133,37 +132,47 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
                     text2 = other.text(6) if other.text(6) != "Milestone" else other.text(5)
                     date1 = datetime.strptime(text1, date_format_str)
                     date2 = datetime.strptime(text2, date_format_str)
-                    return date1 < date2
+                    if date1 != date2:
+                        return date1 < date2
                 else:
-                    logging.warning("main_window not available for date sorting in SortableTreeWidgetItem.")
-                    return self.text(6) < other.text(6)
+                    if self.text(6) != other.text(6):
+                        return self.text(6) < other.text(6)
             except ValueError:
-                # logging.warning(f"Could not parse end date for sorting: {self.text(6)} or {other.text(6)}")
-                return self.text(6) < other.text(6)
+                if self.text(6) != other.text(6):
+                    return self.text(6) < other.text(6)
+            return sort_by_id_secondary()
 
         # Column 7: Duration (numeric)
         elif column == 7:
             try:
                 val1 = float(self.text(7)) if self.text(7) else 0
                 val2 = float(other.text(7)) if other.text(7) else 0
-                return val1 < val2
+                if val1 != val2:
+                    return val1 < val2
             except ValueError:
-                # logging.warning(f"Could not parse duration for sorting: {self.text(7)} or {other.text(7)}")
-                return self.text(7) < other.text(7)
+                if self.text(7) != other.text(7):
+                    return self.text(7) < other.text(7)
+            return sort_by_id_secondary()
 
         # Column 8: % Complete (numeric)
         elif column == 8:
             try:
-                val1 = int(self.text(8).replace('%', '').strip())
-                val2 = int(other.text(8).replace('%', '').strip())
-                return val1 < val2
+                val1 = float(self.text(8).replace('%', '').strip())
+                val2 = float(other.text(8).replace('%', '').strip())
+                if val1 != val2:
+                    return val1 < val2
             except ValueError:
-                # logging.warning(f"Could not parse percent complete for sorting: {self.text(8)} or {other.text(8)}")
-                return self.text(8) < other.text(8)
+                if self.text(8) != other.text(8):
+                    return self.text(8) < other.text(8)
+            return sort_by_id_secondary()
 
         # Default: text comparison
         else:
-            return self.text(column).lower() < other.text(column).lower()
+            t1 = self.text(column).lower()
+            t2 = other.text(column).lower()
+            if t1 != t2:
+                return t1 < t2
+            return sort_by_id_secondary()
 
 class ColorDelegate(QStyledItemDelegate):
     """Custom delegate to show colored status indicators"""
@@ -265,7 +274,7 @@ class ResourceDelegate(QStyledItemDelegate):
         self._resource_names = resource_names
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
-        if index.column() == 9:  # Resources column
+        if index.column() == 10:  # Resources column
             editor = QComboBox(parent)
             editor.setEditable(True) # Allow typing for multiple resources or new ones
             editor.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
@@ -282,7 +291,7 @@ class ResourceDelegate(QStyledItemDelegate):
         return super().createEditor(parent, option, index)
 
     def setEditorData(self, editor: QWidget, index: QModelIndex):
-        if index.column() == 9:  # Resources column
+        if index.column() == 10:  # Resources column
             current_resources_str = index.data(Qt.ItemDataRole.DisplayRole)
             if isinstance(editor, QComboBox):
                 editor.setCurrentText(current_resources_str)
@@ -290,7 +299,7 @@ class ResourceDelegate(QStyledItemDelegate):
             super().setEditorData(editor, index)
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
-        if index.column() == 9:  # Resources column
+        if index.column() == 10:  # Resources column
             if isinstance(editor, QComboBox):
                 # Get text from line edit, as it can be multiple comma-separated resources
                 new_resources_str = editor.lineEdit().text()

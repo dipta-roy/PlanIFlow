@@ -30,6 +30,12 @@ def main():
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
+
+    # Fix for Windows taskbar icon
+    if os.name == 'nt':
+        import ctypes
+        myappid = 'planiflow.projectplanner.1.6' # arbitrary string
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     
     app = QApplication(sys.argv)
     app.setApplicationName("PlanIFlow - Project Planner")
@@ -54,7 +60,7 @@ def main():
     if not splash_pix.isNull():
         splash = QSplashScreen(splash_pix, Qt.WindowType.WindowStaysOnTopHint)
         # Add "Loading..." message below the splash image
-        splash.showMessage("PlanIFlow 1.5 Loading...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.darkGray)
+        splash.showMessage("PlanIFlow 1.6 Loading...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.darkGray)
         splash.show()
         app.processEvents()  # Ensure splash is drawn immediately
     
