@@ -33,7 +33,7 @@ VSVersionInfo(
         StringStruct(u'FileDescription', u'PlanIFlow Project Planner'),
         StringStruct(u'FileVersion', u'1.6.0.0'),
         StringStruct(u'InternalName', u'PlanIFlow'),
-        StringStruct(u'LegalCopyright', u'Copyright (c) 2024 PlanIFlow'),
+        StringStruct(u'LegalCopyright', u'Copyright (c) 2025 PlanIFlow'),
         StringStruct(u'OriginalFilename', u'PlanIFlow_1.6.exe'),
         StringStruct(u'ProductName', u'PlanIFlow'),
         StringStruct(u'ProductVersion', u'1.6.0.0')])

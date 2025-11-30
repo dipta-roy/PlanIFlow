@@ -68,10 +68,13 @@ main.py (Entry)
    ↓
 ui_main.py (MainWindow: Tabs, Menus, TreeView)
    ├── ui_tasks.py (Task Tree: Hierarchy, Dependencies)
+   ├── ui_task_dialog.py.py (Task Settings)
    ├── gantt_chart.py (Gantt: Arrows, Critical Toggle)
    ├── ui_resources.py (Resource Table: Allocation, Warnings)
    ├── ui_dashboard.py (Metrics: Charts, Status Cards)
    ├── ui_project_settings.py (Settings Dialog)
+   ├── ui_calendar_settings_dialog.py (Calendar Settings Dialog)
+   ├── ui_resource_dialog.py (Resource Dialog)
    └── ui_menu_toolbar.py (Actions, Shortcuts)
 Data Layer:
    ├── data_manager.py (Tasks/Resources: CPM, Costs)
@@ -85,6 +88,7 @@ Utilities:
    ├── ui_helpers.py (Icons, Paths)
    ├── ui_delegates.py (Editors: Date, Resource)
    ├── themes.py (Light/Dark)
+   ├── app_images.py (Base64 Images)
    └── __init__.py (Empty)
 ```
 
@@ -192,7 +196,7 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 
 - **JSON**: Save and load your projects using the `.json` format. This is the recommended format for saving your work.
 - **Excel**: Import and export your projects to and from Excel files. This is useful for sharing your project with others who may not have the application.
-- **Excel**: Export your projects to and from PDF report.
+- **PDF**: Export your projects to and from PDF report.
 
 ## ⌨️ Shortcuts
 
@@ -261,6 +265,7 @@ PlanIFlow_v1.6\
 ├───ui_resources.py
 ├───ui_tasks.py
 ├───pdf_exporter.py
+├───version_info.txt
 ├───images\
 │  └───logo.ico
 └───sample\
@@ -283,7 +288,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/f33ef702343c3ab6729aecd186694d83d585c715b50e7736e88825594029e275) - May detect as False Positive, add to Exclusion if necessary.
+- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/cc460de0c162b1aa43bc84440507c4ad7eced22fbf15edae915607a5417793c8) - May detect as **false positive**, add to Exclusion if necessary.
 
 ## 🙏 Acknowledgments
 
