@@ -59,6 +59,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - Matplotlib
 - Openpyxl
 - Reportlab
+- Numpy
 
 ## Architecture Overview
 
@@ -282,6 +283,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
+- **VirusTotal Report**: [VirusTotal Report]https://www.virustotal.com/gui/file/f33ef702343c3ab6729aecd186694d83d585c715b50e7736e88825594029e275
 
 ## 🙏 Acknowledgments
 

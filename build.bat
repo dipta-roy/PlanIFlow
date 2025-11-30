@@ -65,28 +65,22 @@ if defined NEED_INSTALL (
     echo [INFO] Installing dependencies...
     pip install -r requirements.txt
     if errorlevel 1 (
+
         echo [ERROR] Failed to install dependencies!
         pause
         exit /b 1
     )
 )
 
-REM Check if PyInstaller is installed
-echo [INFO] Checking for PyInstaller...
-python -c "import PyInstaller" >nul 2>&1
-if errorlevel 1 (
-    echo [INFO] Installing PyInstaller...
-    pip install pyinstaller
-)
+REM Ensure correct PyInstaller version, encryption support, and compatible NumPy
+echo [INFO] Installing/Verifying PyInstaller 5.x, tinyaes, and compatible NumPy...
+pip install "pyinstaller<6.0" tinyaes "numpy<2.0.0"
 
 REM Clean previous builds
 echo [INFO] Cleaning previous builds...
 if exist "build\" rmdir /s /q build
 if exist "dist\" rmdir /s /q dist
 if exist "*.spec" del /q *.spec
-echo.
-
-REM Build the executable
 echo ===============================================
 echo   Building PlanIFlow - ProjectPlanner v1.6 
 echo ===============================================
@@ -94,6 +88,7 @@ echo.
 
 pyinstaller --onefile --windowed --name="PlanIFlow_1.6.exe" ^
     %ICON_OPTION% ^
+    --version-file=version_info.txt ^
     --add-data="images;images" ^
     --add-data="app_images.py;." ^
     --add-data="data_manager.py;." ^
@@ -133,6 +128,8 @@ pyinstaller --onefile --windowed --name="PlanIFlow_1.6.exe" ^
     --collect-all PyQt6 ^
     --collect-all matplotlib ^
     --noconsole ^
+    --noupx ^
+    --key="PfV2_SecKey_9x82" ^
     main.py
 
 if errorlevel 1 (
