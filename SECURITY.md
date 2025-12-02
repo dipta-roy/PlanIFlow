@@ -139,18 +139,6 @@ try: date = datetime.strptime(...) except: fallback  # Robust parsing
 | **Local-only data** 			| No privacy risk; offline by design |
 | **Qt-Native UI Validation** 	| SpinBoxes/LineEdits limit invalid inputs |
 
-## **7. Recommendations for Enhancement**
-
-| Priority | Item | Effort | Rationale |
-|----------|------|--------|-----------|
-| Medium | Add input length limits (e.g., `QLineEdit.setMaxLength(500)`) | 1 day | Mitigates UI/PDF crashes from malformed data |
-| Low | Use `tempfile.NamedTemporaryFile(delete=True)` for auto-cleanup | 0.5 day | Ensures temp file removal on exceptions |
-| Low | Pin deps in `requirements.txt` (e.g., `pandas==2.2.2`) | 1 day | Prevents version drift/CVEs |
-| Info | Externalize Base64 images to assets dir | 0.5 day | Reduces repo bloat; easier maintenance |
-| Info | Specific exceptions (e.g., `ValueError`) over broad `Exception` | 1 day | Improves debugging without masking issues |
-
-**Integrate Bandit/Safety scans in CI for ongoing assurance.**
-
 ## **8. Conclusion**
 
 > **PlanIFlow v1.6.1 is secure, robust, and suitable for deployment in sensitive environments.**
