@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   Project Planner v1.6 - Environment Setup
+echo   Project Planner v1.6.1 - Environment Setup
 echo ===============================================
 echo.
 
@@ -64,7 +64,7 @@ python -m pip install --upgrade pip --quiet
 echo.
 
 REM Install dependencies
-echo [INFO] Installing Project Planner v1.6 dependencies...
+echo [INFO] Installing Project Planner v1.6.1 dependencies...
 echo.
 
 if not exist "requirements.txt" (
@@ -108,7 +108,7 @@ echo ===============================================
 echo   Setup completed successfully!
 echo ===============================================
 echo.
-echo Environment is ready for Project Planner v1.6
+echo Environment is ready for Project Planner v1.6.1
 echo.
 echo Next steps:
 echo   - Run application:    run.bat

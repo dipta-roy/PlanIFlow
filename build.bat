@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.6 - Build to EXE
+echo   PlanIFlow - Project Planner v1.6.1 - Build to EXE
 echo ===============================================
 echo.
 
@@ -82,11 +82,11 @@ if exist "build\" rmdir /s /q build
 if exist "dist\" rmdir /s /q dist
 if exist "*.spec" del /q *.spec
 echo ===============================================
-echo   Building PlanIFlow - ProjectPlanner v1.6 
+echo   Building PlanIFlow - ProjectPlanner v1.6.1 
 echo ===============================================
 echo.
 
-pyinstaller --onefile --windowed --name="PlanIFlow_1.6.exe" ^
+pyinstaller --onefile --windowed --name="PlanIFlow_1.6.1.exe" ^
     %ICON_OPTION% ^
     --version-file=version_info.txt ^
     --add-data="images;images" ^
@@ -144,12 +144,12 @@ echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
 echo.
-echo [SUCCESS] Executable created: dist\PlanIFlow_1.6.exe
+echo [SUCCESS] Executable created: dist\PlanIFlow_1.6.1.exe
 echo [INFO] Icon has been embedded in the executable
 echo.
 
 REM Display file info
-for %%A in ("dist\PlanIFlow_1.6.exe") do (
+for %%A in ("dist\PlanIFlow_1.6.1.exe") do (
     set size=%%~zA
     set /a sizeMB=!size! / 1048576
     echo [INFO] File size: !sizeMB! MB

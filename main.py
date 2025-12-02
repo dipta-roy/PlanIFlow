@@ -34,7 +34,7 @@ def main():
     # Fix for Windows taskbar icon
     if os.name == 'nt':
         import ctypes
-        myappid = 'planiflow.projectplanner.1.6' # arbitrary string
+        myappid = 'planiflow.projectplanner.1.6.1' # arbitrary string
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     
     app = QApplication(sys.argv)
@@ -43,12 +43,29 @@ def main():
     
     # *** SET APPLICATION ICON (BASE64) ***
     from app_images import SPLASH_BASE64, LOGO_ICO_BASE64
+    import tempfile
     
+    # Create icon from base64 ICO data - save to temp file to preserve all icon sizes
     icon_bytes = base64.b64decode(LOGO_ICO_BASE64)
-    icon_pix = QPixmap()
-    icon_pix.loadFromData(icon_bytes)
-    if not icon_pix.isNull():
-        app.setWindowIcon(QIcon(icon_pix))
+    
+    # Create temp file for the icon
+    temp_icon_fd, temp_icon_path = tempfile.mkstemp(suffix='.ico')
+    try:
+        os.write(temp_icon_fd, icon_bytes)
+        os.close(temp_icon_fd)
+        
+        # Load icon from temp file (preserves all sizes in .ico)
+        app_icon = QIcon()
+        app_icon.addFile(temp_icon_path)
+        if not app_icon.isNull():
+            app.setWindowIcon(app_icon)
+    finally:
+        # Clean up temp file
+        try:
+            if os.path.exists(temp_icon_path):
+                os.remove(temp_icon_path)
+        except:
+            pass  # Ignore cleanup errors
     
     # *** SHOW SPLASH SCREEN IMMEDIATELY (BASE64) ***
     splash_bytes = base64.b64decode(SPLASH_BASE64)
@@ -60,7 +77,7 @@ def main():
     if not splash_pix.isNull():
         splash = QSplashScreen(splash_pix, Qt.WindowType.WindowStaysOnTopHint)
         # Add "Loading..." message below the splash image
-        splash.showMessage("PlanIFlow 1.6 Loading...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.darkGray)
+        splash.showMessage("PlanIFlow 1.6.1 Loading...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.darkGray)
         splash.show()
         app.processEvents()  # Ensure splash is drawn immediately
     

@@ -172,8 +172,9 @@ class Exporter:
                 # Format summary sheet
                 workbook = writer.book
                 summary_sheet = writer.sheets['Summary']
-                summary_sheet.column_dimensions['A'].width = 30
-                summary_sheet.column_dimensions['B'].width = 25
+                for col in summary_sheet.columns:
+                    max_length = max(len(str(cell.value)) for cell in col)
+                    summary_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
                 
                 # Write tasks
                 if tasks_data:
@@ -182,9 +183,9 @@ class Exporter:
                     
                     # Format tasks sheet
                     task_sheet = writer.sheets['Tasks']
-                    task_sheet.column_dimensions['B'].width = 40  # Task Name
-                    task_sheet.column_dimensions['L'].width = 30  # Predecessors
-                    task_sheet.column_dimensions['M'].width = 25  # Resources
+                    for col in task_sheet.columns:
+                        max_length = max(len(str(cell.value)) for cell in col)
+                        task_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
                     
                     # Apply color coding to status column
                     from openpyxl.styles import PatternFill
@@ -215,15 +216,25 @@ class Exporter:
                     df_resources.to_excel(writer, sheet_name='Resources', index=False)
                     
                     resource_sheet = writer.sheets['Resources']
-                    resource_sheet.column_dimensions['A'].width = 20
+                    for col in resource_sheet.columns:
+                        max_length = max(len(str(cell.value)) for cell in col)
+                        resource_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
                 
                 # Write status breakdown
                 df_status = pd.DataFrame(status_data)
                 df_status.to_excel(writer, sheet_name='Status Breakdown', index=False)
+                df_status = writer.sheets['Status Breakdown']
+                for col in df_status.columns:
+                        max_length = max(len(str(cell.value)) for cell in col)
+                        df_status.column_dimensions[col[0].column_letter].width = max_length + 2
                 
                 # Write dependency breakdown
                 df_deps = pd.DataFrame(dep_data)
                 df_deps.to_excel(writer, sheet_name='Dependencies', index=False)
+                df_deps = writer.sheets['Dependencies']
+                for col in df_deps.columns:
+                        max_length = max(len(str(cell.value)) for cell in col)
+                        df_deps.column_dimensions[col[0].column_letter].width = max_length + 2
             
             return True
             

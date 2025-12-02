@@ -9,7 +9,7 @@ from reportlab.lib import colors
 import os
 from datetime import datetime
 from gantt_chart import GanttChart
-
+from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
 
 # Import PyQt6 for Gantt chart rendering
@@ -37,18 +37,58 @@ class PDFExporter:
         self.styles['h2'].level = 1
         self.styles['h3'].level = 2
         self.story = []
-
-    def export(self):
-        doc = SimpleDocTemplate(self.file_path, pagesize=landscape(letter))
-        self.temp_image_paths = [] # Initialize list to store temp image paths
         
+        self.logo_data=base64.b64decode(LOGO_BASE64)
+        self.logo_img = io.BytesIO(self.logo_data)
 
-
+    def _header(self, canvas, doc):
+        canvas.saveState()
+        
+        #logo
+        logo = Image(io.BytesIO(self.logo_data), width =0.8*inch, height=0.8*inch)
+        logo.wrapOn(canvas, 0,0)
+        logo.drawOn(canvas, 0.7*inch, doc.pagesize[1] - 0.9*inch)
+        
+        #project name(center)
+        project_name = self.project_data.project_name or "Untitled Project"
+        canvas.setFont("Helvetica-Bold", 14)
+        canvas.drawCentredString(
+            doc.pagesize[0] /2,
+            doc.pagesize[1] - 0.7*inch,
+            project_name
+        )
+            
+        #Page Number (right)
+        page_num = f"Page {doc.page}"
+        canvas.drawCentredString(
+            doc.pagesize[0] - 0.7*inch,
+            doc.pagesize[1] - 0.7*inch,
+            page_num
+        )
+        
+        #thin line under header
+        canvas.setStrokeColor(colors.lightgrey)
+        canvas.line(
+            0.7*inch,
+            doc.pagesize[1] - 1*inch,
+            doc.pagesize[0] - 0.7*inch,
+            doc.pagesize[1] - 1*inch
+        )
+        canvas.restoreState()
+        
+    def export(self):
+        doc = SimpleDocTemplate(
+            self.file_path, 
+            pagesize=landscape(letter),
+            topMargin = 1.0*inch,
+            bottomMargin = 0.1*inch,
+            leftMargin = 0.1*inch,
+            rightMargin = 0.1*inch
+        )
+        self.temp_image_paths = [] # Initialize list to store temp image paths
         self.build_story() # Build the rest of the story
-
-
-
-        doc.build(self.story)
+        
+        doc.build(self.story, onFirstPage=lambda c, d: None, onLaterPages=self._header)
         
         # Clean up temporary image files after PDF is built
         for path in self.temp_image_paths:
@@ -101,7 +141,9 @@ class PDFExporter:
         img.drawHeight = img.drawWidth * (img_height / img_width) # Maintain aspect ratio
         self.story.append(img)
         self.story.append(Spacer(1, 0.15 * inch))
-
+        
+        self.story.append(PageBreak())
+        
         self.story.append(Paragraph("Gantt Chart (without Critical Path)", self.styles['h2']))
         self.story.append(Spacer(1, 0.1 * inch))
 
@@ -127,7 +169,6 @@ class PDFExporter:
         self.add_gantt_chart()
         self.add_resource_and_cost_details()
         self.add_monthly_expense_breakdown()
-        self.add_current_status()
 
     def add_monthly_expense_breakdown(self):
         self.story.append(Paragraph("Monthly/Daily Expense Breakdown", self.styles['h2']))
@@ -215,8 +256,21 @@ class PDFExporter:
         img.hAlign = 'CENTER'
         self.story.append(img)
         self.story.append(Spacer(1, 0.2*inch))
+        
+        # Add application name below logo with larger font
+        from reportlab.lib.styles import ParagraphStyle
+        app_name_style = ParagraphStyle(
+            'AppName',
+            parent=self.styles['Heading1'],
+            fontSize=20,
+            leading=24,
+            alignment=1,  # TA_CENTER
+            textColor=colors.HexColor('#2E86AB'),  # Professional blue color
+            fontName='Helvetica-Bold'
+        )
+        self.story.append(Paragraph("PlanIFlow", app_name_style))
+        self.story.append(Spacer(1, 0.3*inch))
 
-        self.story.append(Spacer(1, 0.5*inch))
         title_style = self.styles['Title']
         title_style.alignment = 1 # TA_CENTER
         self.story.append(Paragraph(self.project_data.project_name, title_style))
@@ -233,7 +287,7 @@ class PDFExporter:
         project_end = self.project_data.get_project_end_date()
 
         data = [
-            ["Metric", "Value"],
+            ["Project Metric", "Value"],
             ["Project Name:", self.project_data.project_name],
             ["Start Date:", project_start.strftime('%Y-%m-%d') if project_start else "N/A"],
             ["End Date:", project_end.strftime('%Y-%m-%d') if project_end else "N/A"],
@@ -242,7 +296,7 @@ class PDFExporter:
         ]
 
         # Use maximum width for project details table
-        usable_width = landscape(letter)[0] - 1*inch
+        usable_width = landscape(letter)[0] - 0.5*inch
         table = Table(data, colWidths=[2.5*inch, usable_width - 2.5*inch])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -255,7 +309,37 @@ class PDFExporter:
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
         self.story.append(table)
+        
+        #Task Details
+        self.story.append(Spacer(1, 0.2 * inch))
+
+        # Task Status Breakdown
+        self.story.append(Paragraph("Task Status Breakdown:", self.styles['h3']))
+        status_counts = {"Overdue": 0, "In Progress": 0, "Upcoming": 0, "Completed": 0}
+        for task in self.project_data.tasks:
+            if not task.is_summary:
+                status_counts[task.get_status_text()] += 1
+        
+        status_data = [["Status", "Count"]]
+        for status, count in status_counts.items():
+            status_data.append([status, str(count)])
+        
+        status_table = Table(status_data)
+        status_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FFC107')), # Amber header
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#FFF8E1')), # Light amber rows
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        self.story.append(status_table)
+        self.story.append(Spacer(1, 0.2 * inch))
+
         self.story.append(PageBreak())
+        
 
     def add_task_details(self):
         self.story.append(Paragraph("Task Details", self.styles['h2']))
@@ -296,7 +380,7 @@ class PDFExporter:
         # Helper function to flatten tasks with indentation
         def flatten_tasks(task_list, level=0):
             for task in task_list:
-                indent = "&nbsp;&nbsp;&nbsp;&nbsp;" * level
+                indent = "&nbsp;" * level
                 display_name = f"{indent}{task.name}"
                 
                 # Wrap task name in Paragraph
@@ -308,7 +392,7 @@ class PDFExporter:
                     self.calendar_manager
                 )
                 duration_unit = self.project_data.settings.duration_unit.value
-                duration_text = f"{duration:.1f} {duration_unit}" if duration > 0 else "0"
+                duration_text = f"{duration:.1f} {duration_unit}" if duration > 0 else "0 days"
                 
                 # Format dependencies
                 deps_list = []
@@ -346,10 +430,10 @@ class PDFExporter:
         top_level_tasks = self.project_data.get_top_level_tasks()
         flatten_tasks(top_level_tasks)
 
-        # Calculate column widths dynamically - use smaller margins for task table
+        # Calculate column widths dynamically - use maximum width with margins
         # Landscape letter is 11" tall x 8.5" wide, so landscape(letter)[0] = 11 inches
-        # Use 0.25 inch margins on each side for maximum table width
-        usable_width = landscape(letter)[0] - 0.5 * inch  # 10 inches total width
+        # Use 0.5" margins on each side (total 1 inch) for maximum table width, matching other tables
+        usable_width = landscape(letter)[0]
         
         col_widths = [
             0.35*inch,                          # ID
@@ -361,10 +445,12 @@ class PDFExporter:
             (usable_width - 6.3*inch) * 0.35,   # Dependencies (35% of remaining)
             (usable_width - 6.3*inch) * 0.3,    # Resources (30% of remaining)
             0.5*inch,                           # % Complete
-            0.6*inch,                           # Status
+            0.8*inch,                           # Status
         ]
         
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table._argW = col_widths
+        
         table.setStyle(TableStyle([
             # Header styling
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1976D2')),
@@ -378,6 +464,9 @@ class PDFExporter:
             ('ALIGN', (0, 1), (1, -1), 'CENTER'),  # Center ID and WBS
             ('ALIGN', (3, 1), (5, -1), 'CENTER'),  # Center Duration and Dates
             ('ALIGN', (8, 1), (9, -1), 'CENTER'),  # Center % and Status
+            ('ALIGN', (2, 1), (2, -1), 'LEFT'),   # Task Name
+            ('ALIGN', (6, 1), (6, -1), 'LEFT'),   # Predecessor
+            ('ALIGN', (7, 1), (7, -1), 'LEFT'),   # Resource
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('LEFTPADDING', (0, 0), (-1, -1), 3),
             ('RIGHTPADDING', (0, 0), (-1, -1), 3),
@@ -397,44 +486,6 @@ class PDFExporter:
         
         self.story.append(table)
         self.story.append(PageBreak())
-
-    def add_current_status(self):
-        self.story.append(Paragraph("Current Status", self.styles['h2']))
-        self.story.append(Spacer(1, 0.1 * inch))
-
-        # Overall Completion
-        overall_completion = self.project_data.get_overall_completion()
-        self.story.append(Paragraph(f"Overall Project Completion: <b>{overall_completion:.1f}%</b>", self.styles['Normal']))
-        self.story.append(Spacer(1, 0.1 * inch))
-
-        # Task Status Breakdown
-        self.story.append(Paragraph("Task Status Breakdown:", self.styles['h3']))
-        status_counts = {"Overdue": 0, "In Progress": 0, "Upcoming": 0, "Completed": 0}
-        for task in self.project_data.tasks:
-            if not task.is_summary:
-                status_counts[task.get_status_text()] += 1
-        
-        status_data = [["Status", "Count"]]
-        for status, count in status_counts.items():
-            status_data.append([status, str(count)])
-        
-        status_table = Table(status_data)
-        status_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FFC107')), # Amber header
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#FFF8E1')), # Light amber rows
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]))
-        self.story.append(status_table)
-        self.story.append(Spacer(1, 0.2 * inch))
-
-        self.story.append(PageBreak())
-
-
 
     def add_resource_and_cost_details(self):
         self.story.append(Paragraph("Resource and Cost Details", self.styles['h2']))
@@ -471,7 +522,7 @@ class PDFExporter:
         
         # Add total row
         total_label = Paragraph("<b>Total Project Cost:</b>", resource_style)
-        data.append(["", "", "", total_label, f"<b>${total_project_cost:.2f}</b>"])
+        data.append(["", "", "", total_label, f"${total_project_cost:.2f}"])
 
         # Calculate column widths dynamically - use maximum width
         usable_width = landscape(letter)[0] - 1 * inch  # 0.5\" margins
@@ -485,25 +536,33 @@ class PDFExporter:
         
         table = Table(data, colWidths=col_widths)
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')),  # Material Green header
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')),  # Green header
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),  # Center all except resource name
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),  # <-- Center header text
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('TOPPADDING', (0, 0), (-1, 0), 8),
+
+            # Row alignment rules
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),   # Resource name stays left
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+
             ('LEFTPADDING', (0, 0), (-1, -1), 6),
             ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ('BACKGROUND', (0, 1), (-1, -2), colors.HexColor('#E8F5E9')),  # Light green rows
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.HexColor('#E8F5E9'), colors.HexColor('#C8E6C9')]),  # Alternating rows
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#81C784')),  # Lighter grid lines
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#66BB6A')),  # Green for total row
+
+            ('BACKGROUND', (0, 1), (-1, -2), colors.HexColor('#E8F5E9')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.HexColor('#E8F5E9'), colors.HexColor('#C8E6C9')]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#81C784')),
+
+            # Total row styling
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#66BB6A')),
             ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
             ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, -1), (-1, -1), 10),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('WORDWRAP', (0, 1), (0, -1), 'LTR'),  # Enable word wrap for resource names
+
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('WORDWRAP', (0, 1), (0, -1), 'LTR'),
         ]))
         self.story.append(table)
         self.story.append(PageBreak())

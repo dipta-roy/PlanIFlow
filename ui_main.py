@@ -1824,7 +1824,7 @@ class MainWindow(QMainWindow):
         about_box.setWindowTitle("About PlanIFlow - Project Planner")
         about_box.setText(
             f"<h2>PlanIFlow - Project Planner</h2>"
-            f"<p>App Version: 1.6</p>"
+            f"<p>App Version: 1.6.1</p>"
             f"<p><b>Developed by: Dipta Roy</b></p>"
             "<p>A desktop project management application</p>"
             "<p><b>Key Features:</b></p>"
