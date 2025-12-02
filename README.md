@@ -130,7 +130,7 @@ This script will activate the virtual environment and start the application.
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download PlanIFlow `PlanIFlow_1.6.zip`:
+Download PlanIFlow `PlanIFlow_1.6.1.zip`:
 Download Code Verification Certificate: [Dipta Roy](https://github.com/dipta-roy/dipta-roy.github.io/blob/main/downloads/Code%20Verifying%20Certificates.zip).
 ```
 - HOW TO TRUST
@@ -152,7 +152,7 @@ Download Code Verification Certificate: [Dipta Roy](https://github.com/dipta-roy
 
 Once verified,
 ```
-Run: PlanIFlow_1.6.exe
+Run: PlanIFlow_1.6.1.exe
 ```
 
 ## 💻 Usage
@@ -237,7 +237,7 @@ To build a standalone executable from the source code, you can use the `build.ba
 ## 📂 Project Structure
 
 ```
-PlanIFlow_v1.6\
+PlanIFlow_v1.6.1\
 ├───build.bat
 ├───clean.bat
 ├───install.bat 

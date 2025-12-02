@@ -1,6 +1,6 @@
 # **PlanIFlow - Formal Security Assessment Report**  
-## **PlanIFlow v1.6 – Offline Desktop Project Management Application**  
-**Assessment Conducted:** November 30, 2025  
+## **PlanIFlow v1.6.1 – Offline Desktop Project Management Application**  
+**Assessment Conducted:** December 02, 2025  
 **Scope:** All 22 Python source files (`*.py`)  
 **Methodology:** Static code analysis, data flow tracing, threat modeling  
 **Classification:** **LOW RISK – SECURE FOR INTENDED USE**
