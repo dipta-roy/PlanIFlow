@@ -2,8 +2,8 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTableWidget, QLabel, QMenu, QTextEdit, QTableWidgetItem, QMessageBox, QDialog, QHeaderView
 from PyQt6.QtGui import QAction, QBrush, QColor
 from PyQt6.QtCore import Qt
-from data_manager import Resource
-from ui_project_settings import ResourceDialog
+from data_manager.models import Resource
+from ui.ui_resource_dialog import ResourceDialog
 
 class ResourceSheet(QWidget):
     def __init__(self, parent, data_manager):
@@ -15,16 +15,42 @@ class ResourceSheet(QWidget):
         
         # Resource table
         self.resource_table = QTableWidget()
-        self.resource_table.setColumnCount(7) 
+        self.resource_table.setColumnCount(8) 
         self.resource_table.setHorizontalHeaderLabels([
             "Resource Name", "Max Hours/Day", "Total Hours", 
-            "Tasks Assigned", "Billing Rate ($/hr)", "Total Amount ($)", "Status"
+            "Tasks Assigned", "Billing Rate ($/hr)", "Total Amount ($)", "Exceptions", "Status"
         ])
         self.resource_table.setAlternatingRowColors(True)
         self.resource_table.horizontalHeader().setStretchLastSection(True)
         self.resource_table.doubleClicked.connect(self._edit_resource_dialog)
         self.resource_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.resource_table.customContextMenuRequested.connect(self._show_resource_context_menu)
+
+        # Column resizing logic
+        header = self.resource_table.horizontalHeader()
+        # First, resize all sections to their content
+        for i in range(self.resource_table.columnCount()):
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+        # Then, allow interactive resizing for all columns except the last (Status)
+        for i in range(self.resource_table.columnCount()):
+            if i != 7:  # All columns except Status
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive)
+        
+        # Make Status column (index 7) stretch to fill remaining space
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
+        header.setStretchLastSection(False)
+
+        # Set default width for Resource Name column
+        self.resource_table.setColumnWidth(0, 200)
+        
+        self.resource_table.setColumnWidth(1, 120)
+        self.resource_table.setColumnWidth(2, 120)
+        self.resource_table.setColumnWidth(3, 120)
+        self.resource_table.setColumnWidth(4, 120)
+        self.resource_table.setColumnWidth(5, 120)
+        
+        self.resource_table.setColumnWidth(6, 900)
+        self.resource_table.setColumnWidth(7, 100)
         
         layout.addWidget(QLabel("<h3>Resource Allocation</h3>"))
         layout.addWidget(self.resource_table)
@@ -124,33 +150,6 @@ class ResourceSheet(QWidget):
             self.parent_window._update_all_views()
             self.parent_window.status_label.setText("Resource deleted")
 
-    def _edit_resource_dialog(self):
-        """Show edit resource dialog"""
-        selected_items = self.resource_table.selectedItems()
-        if not selected_items:
-            QMessageBox.information(self, "No Selection", "Please select a resource to edit.")
-            return
-        
-        row = selected_items[0].row()
-        resource_name = self.resource_table.item(row, 0).text()
-        resource = self.data_manager.get_resource(resource_name)
-        
-        if resource:
-            dialog = ResourceDialog(self, resource)
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                resource_data = dialog.get_resource_data()
-                
-                updated_resource = Resource(
-                    name=resource_data['name'],
-                    max_hours_per_day=resource_data['max_hours_per_day'],
-                    exceptions=resource_data['exceptions'],
-                    billing_rate=resource_data['billing_rate']
-                )
-                
-                self.data_manager.update_resource(resource_name, updated_resource)
-                self.parent_window._update_all_views()
-                self.parent_window.status_label.setText("Resource updated")
-
     def _update_resource_delegates(self):
         """Update the resource delegate with the latest list of resource names"""
         resource_names = [r.name for r in self.data_manager.get_all_resources()]
@@ -183,7 +182,8 @@ class ResourceSheet(QWidget):
             self.resource_table.setItem(row, 3, QTableWidgetItem(str(tasks_assigned)))
             self.resource_table.setItem(row, 4, QTableWidgetItem(f"{resource.billing_rate:.2f}"))
             self.resource_table.setItem(row, 5, QTableWidgetItem(f"{alloc.get('total_amount', 0.0):.2f}"))
-            self.resource_table.setItem(row, 6, QTableWidgetItem(status))
+            self.resource_table.setItem(row, 6, QTableWidgetItem(", ".join(resource.exceptions))) 
+            self.resource_table.setItem(row, 7, QTableWidgetItem(status))
         
         # Update warnings
         warnings = self.data_manager.check_resource_overallocation()

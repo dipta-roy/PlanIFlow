@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-                             QLineEdit, QDoubleSpinBox, QPushButton)
-from data_manager import Resource
+                              QLineEdit, QDoubleSpinBox, QPushButton)
+from data_manager.models import Resource
+from ui.ui_resource_exceptions_widget import ResourceExceptionsWidget
 
 class ResourceDialog(QDialog):
     """Dialog for adding/editing resources"""
@@ -12,7 +13,8 @@ class ResourceDialog(QDialog):
         
         self.setWindowTitle("Edit Resource" if self.is_edit else "Add Resource")
         self.setModal(True)
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(500)
+        self.setMinimumHeight(500)
         
         self._create_ui()
         
@@ -47,6 +49,10 @@ class ResourceDialog(QDialog):
         
         layout.addLayout(form_layout)
         
+        # Exception Days Widget
+        self.exceptions_widget = ResourceExceptionsWidget(self)
+        layout.addWidget(self.exceptions_widget)
+        
         # Buttons
         button_layout = QHBoxLayout()
         
@@ -65,12 +71,13 @@ class ResourceDialog(QDialog):
         self.name_edit.setText(self.resource.name)
         self.hours_spin.setValue(self.resource.max_hours_per_day)
         self.billing_rate_spin.setValue(self.resource.billing_rate)
+        self.exceptions_widget.set_exceptions(self.resource.exceptions)
     
     def get_resource_data(self):
         """Get resource data from form"""
         return {
             'name': self.name_edit.text(),
             'max_hours_per_day': self.hours_spin.value(),
-            'exceptions': [], # Exceptions are not handled in this dialog currently
+            'exceptions': self.exceptions_widget.get_exceptions(),
             'billing_rate': self.billing_rate_spin.value()
         }

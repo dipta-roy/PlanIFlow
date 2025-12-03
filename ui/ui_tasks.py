@@ -12,13 +12,11 @@ from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QFont
 # Import typing for list[str] on older pythons
 from typing import List
-from settings_manager import DateFormat
-from data_manager import ScheduleType
+from settings_manager.settings_manager import DateFormat
+from data_manager.models import ScheduleType
 
 # Constants for ColorDelegate
-CIRCLE_SIZE = 10
-LEFT_PADDING = 8
-TEXT_SHIFT = 15
+from constants.constants import CIRCLE_SIZE, LEFT_PADDING, TEXT_SHIFT
 
 
 
@@ -315,13 +313,23 @@ def create_task_tree(main_window):
     # First, resize all sections to their content
     for i in range(tree.columnCount()):
         header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
-    # Then, allow interactive resizing
+    # Then, allow interactive resizing for all columns except Notes (which will stretch)
     for i in range(tree.columnCount()):
-        header.setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive)
+        if i != 11:  # All columns except Notes
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive)
+    
+    # Make Notes column (index 11) stretch to fill remaining space
+    header.setSectionResizeMode(11, QHeaderView.ResizeMode.Stretch)
     header.setStretchLastSection(False)
 
     # Set default width for ID column
-    tree.setColumnWidth(2, 100)
+    tree.setColumnWidth(2, 50)
+    
+    # Set default width for WBS column
+    tree.setColumnWidth(3, 70)
+    
+    # Set default width for Task Name column (double the default)
+    tree.setColumnWidth(4, 300)
 
     # Set initial visibility for WBS column
     tree.setColumnHidden(3, not main_window.toggle_wbs_action.isChecked())

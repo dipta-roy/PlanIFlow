@@ -8,9 +8,10 @@ import re
 import logging
 import math
 
-from data_manager import DataManager, Task, Resource, DependencyType, ScheduleType
-from settings_manager import DurationUnit, DateFormat, ProjectSettings
-from calendar_manager import CalendarManager
+from data_manager.manager import DataManager
+from data_manager.models import Task, Resource, DependencyType, ScheduleType
+from settings_manager.settings_manager import DurationUnit, DateFormat, ProjectSettings
+from calendar_manager.calendar_manager import CalendarManager
 
 class TaskDialog(QDialog):
     def __init__(self, parent=None, data_manager: DataManager = None, task: Task = None, parent_task: Task = None, is_milestone: bool = False):
@@ -290,6 +291,7 @@ class TaskDialog(QDialog):
         self.resources_table.insertRow(row_count)
 
         resource_combo = QComboBox()
+        resource_combo.setEditable(True)
         if self.data_manager:
             all_resource_names = sorted([r.name for r in self.data_manager.get_all_resources()])
             resource_combo.addItems(all_resource_names)

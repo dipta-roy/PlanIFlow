@@ -3,10 +3,11 @@
 
 from PyQt6.QtWidgets import QLabel, QToolBar, QMenu, QStatusBar, QApplication, QFileDialog, QMessageBox
 from PyQt6.QtGui import QAction, QPixmap
-from ui_delegates import get_resource_path
+from ui.ui_helpers import get_resource_path
 import os
 import base64
 from PyQt6.QtCore import Qt, QSize
+from constants.app_images import LOGO_ICO_BASE64
 
 def create_menu_bar(window):
     """Create menu bar"""
@@ -230,8 +231,7 @@ def create_menu_bar(window):
 
 def create_toolbar(window):
     """Create toolbar"""
-def create_toolbar(window):
-    """Create toolbar"""
+
     toolbar = QToolBar("Main Toolbar")
     toolbar.setMovable(False)
     window.addToolBar(toolbar)
@@ -239,7 +239,6 @@ def create_toolbar(window):
     toolbar.setStyleSheet("QToolButton { padding: 5px; }")
 
     # Load logo from base64
-    from app_images import LOGO_ICO_BASE64
     try:
         logo_bytes = base64.b64decode(LOGO_ICO_BASE64)
         logo_pixmap = QPixmap()
@@ -342,6 +341,12 @@ def create_toolbar(window):
     toolbar.addAction(bulk_outdent_btn)
 
     toolbar.addSeparator()
+
+    # *** ADD EXPAND/COLLAPSE BUTTONS ***
+    expand_selected_btn = QAction("⊕ Expand Selected", window)
+    expand_selected_btn.setToolTip("Expand selected summary task and all subtasks")
+    expand_selected_btn.triggered.connect(window._expand_selected)
+    toolbar.addAction(expand_selected_btn)
 
     # Resource Management
     add_resource_btn = QAction("👤", window)

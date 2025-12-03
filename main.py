@@ -8,9 +8,11 @@ import os
 import base64
 
 # Import only essential PyQt6 modules first for fast splash screen
+
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import Qt
+from constants.constants import APP_NAME, VERSION
 
 
 def get_resource_path(relative_path):
@@ -34,15 +36,15 @@ def main():
     # Fix for Windows taskbar icon
     if os.name == 'nt':
         import ctypes
-        myappid = 'planiflow.projectplanner.1.6.1' # arbitrary string
+        myappid = f'{APP_NAME.lower().replace(" ", "")}.projectplanner.{VERSION}' # arbitrary string
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     
     app = QApplication(sys.argv)
-    app.setApplicationName("PlanIFlow - Project Planner")
-    app.setOrganizationName("PlanIFlow - Project Planner")
+    app.setApplicationName(f"{APP_NAME} - Project Planner")
+    app.setOrganizationName(f"{APP_NAME} - Project Planner")
     
     # *** SET APPLICATION ICON (BASE64) ***
-    from app_images import SPLASH_BASE64, LOGO_ICO_BASE64
+    from constants.app_images import SPLASH_BASE64, LOGO_ICO_BASE64
     import tempfile
     
     # Create icon from base64 ICO data - save to temp file to preserve all icon sizes
@@ -77,12 +79,12 @@ def main():
     if not splash_pix.isNull():
         splash = QSplashScreen(splash_pix, Qt.WindowType.WindowStaysOnTopHint)
         # Add "Loading..." message below the splash image
-        splash.showMessage("PlanIFlow 1.6.1 Loading...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.darkGray)
+        splash.showMessage(f"{APP_NAME} {VERSION} Loading...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.darkGray)
         splash.show()
         app.processEvents()  # Ensure splash is drawn immediately
     
     # NOW import heavy modules while splash is visible
-    from ui_main import MainWindow
+    from ui.ui_main import MainWindow
     
     # Create and show main window
     window = MainWindow()

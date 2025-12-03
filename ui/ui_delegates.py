@@ -10,9 +10,7 @@ import logging
 from datetime import datetime, timedelta
 
 # Constants for ColorDelegate
-CIRCLE_SIZE = 10
-LEFT_PADDING = 8
-TEXT_SHIFT = 15
+from constants.constants import CIRCLE_SIZE, LEFT_PADDING, TEXT_SHIFT, ICON_SIZE
 
 import logging
 from datetime import datetime, timedelta
@@ -324,3 +322,63 @@ def get_resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+
+class ExpandCollapseDelegate(QStyledItemDelegate):
+    """Custom delegate to show expand/collapse buttons"""
+    
+    def __init__(self, tree_widget):
+        super().__init__()
+        self.tree_widget = tree_widget
+    
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        """Paint expand/collapse icon"""
+        super().paint(painter, option, index)
+        
+        # Get the tree widget item
+        item = self.tree_widget.itemFromIndex(index)
+        
+        # Only draw icon if item has children
+        if item and item.childCount() > 0:
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            
+            # Draw expand/collapse icon
+            rect = option.rect
+            x = rect.x() + (rect.width() - ICON_SIZE) // 2
+            y = rect.y() + (rect.height() - ICON_SIZE) // 2
+            
+            # Determine if expanded
+            is_expanded = item.isExpanded()
+            
+            # Draw circular button
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor(180, 180, 180, 150)))
+            painter.drawEllipse(x, y, ICON_SIZE, ICON_SIZE)
+            
+            # Draw border
+            painter.setPen(QColor(100, 100, 100))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(x, y, ICON_SIZE, ICON_SIZE)
+            
+            # Draw +/- symbol
+            painter.setPen(QColor(50, 50, 50))
+            painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+            symbol = "−" if is_expanded else "+"
+            painter.drawText(x, y, ICON_SIZE, ICON_SIZE, 
+                           Qt.AlignmentFlag.AlignCenter, symbol)
+            
+            painter.restore()
+    
+    def editorEvent(self, event, model, option, index):
+        """Handle click on expand/collapse icon"""
+        if event.type() == event.Type.MouseButtonRelease:
+            item = self.tree_widget.itemFromIndex(index)
+            if item and item.childCount() > 0:
+                # Toggle expansion
+                item.setExpanded(not item.isExpanded())
+                return True
+        return super().editorEvent(event, model, option, index)
+    
+    def sizeHint(self, option, index):
+        """Provide size hint for the cell"""
+        return super().sizeHint(option, index)

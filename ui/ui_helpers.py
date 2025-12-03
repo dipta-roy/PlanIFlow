@@ -3,6 +3,10 @@
 
 import sys, os
 import base64
+from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtWidgets import QApplication
+from constants.app_images import LOGO_ICO_BASE64
+
 
 def get_resource_path(relative_path):
     """
@@ -19,12 +23,8 @@ def get_resource_path(relative_path):
 
 def set_application_icon(window, logo_base64=None):
     """Set application icon for window and QApplication using base64 encoded icon"""
-    from PyQt6.QtGui import QIcon, QPixmap
-    from PyQt6.QtWidgets import QApplication
-    
     if logo_base64 is None:
         # Import from app_images if not provided
-        from app_images import LOGO_ICO_BASE64
         logo_base64 = LOGO_ICO_BASE64
     
     try:

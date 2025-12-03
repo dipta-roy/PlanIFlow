@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QDoubleSpinBox,
                              QPushButton, QCheckBox, QLabel)
-from calendar_manager import CalendarManager
+from calendar_manager.calendar_manager import CalendarManager
 
 class CalendarSettingsDialog(QDialog):
     """Dialog for calendar settings"""

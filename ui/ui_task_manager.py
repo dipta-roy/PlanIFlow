@@ -1,0 +1,575 @@
+from PyQt6.QtWidgets import QMessageBox, QDialog
+from PyQt6.QtCore import Qt, QDate
+from datetime import datetime, timedelta
+import traceback
+
+from data_manager.models import Task, Resource, ScheduleType, DependencyType
+from ui.ui_task_dialog import TaskDialog
+from ui.ui_resource_dialog import ResourceDialog
+
+class TaskOperationsMixin:
+    """Mixin for task and resource operations in MainWindow"""
+
+    def _quick_add_task(self):
+        """Quickly add a task with just the name from the quick add input field"""
+        task_name = self.quick_add_task_input.text().strip()
+        
+        if not task_name:
+            return
+        
+        # Create task with default values
+        task = Task(
+            name=task_name,
+            start_date=datetime.now(),
+            end_date=datetime.now() + timedelta(days=1),
+            percent_complete=0,
+            predecessors=[],
+            assigned_resources=[],
+            notes="",
+            schedule_type=ScheduleType.AUTO_SCHEDULED
+        )
+        
+        if self.data_manager.add_task(task):
+            self._update_all_views()
+            self.status_label.setText(f"Task '{task.name}' added successfully")
+            self.quick_add_task_input.clear()
+        else:
+            QMessageBox.warning(self, "Validation Error", 
+                              "Task could not be added.")
+    
+    def _add_task_dialog(self):
+        """Show add task dialog"""
+        dialog = TaskDialog(self, self.data_manager, is_milestone=False)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            task_data = dialog.get_task_data()
+            
+            task = Task(
+                name=task_data['name'],
+                start_date=task_data['start_date'],
+                end_date=task_data['end_date'],
+                percent_complete=task_data['percent_complete'],
+                predecessors=task_data['predecessors'],
+                assigned_resources=task_data['assigned_resources'],
+                notes=task_data['notes'],
+                schedule_type=task_data['schedule_type']
+            )
+            
+            if self.data_manager.add_task(task):
+                self._update_all_views()
+                self.status_label.setText(f"Task '{task.name}' added successfully")
+            else:
+                QMessageBox.warning(self, "Validation Error", 
+                                  "Task has circular dependencies or invalid dates.")
+    
+    def _add_subtask_dialog(self):
+        """Show add subtask dialog"""
+        # Get selected task
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", 
+                                  "Please select a parent task first.")
+            return
+        
+        parent_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
+        parent_task = self.data_manager.get_task(parent_id)
+        
+        if not parent_task:
+            return
+        
+        dialog = TaskDialog(self, self.data_manager, parent_task=parent_task, is_milestone=False)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            task_data = dialog.get_task_data()
+            
+            task = Task(
+                name=task_data['name'],
+                start_date=task_data['start_date'],
+                end_date=task_data['end_date'],
+                percent_complete=task_data['percent_complete'],
+                predecessors=task_data['predecessors'],
+                assigned_resources=task_data['assigned_resources'],
+                notes=task_data['notes'],
+                schedule_type=task_data['schedule_type']
+            )
+            
+            if self.data_manager.add_task(task, parent_id=parent_id):
+                self._update_all_views()
+                self.status_label.setText(f"Subtask '{task.name}' added to '{parent_task.name}'")
+            else:
+                QMessageBox.warning(self, "Validation Error", 
+                                  "Task has circular dependencies or invalid dates.")
+    
+    def _edit_task_dialog(self):
+        """Show edit task dialog"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", "Please select a task to edit.")
+            return
+        
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
+        task = self.data_manager.get_task(task_id)
+        
+        if task:
+            try:
+                dialog = TaskDialog(self, self.data_manager, task, is_milestone=task.is_milestone)
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    task_data = dialog.task_data
+                    
+                    updated_task = Task(
+                        name=task_data['name'],
+                        start_date=task_data['start_date'],
+                        end_date=task_data['end_date'],
+                        percent_complete=task_data['percent_complete'],
+                        predecessors=task_data['predecessors'],
+                        assigned_resources=task_data['assigned_resources'],
+                        notes=task_data['notes'],
+                        task_id=task.id,
+                        schedule_type=task_data['schedule_type']
+                    )
+                    
+                    if self.data_manager.update_task(task_id, updated_task):
+                        self._update_all_views()
+                        self.status_label.setText(f"Task '{updated_task.name}' updated successfully")
+                    else:
+                        QMessageBox.warning(self, "Validation Error", 
+                                          "Task update failed due to circular dependencies.")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to open task dialog: {e}")
+                traceback.print_exc() # Print full traceback to console
+    
+    def _delete_task(self):
+        """Delete selected task"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", "Please select a task to delete.")
+            return
+        
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
+        task = self.data_manager.get_task(task_id)
+        
+        if task:
+            # Check if it has subtasks
+            children = self.data_manager.get_child_tasks(task_id)
+            msg = f"Delete task '{task.name}'?"
+            if children:
+                msg = f"Delete task '{task.name}' and all {len(children)} subtask(s)?"
+            
+            reply = QMessageBox.question(self, "Confirm Delete", msg,
+                                        QMessageBox.StandardButton.Yes | 
+                                        QMessageBox.StandardButton.No)
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.data_manager.delete_task(task_id)
+                self._update_all_views()
+                self.status_label.setText("Task deleted")
+    
+    def _indent_task(self):
+        """Indent selected task (make it a subtask of previous sibling in visual order)"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", 
+                                  "Please select a task to indent.")
+            return
+        
+        current_item = selected_items[0]
+        task_id = current_item.data(2, Qt.ItemDataRole.UserRole)
+        
+        if task_id is None:
+            QMessageBox.warning(self, "Error", "Could not identify selected task.")
+            return
+        
+        task = self.data_manager.get_task(task_id)
+        if not task:
+            QMessageBox.warning(self, "Error", "Selected task not found.")
+            return
+        
+        # Get the parent item (None if top-level)
+        parent_item = current_item.parent()
+        
+        # Find the index of current item
+        if parent_item is None:
+            # Top-level item
+            root = self.task_tree.invisibleRootItem()
+            index = root.indexOfChild(current_item)
+            
+            if index == 0:
+                QMessageBox.information(self, "Cannot Indent", 
+                                      f"Cannot indent '{task.name}'.\n\n"
+                                      "This is the first task. There is no task above it to indent under.")
+                return
+            
+            # Get the previous sibling item
+            previous_item = root.child(index - 1)
+        else:
+            # Child item
+            index = parent_item.indexOfChild(current_item)
+            
+            if index == 0:
+                QMessageBox.information(self, "Cannot Indent", 
+                                      f"Cannot indent '{task.name}'.\n\n"
+                                      "This is the first subtask under its parent.\n"
+                                      "There is no task above it to indent under.")
+                return
+            
+            # Get the previous sibling item
+            previous_item = parent_item.child(index - 1)
+        
+        # Get the task ID of the previous item
+        previous_task_id = previous_item.data(2, Qt.ItemDataRole.UserRole)
+        if previous_task_id is None:
+            QMessageBox.warning(self, "Error", "Could not identify previous task.")
+            return
+        
+        previous_task = self.data_manager.get_task(previous_task_id)
+        if not previous_task:
+            QMessageBox.warning(self, "Error", "Previous task not found.")
+            return
+        
+        # Perform the indent (make current task a child of previous task)
+        if self.data_manager.move_task(task_id, previous_task_id):
+            self.expanded_tasks.add(previous_task_id)  # Auto-expand the new parent
+            self._update_all_views()
+            self.status_label.setText(f"✓ '{task.name}' indented under '{previous_task.name}'")
+        else:
+            QMessageBox.warning(self, "Cannot Indent", 
+                              f"Cannot indent '{task.name}' under '{previous_task.name}'.\n\n"
+                              "This would create a circular dependency.")
+    
+    def _outdent_task(self):
+        """Outdent selected task (move up one level)"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", 
+                                  "Please select a task to outdent.")
+            return
+        
+        current_item = selected_items[0]
+        task_id = current_item.data(2, Qt.ItemDataRole.UserRole)
+        
+        if task_id is None:
+            QMessageBox.warning(self, "Error", "Could not identify selected task.")
+            return
+        
+        task = self.data_manager.get_task(task_id)
+        if not task:
+            QMessageBox.warning(self, "Error", "Selected task not found.")
+            return
+        
+        if task.parent_id is None:
+            QMessageBox.information(self, "Cannot Outdent", 
+                                  f"Cannot outdent '{task.name}'.\n\n"
+                                  "This task is already at the top level.")
+            return
+        
+        parent = self.data_manager.get_task(task.parent_id)
+        if not parent:
+            QMessageBox.warning(self, "Error", "Parent task not found.")
+            return
+        
+        # Get the grandparent ID (None means move to top level)
+        new_parent_id = parent.parent_id
+        
+        # Perform the outdent
+        if self.data_manager.move_task(task_id, new_parent_id):
+            self._update_all_views()
+            if new_parent_id is None:
+                self.status_label.setText(f"✓ '{task.name}' moved to top level")
+            else:
+                grandparent = self.data_manager.get_task(new_parent_id)
+                self.status_label.setText(f"✓ '{task.name}' outdented (now under '{grandparent.name}')")
+        else:
+            QMessageBox.warning(self, "Error", "Failed to outdent task.")
+    
+    def _add_resource_dialog(self):
+        """Show add resource dialog"""
+        dialog = ResourceDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            resource_data = dialog.get_resource_data()
+            
+            resource = Resource(
+                name=resource_data['name'],
+                max_hours_per_day=resource_data['max_hours_per_day'],
+                exceptions=resource_data['exceptions']
+            )
+            
+            if self.data_manager.add_resource(resource):
+                self._update_all_views()
+                self.resource_summary._update_resource_delegates()
+                self.status_label.setText(f"Resource '{resource.name}' added successfully")
+            else:
+                QMessageBox.warning(self, "Duplicate Resource", 
+                                  "A resource with this name already exists.")
+    
+
+
+    def _add_milestone_dialog(self):
+        """Show add milestone dialog"""
+        dialog = TaskDialog(self, self.data_manager, is_milestone=True)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            task_data = dialog.get_task_data()
+            
+            task = Task(
+                name=task_data['name'],
+                start_date=task_data['start_date'],
+                end_date=task_data['start_date'],  # Milestone: end = start
+                percent_complete=task_data['percent_complete'],
+                predecessors=task_data['predecessors'],
+                assigned_resources=task_data['assigned_resources'],
+                notes=task_data['notes'],
+                is_milestone=True  # *** MARK AS MILESTONE ***
+            )
+            
+            if self.data_manager.add_task(task):
+                self._update_all_views()
+                self.status_label.setText(f"✓ Milestone '{task.name}' added successfully")
+            else:
+                QMessageBox.warning(self, "Validation Error", 
+                                  "Milestone has circular dependencies or invalid dates.")
+
+    def _insert_task_above(self):
+        """Insert a new task above the selected task (renumbers IDs)"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", 
+                                  "Please select a task to insert above.")
+            return
+        
+        # Get selected task
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
+        selected_task = self.data_manager.get_task(task_id)
+        
+        if not selected_task:
+            return
+        
+        # Show info about renumbering
+        reply = QMessageBox.question(
+            self,
+            "Insert Task",
+            f"Insert a new task before '{selected_task.name}' (ID {selected_task.id})?\n\n"
+            f"The new task will get ID {selected_task.id}.\n"
+            f"All tasks from ID {selected_task.id} onwards will be renumbered.\n"
+            f"Predecessors will be updated automatically.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        # Open dialog for new task
+        dialog = TaskDialog(self, self.data_manager)
+        
+        # Pre-fill with dates just before the selected task
+        if selected_task.start_date:
+            default_end = selected_task.start_date - timedelta(days=1)
+            default_start = default_end - timedelta(days=6)
+            
+            dialog.start_date_input.setDate(QDate(default_start.year, default_start.month, default_start.day))
+            dialog.end_date_input.setDate(QDate(default_end.year, default_end.month, default_end.day))
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            task_data = dialog.get_task_data()
+            
+            new_task = Task(
+                name=task_data['name'],
+                start_date=task_data['start_date'],
+                end_date=task_data['end_date'],
+                percent_complete=task_data['percent_complete'],
+                predecessors=task_data['predecessors'],
+                assigned_resources=task_data['assigned_resources'],
+                notes=task_data['notes'],
+                task_id=None  # Will be set by insert method
+            )
+            
+            if self.data_manager.insert_task_before(new_task, selected_task.id):
+                self._update_all_views()
+                self.status_label.setText(
+                    f"✓ Task '{new_task.name}' inserted at ID {new_task.id}. "
+                    f"Tasks renumbered."
+                )
+            else:
+                QMessageBox.warning(self, "Error", "Failed to insert task.")
+    
+    def _insert_task_below(self):
+        """Insert a new task below the selected task (renumbers IDs)"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", 
+                                  "Please select a task to insert below.")
+            return
+        
+        # Get selected task
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
+        selected_task = self.data_manager.get_task(task_id)
+        
+        if not selected_task:
+            return
+        
+        # Show info about renumbering
+        new_id = selected_task.id + 1
+        reply = QMessageBox.question(
+            self,
+            "Insert Task",
+            f"Insert a new task after '{selected_task.name}' (ID {selected_task.id})?\n\n"
+            f"The new task will get ID {new_id}.\n"
+            f"All tasks from ID {new_id} onwards will be renumbered.\n"
+            f"Predecessors will be updated automatically.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        # Open dialog for new task
+        dialog = TaskDialog(self, self.data_manager)
+        
+        # Pre-fill with dates just after the selected task
+        if selected_task.end_date:
+            default_start = selected_task.end_date + timedelta(days=1)
+            default_end = default_start + timedelta(days=6)
+            
+            dialog.start_date_input.setDate(QDate(default_start.year, default_start.month, default_start.day))
+            dialog.end_date_input.setDate(QDate(default_end.year, default_end.month, default_end.day))
+            
+            # Auto-add the selected task as predecessor
+            dialog._add_predecessor_row()
+            if dialog.predecessor_rows:
+                task_combo, dep_type_combo, lag_spin, _ = dialog.predecessor_rows[0]
+                # Find and select the current task
+                for i in range(task_combo.count()):
+                    if task_combo.itemData(i) == selected_task.id:
+                        task_combo.setCurrentIndex(i)
+                        break
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            task_data = dialog.get_task_data()
+            
+            new_task = Task(
+                name=task_data['name'],
+                start_date=task_data['start_date'],
+                end_date=task_data['end_date'],
+                percent_complete=task_data['percent_complete'],
+                predecessors=task_data['predecessors'],
+                assigned_resources=task_data['assigned_resources'],
+                notes=task_data['notes'],
+                task_id=None  # Will be set by insert method
+            )
+            
+            if self.data_manager.insert_task_at_position(new_task, selected_task.id):
+                self._update_all_views()
+                self.status_label.setText(
+                    f"✓ Task '{new_task.name}' inserted at ID {new_task.id}. "
+                    f"Tasks renumbered."
+                )
+            else:
+                QMessageBox.warning(self, "Error", "Failed to insert task.")
+    
+    def _convert_to_milestone(self):
+        """Convert selected task to milestone"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", 
+                                  "Please select a task to convert.")
+            return
+        
+        task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
+        task = self.data_manager.get_task(task_id)
+        
+        if not task:
+            return
+        
+        # Check if it's a summary task
+        if getattr(task, 'is_summary', False):
+            QMessageBox.warning(self, "Cannot Convert", 
+                              "Cannot convert a summary task to a milestone.\n"
+                              "Summary tasks have subtasks and must remain as summaries.")
+            return
+        
+        # Check current state
+        is_milestone = getattr(task, 'is_milestone', False)
+        
+        if is_milestone:
+            # Convert milestone to regular task
+            reply = QMessageBox.question(
+                self, 
+                "Convert to Task",
+                f"Convert milestone '{task.name}' to a regular task?\n\n"
+                "You'll need to set the end date.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                task.is_milestone = False
+                # Set default end date (7 days after start)
+                task.end_date = task.start_date + timedelta(days=6)
+                
+                self._update_all_views()
+                self.status_label.setText(f"✓ Converted '{task.name}' to regular task")
+        else:
+            # Convert regular task to milestone
+            reply = QMessageBox.question(
+                self, 
+                "Convert to Milestone",
+                f"Convert task '{task.name}' to a milestone?\n\n"
+                "The end date will be set to the start date (0 duration).",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                task.is_milestone = True
+                task.end_date = task.start_date
+                
+                self._update_all_views()
+                self.status_label.setText(f"✓ Converted '{task.name}' to milestone")
+
+    def _bulk_indent_tasks(self):
+        """Indent multiple selected tasks"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", 
+                                  "Please select one or more tasks to indent.")
+            return
+        
+        # Get task IDs
+        task_ids = []
+        for item in selected_items:
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
+            if task_id is not None:
+                task_ids.append(task_id)
+        
+        if not task_ids:
+            return
+        
+        # Perform bulk indent
+        if self.data_manager.bulk_indent_tasks(task_ids):
+            self._update_all_views()
+            self.status_label.setText(f"✓ Indented {len(task_ids)} task(s)")
+        else:
+            QMessageBox.warning(self, "Cannot Indent", 
+                              "Could not indent the selected tasks.\n"
+                              "Make sure they have tasks above them to indent under.")
+    
+    def _bulk_outdent_tasks(self):
+        """Outdent multiple selected tasks"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", 
+                                  "Please select one or more tasks to outdent.")
+            return
+        
+        # Get task IDs
+        task_ids = []
+        for item in selected_items:
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
+            if task_id is not None:
+                task_ids.append(task_id)
+        
+        if not task_ids:
+            return
+        
+        # Perform bulk outdent
+        if self.data_manager.bulk_outdent_tasks(task_ids):
+            self._update_all_views()
+            self.status_label.setText(f"✓ Outdented {len(task_ids)} task(s)")
+        else:
+            QMessageBox.warning(self, "Cannot Outdent", 
+                              "Could not outdent the selected tasks.\n"
+                              "Make sure they are not already at top level.")

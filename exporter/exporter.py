@@ -8,9 +8,11 @@ import pandas as pd
 import json
 from typing import Dict, Any, Tuple
 from datetime import datetime
-from data_manager import DataManager, Task, Resource, DependencyType, DurationUnit
-from calendar_manager import CalendarManager
-from settings_manager import DateFormat
+from data_manager.manager import DataManager
+from data_manager.models import Task, Resource, DependencyType
+from settings_manager.settings_manager import DurationUnit
+from calendar_manager.calendar_manager import CalendarManager
+from settings_manager.settings_manager import DateFormat
 
 class Exporter:
     """Handles data import/export operations with enhanced features"""
@@ -447,14 +449,14 @@ class Exporter:
             return data_manager, False
     
     @staticmethod
-    def save_to_json(data_manager: DataManager, calendar_manager: CalendarManager, 
+    def export_to_json(data_manager: DataManager, calendar_manager: CalendarManager, 
                      filepath: str) -> bool:
         """Save project to JSON file with all enhanced features"""
         try:
             data = {
                 'version': '2.2',
                 'project_name': data_manager.project_name,
-                'project_data': data_manager.to_dict(),
+                'project_data': data_manager.save_to_dict(),
                 'calendar_settings': calendar_manager.to_dict(),
                 'project_settings': data_manager.settings.to_dict(), # Include project settings
                 'saved_at': datetime.now().isoformat(),
@@ -480,7 +482,7 @@ class Exporter:
             return False
     
     @staticmethod
-    def load_from_json(filepath: str) -> Tuple[DataManager, CalendarManager, bool]:
+    def import_from_json(filepath: str) -> Tuple[DataManager, CalendarManager, bool]:
         """Load project from JSON file with backward compatibility"""
         data_manager = DataManager()
         calendar_manager = CalendarManager()
@@ -508,7 +510,7 @@ class Exporter:
                 data_manager.settings.from_dict(data['project_settings'])
 
             # Load project data
-            data_manager.from_dict(data.get('project_data', {}))
+            data_manager.load_from_dict(data.get('project_data', {}))
             
             # Backward compatibility for project_start_date if not loaded from settings
             if data_manager.settings.project_start_date is None and data_manager.tasks:

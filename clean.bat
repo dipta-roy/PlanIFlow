@@ -2,7 +2,7 @@
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================
-echo   Project Planner v1.3 - Clean Build Files
+echo   Project Planner - Clean Build Files
 echo ===============================================
 echo.
 
@@ -74,7 +74,6 @@ if /i "!CLEAN_VENV!"=="Y" (
         echo [INFO] Removing virtual environment...
         rmdir /s /q venv
         echo [SUCCESS] Virtual environment removed.
-        echo [INFO] Run 'install.bat' or 'setup.bat' to recreate it.
     ) else (
         echo [INFO] No virtual environment found.
     )

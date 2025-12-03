@@ -8,23 +8,18 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 import os
 from datetime import datetime
-from gantt_chart import GanttChart
+from ui.gantt_chart import GanttChart
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
-
-# Import PyQt6 for Gantt chart rendering
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import QSize, Qt
-
-# Import PIL for image dimension retrieval
 from PIL import Image as PILImage
-
 import base64
 import io
-
-# Base64 encoded logo.ico
-from app_images import LOGO_BASE64
+import constants.constants as constants
+from constants.app_images import LOGO_BASE64
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 class PDFExporter:
     def __init__(self, project_data, file_path, calendar_manager):
@@ -40,6 +35,20 @@ class PDFExporter:
         
         self.logo_data=base64.b64decode(LOGO_BASE64)
         self.logo_img = io.BytesIO(self.logo_data)
+
+    def _get_base_table_style(self):
+        """Returns a base TableStyle with common styling for all tables."""
+        return TableStyle([
+            ('GRID', (0, 0), (-1, -1), constants.PDF_TABLE_GRID_LINE_WIDTH, constants.PDF_TABLE_GRID_COLOR),
+            ('FONTNAME', (0, 0), (-1, -1), constants.PDF_TABLE_FONT_NAME),
+            ('FONTSIZE', (0, 0), (-1, -1), constants.PDF_TABLE_FONT_SIZE),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), constants.PDF_TABLE_PADDING_TOP),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), constants.PDF_TABLE_PADDING_BOTTOM),
+        ])
+
 
     def _header(self, canvas, doc):
         canvas.saveState()
@@ -80,10 +89,10 @@ class PDFExporter:
         doc = SimpleDocTemplate(
             self.file_path, 
             pagesize=landscape(letter),
-            topMargin = 1.0*inch,
-            bottomMargin = 0.1*inch,
-            leftMargin = 0.1*inch,
-            rightMargin = 0.1*inch
+            topMargin = constants.PDF_TOP_MARGIN,
+            bottomMargin = constants.PDF_BOTTOM_MARGIN,
+            leftMargin = constants.PDF_LEFT_MARGIN,
+            rightMargin = constants.PDF_RIGHT_MARGIN
         )
         self.temp_image_paths = [] # Initialize list to store temp image paths
         self.build_story() # Build the rest of the story
@@ -111,8 +120,8 @@ class PDFExporter:
         gantt_widget.update_chart(self.project_data.get_all_tasks(), self.project_data)
 
         # Set a much higher resolution for better quality and detail
-        render_width = 2400
-        render_height = 1200
+        render_width = constants.PDF_RENDER_WIDTH
+        render_height = constants.PDF_RENDER_HEIGHT
         gantt_widget.setFixedSize(QSize(render_width, render_height))
 
         # Render to QPixmap
@@ -137,7 +146,7 @@ class PDFExporter:
 
         img = Image(critical_path_image_path)
         # Use landscape width with 0.5" margins for maximum chart size
-        img.drawWidth = landscape(letter)[0] - 1*inch
+        img.drawWidth = landscape(letter)[0] - constants.PDF_LEFT_MARGIN - constants.PDF_RIGHT_MARGIN
         img.drawHeight = img.drawWidth * (img_height / img_width) # Maintain aspect ratio
         self.story.append(img)
         self.story.append(Spacer(1, 0.15 * inch))
@@ -155,7 +164,7 @@ class PDFExporter:
 
         img = Image(non_critical_path_image_path)
         # Use landscape width with 0.5" margins for maximum chart size
-        img.drawWidth = landscape(letter)[0] - 1*inch
+        img.drawWidth = landscape(letter)[0] - constants.PDF_LEFT_MARGIN - constants.PDF_RIGHT_MARGIN
         img.drawHeight = img.drawWidth * (img_height / img_width) # Maintain aspect ratio
         self.story.append(img)
         self.story.append(Spacer(1, 0.2 * inch))
@@ -183,18 +192,26 @@ class PDFExporter:
             self.story.append(PageBreak())
             return
 
+        if not headers:
+            self.story.append(Paragraph("No breakdown headers available.", self.styles['Normal']))
+            self.story.append(PageBreak())
+            return
+
         # Create header style for wrapping
-        header_style = self.styles['Normal'].clone('header_style')
-        header_style.textColor = colors.whitesmoke
-        header_style.alignment = 1 # CENTER
-        header_style.fontName = 'Helvetica-Bold'
+        header_style = self.styles['Normal'].clone('breakdown_header_style')
+        header_style.textColor = constants.PDF_TABLE_HEADER_TEXT_COLOR
+        header_style.alignment = TA_CENTER  # Use TA_CENTER constant instead of string
+        header_style.fontName = constants.PDF_TABLE_FONT_NAME_BOLD
+        header_style.fontSize = constants.PDF_TABLE_HEADER_FONT_SIZE
         
         # Wrap headers in Paragraph objects to allow word wrapping
         wrapped_headers = [Paragraph(h, header_style) for h in headers]
 
         # Create cell style for wrapping content
         cell_style = self.styles['Normal'].clone('cell_style')
-        cell_style.alignment = 1 # CENTER
+        cell_style.alignment = TA_CENTER  # Use TA_CENTER constant instead of string
+        cell_style.fontName = constants.PDF_TABLE_FONT_NAME
+        cell_style.fontSize = constants.PDF_TABLE_FONT_SIZE
 
         # Wrap row content in Paragraph objects
         wrapped_rows = []
@@ -204,15 +221,20 @@ class PDFExporter:
 
         table_data = [wrapped_headers] + wrapped_rows
 
+        if not table_data:
+            self.story.append(Paragraph("No breakdown data available to create table.", self.styles['Normal']))
+            self.story.append(PageBreak())
+            return
+
         # Calculate column widths dynamically with maximum width
         # Period column: fixed width
         # Total column: fixed width
         # Resource columns: distribute remaining width
-        usable_width = landscape(letter)[0] - 1 * inch # Use 0.5" margins
+        usable_width = landscape(letter)[0] - constants.PDF_LEFT_MARGIN - constants.PDF_RIGHT_MARGIN # Use margins
         
         # Fixed width for 'Period' and 'Total' columns
-        period_col_width = 1.0 * inch # Slightly reduced
-        total_col_width = 0.8 * inch  # Slightly reduced
+        period_col_width = constants.PDF_PERIOD_COL_WIDTH
+        total_col_width = constants.PDF_TOTAL_COL_WIDTH
         
         remaining_width = usable_width - period_col_width - total_col_width
         
@@ -226,23 +248,24 @@ class PDFExporter:
         col_widths = [period_col_width, total_col_width] + [resource_col_width] * num_resource_cols
         
         table = Table(table_data, colWidths=col_widths)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')), # Green header
-            # TEXTCOLOR for headers is handled by Paragraph style
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            # FONTNAME for headers is handled by Paragraph style
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#E8F5E9')), # Light green rows
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]))
+        
+        style = self._get_base_table_style()
+        style.add('BACKGROUND', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_BG_COLOR)
+        style.add('TEXTCOLOR', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_TEXT_COLOR)
+        style.add('ALIGN', (0, 0), (-1, -1), 'CENTER')
+        style.add('BOTTOMPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_BOTTOM)
+        style.add('TOPPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_TOP)
+        style.add('ROWBACKGROUNDS', (0, 1), (-1, -1),
+                  [constants.PDF_TABLE_BODY_BG_COLOR_ODD, constants.PDF_TABLE_BODY_BG_COLOR_EVEN])
+        
+        table.setStyle(style)
         self.story.append(table)
         self.story.append(PageBreak())
 
     def add_title_page(self):
         # Use a custom style for centering
         centered_style = self.styles['Normal']
-        centered_style.alignment = 1 # TA_CENTER
+        centered_style.alignment = TA_CENTER
 
         # Decode base64 logo and save to a temporary file
         logo_data = base64.b64decode(LOGO_BASE64)
@@ -262,18 +285,18 @@ class PDFExporter:
         app_name_style = ParagraphStyle(
             'AppName',
             parent=self.styles['Heading1'],
-            fontSize=20,
-            leading=24,
-            alignment=1,  # TA_CENTER
-            textColor=colors.HexColor('#2E86AB'),  # Professional blue color
-            fontName='Helvetica-Bold'
+            fontSize=constants.PDF_FONT_SIZE_LARGE,
+            leading=constants.PDF_LEADING_LARGE,
+            alignment=TA_CENTER,
+            textColor=constants.PDF_COLOR_PROFESSIONAL_BLUE,
+            fontName=constants.PDF_FONT_HELVETICA_BOLD
         )
-        self.story.append(Paragraph("PlanIFlow", app_name_style))
+        self.story.append(Paragraph(constants.APP_NAME, app_name_style))
         self.story.append(Spacer(1, 0.3*inch))
 
         title_style = self.styles['Title']
-        title_style.alignment = 1 # TA_CENTER
-        self.story.append(Paragraph(self.project_data.project_name, title_style))
+        title_style.alignment = TA_CENTER
+        self.story.append(Paragraph(str(self.project_data.project_name), title_style))
         self.story.append(Spacer(1, 0.2*inch))
         self.story.append(Paragraph(f"Report Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", centered_style))
         self.story.append(PageBreak())
@@ -296,18 +319,20 @@ class PDFExporter:
         ]
 
         # Use maximum width for project details table
-        usable_width = landscape(letter)[0] - 0.5*inch
+        usable_width = landscape(letter)[0] - constants.PDF_LEFT_MARGIN - constants.PDF_RIGHT_MARGIN
         table = Table(data, colWidths=[2.5*inch, usable_width - 2.5*inch])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]))
+        
+        style = self._get_base_table_style()
+        style.add('BACKGROUND', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_BG_COLOR)
+        style.add('TEXTCOLOR', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_TEXT_COLOR)
+        style.add('ALIGN', (0, 0), (-1, -1), 'LEFT')
+        style.add('FONTNAME', (0, 0), (-1, 0), constants.PDF_TABLE_FONT_NAME_BOLD)
+        style.add('FONTSIZE', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_FONT_SIZE)
+        style.add('BOTTOMPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_BOTTOM)
+        style.add('TOPPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_TOP)
+        style.add('ROWBACKGROUNDS', (0, 1), (-1, -1),
+                  [constants.PDF_TABLE_BODY_BG_COLOR_ODD, constants.PDF_TABLE_BODY_BG_COLOR_EVEN])
+        table.setStyle(style)
         self.story.append(table)
         
         #Task Details
@@ -325,16 +350,18 @@ class PDFExporter:
             status_data.append([status, str(count)])
         
         status_table = Table(status_data)
-        status_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FFC107')), # Amber header
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#FFF8E1')), # Light amber rows
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]))
+        
+        status_style = self._get_base_table_style()
+        status_style.add('BACKGROUND', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_BG_COLOR)
+        status_style.add('TEXTCOLOR', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_TEXT_COLOR)
+        status_style.add('ALIGN', (0, 0), (-1, -1), 'CENTER')
+        status_style.add('FONTNAME', (0, 0), (-1, 0), constants.PDF_TABLE_FONT_NAME_BOLD)
+        status_style.add('FONTSIZE', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_FONT_SIZE)
+        status_style.add('BOTTOMPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_BOTTOM)
+        status_style.add('TOPPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_TOP)
+        status_style.add('ROWBACKGROUNDS', (0, 1), (-1, -1),
+                         [constants.PDF_TABLE_BODY_BG_COLOR_ODD, constants.PDF_TABLE_BODY_BG_COLOR_EVEN])
+        status_table.setStyle(status_style)
         self.story.append(status_table)
         self.story.append(Spacer(1, 0.2 * inch))
 
@@ -352,14 +379,17 @@ class PDFExporter:
 
         # Create custom styles
         task_style = self.styles['Normal'].clone('task_style')
-        task_style.fontSize = 8
-        task_style.leading = 10
+        task_style.fontSize = constants.PDF_TABLE_FONT_SIZE
+        task_style.leading = constants.PDF_LEADING_SMALL
+        task_style.fontName = constants.PDF_TABLE_FONT_NAME
+        task_style.alignment = TA_LEFT  # Explicitly set alignment
         
         header_style = self.styles['Normal'].clone('header_style')
-        header_style.fontSize = 9
-        header_style.leading = 11
-        header_style.textColor = colors.whitesmoke
-        header_style.alignment = 1  # Center
+        header_style.fontSize = constants.PDF_TABLE_HEADER_FONT_SIZE
+        header_style.leading = constants.PDF_LEADING_MEDIUM
+        header_style.textColor = constants.PDF_TABLE_HEADER_TEXT_COLOR
+        header_style.alignment = TA_CENTER
+        header_style.fontName = constants.PDF_TABLE_FONT_NAME_BOLD
         
         # Create headers with Paragraph objects for wrapping
         headers = [
@@ -431,58 +461,62 @@ class PDFExporter:
         flatten_tasks(top_level_tasks)
 
         # Calculate column widths dynamically - use maximum width with margins
-        # Landscape letter is 11" tall x 8.5" wide, so landscape(letter)[0] = 11 inches
-        # Use 0.5" margins on each side (total 1 inch) for maximum table width, matching other tables
-        usable_width = landscape(letter)[0]
+        # Landscape letter is 11\" tall x 8.5\" wide, so landscape(letter)[0] = 11 inches
+        usable_width = landscape(letter)[0] - constants.PDF_LEFT_MARGIN - constants.PDF_RIGHT_MARGIN
+        
+        # Define fixed column widths
+        id_width = 0.35*inch
+        wbs_width = 0.5*inch
+        duration_width = 0.65*inch
+        start_date_width = 0.85*inch
+        end_date_width = 0.85*inch
+        percent_width = 0.5*inch
+        status_width = 0.8*inch
+        
+        # Calculate total fixed width
+        fixed_width = id_width + wbs_width + duration_width + start_date_width + end_date_width + percent_width + status_width
+        
+        # Remaining width for flexible columns (Task Name, Dependencies, Resources)
+        remaining_width = usable_width - fixed_width
         
         col_widths = [
-            0.35*inch,                          # ID
-            0.5*inch,                           # WBS
-            (usable_width - 6.3*inch) * 0.35,   # Task Name (35% of remaining)
-            0.65*inch,                          # Duration
-            0.85*inch,                          # Start Date
-            0.85*inch,                          # End Date
-            (usable_width - 6.3*inch) * 0.35,   # Dependencies (35% of remaining)
-            (usable_width - 6.3*inch) * 0.3,    # Resources (30% of remaining)
-            0.5*inch,                           # % Complete
-            0.8*inch,                           # Status
+            id_width,                       # ID
+            wbs_width,                      # WBS
+            remaining_width * 0.35,         # Task Name (35% of remaining)
+            duration_width,                 # Duration
+            start_date_width,               # Start Date
+            end_date_width,                 # End Date
+            remaining_width * 0.35,         # Dependencies (35% of remaining)
+            remaining_width * 0.3,          # Resources (30% of remaining)
+            percent_width,                  # % Complete
+            status_width,                   # Status
         ]
         
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
-        table._argW = col_widths
+
         
-        table.setStyle(TableStyle([
-            # Header styling
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1976D2')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-            ('TOPPADDING', (0, 0), (-1, 0), 6),
-            
-            # Data rows styling
-            ('ALIGN', (0, 1), (1, -1), 'CENTER'),  # Center ID and WBS
-            ('ALIGN', (3, 1), (5, -1), 'CENTER'),  # Center Duration and Dates
-            ('ALIGN', (8, 1), (9, -1), 'CENTER'),  # Center % and Status
-            ('ALIGN', (2, 1), (2, -1), 'LEFT'),   # Task Name
-            ('ALIGN', (6, 1), (6, -1), 'LEFT'),   # Predecessor
-            ('ALIGN', (7, 1), (7, -1), 'LEFT'),   # Resource
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 3),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-            ('TOPPADDING', (0, 1), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
-            
-            # Row backgrounds - alternating colors
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), 
-             [colors.HexColor('#E3F2FD'), colors.HexColor('#BBDEFB')]),
-            
-            # Grid
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#90CAF9')),
-            
-            # Font size for data
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ]))
+        style = self._get_base_table_style()
+        # Header styling
+        style.add('BACKGROUND', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_BG_COLOR)
+        style.add('TEXTCOLOR', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_TEXT_COLOR)
+        style.add('FONTNAME', (0, 0), (-1, 0), constants.PDF_TABLE_FONT_NAME_BOLD)
+        style.add('FONTSIZE', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_FONT_SIZE)
+        style.add('BOTTOMPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_BOTTOM)
+        style.add('TOPPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_TOP)
+        
+        # Data rows styling
+        style.add('ALIGN', (0, 1), (1, -1), 'CENTER')  # Center ID and WBS
+        style.add('ALIGN', (3, 1), (5, -1), 'CENTER')  # Center Duration and Dates
+        style.add('ALIGN', (8, 1), (9, -1), 'CENTER')  # Center % and Status
+        style.add('ALIGN', (2, 1), (2, -1), 'LEFT')   # Task Name
+        style.add('ALIGN', (6, 1), (6, -1), 'LEFT')   # Predecessor
+        style.add('ALIGN', (7, 1), (7, -1), 'LEFT')   # Resource
+        
+        # Row backgrounds - alternating colors
+        style.add('ROWBACKGROUNDS', (0, 1), (-1, -1), 
+                 [constants.PDF_TABLE_BODY_BG_COLOR_ODD, constants.PDF_TABLE_BODY_BG_COLOR_EVEN])
+        
+        table.setStyle(style)
         
         self.story.append(table)
         self.story.append(PageBreak())
@@ -497,9 +531,11 @@ class PDFExporter:
             return
 
         # Create custom style for resource names with proper wrapping
-        resource_style = self.styles['Normal']
-        resource_style.fontSize = 9
-        resource_style.leading = 11
+        resource_style = self.styles['Normal'].clone('resource_style')
+        resource_style.fontSize = constants.PDF_TABLE_FONT_SIZE
+        resource_style.leading = constants.PDF_LEADING_MEDIUM
+        resource_style.fontName = constants.PDF_TABLE_FONT_NAME
+        resource_style.alignment = TA_LEFT  # Explicitly set alignment
         
         allocation = self.project_data.get_resource_allocation()
         total_project_cost = sum(data.get('total_amount', 0.0) for data in allocation.values())
@@ -525,7 +561,7 @@ class PDFExporter:
         data.append(["", "", "", total_label, f"${total_project_cost:.2f}"])
 
         # Calculate column widths dynamically - use maximum width
-        usable_width = landscape(letter)[0] - 1 * inch  # 0.5\" margins
+        usable_width = landscape(letter)[0] - constants.PDF_LEFT_MARGIN - constants.PDF_RIGHT_MARGIN
         col_widths = [
             usable_width * 0.3,  # Resource Name - 30%
             usable_width * 0.15, # Max Hours/Day - 15%
@@ -535,34 +571,29 @@ class PDFExporter:
         ]
         
         table = Table(data, colWidths=col_widths)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')),  # Green header
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),  # <-- Center header text
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('TOPPADDING', (0, 0), (-1, 0), 8),
+        
+        style = self._get_base_table_style()
+        style.add('BACKGROUND', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_BG_COLOR)  # Green header
+        style.add('TEXTCOLOR', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_TEXT_COLOR)
+        style.add('ALIGN', (0, 0), (-1, 0), 'CENTER')
+        style.add('FONTNAME', (0, 0), (-1, 0), constants.PDF_TABLE_FONT_NAME_BOLD)
+        style.add('FONTSIZE', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_FONT_SIZE)
+        style.add('BOTTOMPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_BOTTOM)
+        style.add('TOPPADDING', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_PADDING_TOP)
 
-            # Row alignment rules
-            ('ALIGN', (0, 1), (0, -1), 'LEFT'),   # Resource name stays left
-            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+        # Row alignment rules
+        style.add('ALIGN', (0, 1), (0, -1), 'LEFT')   # Resource name stays left
+        style.add('ALIGN', (1, 1), (-1, -1), 'CENTER')
 
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        style.add('ROWBACKGROUNDS', (0, 1), (-1, -2),
+                 [constants.PDF_TABLE_BODY_BG_COLOR_ODD, constants.PDF_TABLE_BODY_BG_COLOR_EVEN])
 
-            ('BACKGROUND', (0, 1), (-1, -2), colors.HexColor('#E8F5E9')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.HexColor('#E8F5E9'), colors.HexColor('#C8E6C9')]),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#81C784')),
+        # Total row styling
+        style.add('BACKGROUND', (0, -1), (-1, -1), constants.PDF_TABLE_HEADER_BG_COLOR)
+        style.add('TEXTCOLOR', (0, -1), (-1, -1), constants.PDF_TABLE_HEADER_TEXT_COLOR)
+        style.add('FONTNAME', (0, -1), (-1, -1), constants.PDF_TABLE_FONT_NAME_BOLD)
+        style.add('FONTSIZE', (0, -1), (-1, -1), constants.PDF_TABLE_HEADER_FONT_SIZE)
 
-            # Total row styling
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#66BB6A')),
-            ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, -1), (-1, -1), 10),
-
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('WORDWRAP', (0, 1), (0, -1), 'LTR'),
-        ]))
+        table.setStyle(style)
         self.story.append(table)
         self.story.append(PageBreak())

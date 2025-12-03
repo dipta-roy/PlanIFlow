@@ -1,8 +1,24 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
 
+set force_deps=0
+set encrypt=0
+set onedir=0
+set clean=0
+
+:arg_loop
+if "%~1"=="" goto arg_loop_end
+if "%~1"=="--force-deps" set force_deps=1
+if "%~1"=="--encrypt" set encrypt=1
+if "%~1"=="--onedir" set onedir=1
+if "%~1"=="--clean" set clean=1
+shift
+goto arg_loop
+
+:arg_loop_end
+
 echo ===============================================
-echo   PlanIFlow - Project Planner v1.6.1 - Build to EXE
+echo   PlanIFlow - Project Planner - Build to EXE
 echo ===============================================
 echo.
 
@@ -56,12 +72,7 @@ if errorlevel 1 (
 )
 echo.
 
-REM Check and install dependencies
-echo [INFO] Checking dependencies...
-python -c "import PyQt6" >nul 2>&1
-if errorlevel 1 set NEED_INSTALL=1
-
-if defined NEED_INSTALL (
+if !force_deps! == 1 (
     echo [INFO] Installing dependencies...
     pip install -r requirements.txt
     if errorlevel 1 (
@@ -72,44 +83,39 @@ if defined NEED_INSTALL (
     )
 )
 
-REM Ensure correct PyInstaller version, encryption support, and compatible NumPy
-echo [INFO] Installing/Verifying PyInstaller 5.x, tinyaes, and compatible NumPy...
-pip install "pyinstaller<6.0" tinyaes "numpy<2.0.0"
+if !force_deps! == 1 (
+    echo [INFO] Installing/Verifying PyInstaller 5.x, tinyaes, and compatible NumPy...
+    pip install "pyinstaller<6.0" tinyaes "numpy<2.0.0"
+) else (
+    echo [INFO] Skipping dependency installation. Use --force-deps to install.
+)
 
-REM Clean previous builds
-echo [INFO] Cleaning previous builds...
-if exist "build\" rmdir /s /q build
-if exist "dist\" rmdir /s /q dist
-if exist "*.spec" del /q *.spec
+if !clean! == 1 (
+    echo [INFO] Cleaning previous builds...
+    if exist "build\" rmdir /s /q build
+    if exist "dist\" rmdir /s /q dist
+    if exist "*.spec" del /q *.spec
+) else (
+    echo [INFO] Skipping clean. Use --clean to force a clean build.
+)
 echo ===============================================
-echo   Building PlanIFlow - ProjectPlanner v1.6.1 
+echo   Building PlanIFlow - ProjectPlanner
 echo ===============================================
 echo.
 
-pyinstaller --onefile --windowed --name="PlanIFlow_1.6.1.exe" ^
+set spec_file=PlanIFlow_1.7.exe.spec
+
+echo [INFO] Generating spec file...
+set makespec_command=pyi-makespec --windowed --name="PlanIFlow_1.7.exe" ^
     %ICON_OPTION% ^
     --version-file=version_info.txt ^
     --add-data="images;images" ^
-    --add-data="app_images.py;." ^
-    --add-data="data_manager.py;." ^
-    --add-data="calendar_manager.py;." ^
-    --add-data="gantt_chart.py;." ^
-    --add-data="exporter.py;." ^
-    --add-data="themes.py;." ^
-    --add-data="ui_main.py;." ^
-    --add-data="settings_manager.py;." ^
-    --add-data="ui_dashboard.py;." ^
-    --add-data="ui_menu_toolbar.py;." ^
-    --add-data="ui_tasks.py;." ^
-    --add-data="ui_resources.py;." ^
-    --add-data="ui_project_settings.py;." ^
-    --add-data="ui_delegates.py;." ^
-    --add-data="settings_manager_new_del.py;." ^
-    --add-data="ui_helpers.py;." ^
-    --add-data="pdf_exporter.py;." ^
-    --add-data="ui_task_dialog.py;." ^
-    --add-data="ui_resource_dialog.py;." ^
-    --add-data="ui_calendar_settings_dialog.py;." ^
+    --add-data="calendar_manager;calendar_manager" ^
+    --add-data="constants;constants" ^
+    --add-data="data_manager;data_manager" ^
+    --add-data="exporter;exporter" ^
+    --add-data="settings_manager;settings_manager" ^
+    --add-data="ui;ui" ^
     --hidden-import=PyQt6 ^
     --hidden-import=PyQt6.QtCore ^
     --hidden-import=PyQt6.QtGui ^
@@ -128,9 +134,30 @@ pyinstaller --onefile --windowed --name="PlanIFlow_1.6.1.exe" ^
     --collect-all PyQt6 ^
     --collect-all matplotlib ^
     --noconsole ^
-    --noupx ^
-    --key="PfV2_SecKey_9x82" ^
-    main.py
+    --noupx
+
+if !onedir! == 1 (
+    set makespec_command=!makespec_command! --onedir
+) else (
+    set makespec_command=!makespec_command! --onefile
+)
+
+!makespec_command! main.py
+
+echo [INFO] Modifying spec file to increase recursion limit...
+python prepare_spec.py "!spec_file!"
+
+set build_command=pyinstaller --noconfirm "!spec_file!"
+
+if !encrypt! == 1 (
+    echo [INFO] Encryption enabled.
+    set build_command=!build_command! --key="PfV2_SecKey_9x82"
+) else (
+    echo [INFO] Encryption disabled.
+)
+
+echo [INFO] Running build command: !build_command!
+!build_command!
 
 if errorlevel 1 (
     echo.
@@ -144,12 +171,12 @@ echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
 echo.
-echo [SUCCESS] Executable created: dist\PlanIFlow_1.6.1.exe
+echo [SUCCESS] Executable created: dist\PlanIFlow_1.7.exe
 echo [INFO] Icon has been embedded in the executable
 echo.
 
 REM Display file info
-for %%A in ("dist\PlanIFlow_1.6.1.exe") do (
+for %%A in ("dist\PlanIFlow_1.7.exe") do (
     set size=%%~zA
     set /a sizeMB=!size! / 1048576
     echo [INFO] File size: !sizeMB! MB

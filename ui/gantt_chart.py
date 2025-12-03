@@ -11,7 +11,9 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from data_manager import Task, DataManager, DependencyType
+from data_manager.models import Task, DependencyType
+from data_manager.manager import DataManager
+import constants.constants as constants
 
 class GanttChart(FigureCanvas):
     """Interactive Gantt chart widget with hierarchy and status support"""
@@ -30,12 +32,7 @@ class GanttChart(FigureCanvas):
         self.current_scale = "Days" # Default scale
         
         # Color scheme for status indicators
-        self.status_colors = {
-            'red': '#F44336',      # Overdue
-            'green': '#4CAF50',    # In Progress
-            'grey': '#9E9E9E',     # Upcoming
-            'blue': '#2196F3'      # Completed
-        }
+        self.status_colors = constants.GANTT_STATUS_COLORS
         
         # Configure interactive features
         self.fig.canvas.mpl_connect('scroll_event', self._on_scroll)
@@ -266,7 +263,7 @@ class GanttChart(FigureCanvas):
         milestone_date = mdates.date2num(task.end_date)
         
         # Choose color based on status
-        status_color = self.status_colors.get(task.get_status_color(), '#FFD700') # Default to gold
+        status_color = self.status_colors.get(task.get_status_color(), constants.GANTT_MILESTONE_DEFAULT_COLOR) # Default to gold
         
         # Draw star marker
         self.ax.plot(milestone_date, y, marker='*', markersize=15, \
@@ -305,12 +302,12 @@ class GanttChart(FigureCanvas):
                           color: str, task: Task, is_critical: bool = False):
         """Draw a regular task bar"""
         # Main task bar with border
-        edge_color = 'black' if not self.dark_mode else 'white'
-        linewidth = 1.0
+        edge_color = constants.GANTT_REGULAR_TASK_LIGHT_EDGE_COLOR if not self.dark_mode else constants.GANTT_REGULAR_TASK_DARK_EDGE_COLOR
+        linewidth = constants.GANTT_REGULAR_TASK_DEFAULT_LINEWIDTH
         
         if is_critical:
-            edge_color = 'red'
-            linewidth = 2.5
+            edge_color = constants.GANTT_CRITICAL_COLOR
+            linewidth = constants.GANTT_REGULAR_TASK_CRITICAL_LINEWIDTH
         
         self.ax.barh(y, duration, left=start_num, 
                     height=0.4, color=color, alpha=0.7,
@@ -321,11 +318,11 @@ class GanttChart(FigureCanvas):
                           color: str, task: Task, is_critical: bool = False):
         """Draw a summary task as a single line"""
         # Draw a single horizontal line
-        linewidth = 4
+        linewidth = constants.GANTT_SUMMARY_TASK_DEFAULT_LINEWIDTH
         line_color = color
         if is_critical:
-            linewidth = 6
-            line_color = 'red'
+            linewidth = constants.GANTT_SUMMARY_TASK_CRITICAL_LINEWIDTH
+            line_color = constants.GANTT_CRITICAL_COLOR
 
         self.ax.plot([start_num, start_num + duration], [y, y], 
                      color=line_color, linewidth=linewidth, solid_capstyle='butt', zorder=2)
@@ -372,12 +369,7 @@ class GanttChart(FigureCanvas):
                               dep_type: DependencyType):
         """Draw a single dependency arrow with appropriate style"""
         # Arrow colors by type
-        arrow_colors = {
-            DependencyType.FS: '#D32F2F',  # Red
-            DependencyType.SS: '#1976D2',  # Blue
-            DependencyType.FF: '#388E3C',  # Green
-            DependencyType.SF: '#F57C00'   # Orange
-        }
+        arrow_colors = constants.GANTT_DEPENDENCY_ARROW_COLORS
         
         arrow_color = arrow_colors.get(dep_type, '#D32F2F')
         
@@ -410,24 +402,24 @@ class GanttChart(FigureCanvas):
         if abs(y_from - y_to) > 0.5:
             # Three-segment arrow: horizontal, vertical, horizontal
             self.ax.plot([x_from, mid_x], [y_from, y_from], 
-                        color=arrow_color, linewidth=1.5, alpha=0.7, linestyle='--')
+                        color=arrow_color, linewidth=constants.GANTT_DEPENDENCY_ARROW_LINEWIDTH, alpha=0.7, linestyle='--')
             self.ax.plot([mid_x, mid_x], [y_from, y_to], 
-                        color=arrow_color, linewidth=1.5, alpha=0.7, linestyle='--')
+                        color=arrow_color, linewidth=constants.GANTT_DEPENDENCY_ARROW_LINEWIDTH, alpha=0.7, linestyle='--')
             self.ax.plot([mid_x, x_to], [y_to, y_to], 
-                        color=arrow_color, linewidth=1.5, alpha=0.7, linestyle='--')
+                        color=arrow_color, linewidth=constants.GANTT_DEPENDENCY_ARROW_LINEWIDTH, alpha=0.7, linestyle='--')
             
             # Arrow head at the end
             self.ax.annotate('', xy=(x_to, y_to), xytext=(mid_x, y_to),
                            arrowprops=dict(arrowstyle='->', 
                                          color=arrow_color,
-                                         lw=2,
+                                         lw=constants.GANTT_DEPENDENCY_ARROW_CRITICAL_LINEWIDTH,
                                          alpha=0.8))
         else:
             # Simple straight arrow for same level
             self.ax.annotate('', xy=(x_to, y_to), xytext=(x_from, y_from),
                            arrowprops=dict(arrowstyle='->', 
                                          color=arrow_color,
-                                         lw=1.5,
+                                         lw=constants.GANTT_DEPENDENCY_ARROW_LINEWIDTH,
                                          alpha=0.7,
                                          linestyle='--'))
         
@@ -508,7 +500,7 @@ class GanttChart(FigureCanvas):
         cur_ylim = self.ax.get_ylim()
         
         # Calculate zoom factor
-        zoom_factor = 1.1 if event.button == 'down' else 0.9
+        zoom_factor = constants.GANTT_ZOOM_IN_FACTOR if event.button == 'down' else constants.GANTT_ZOOM_OUT_FACTOR
         
         # Zoom X axis
         xdata = event.xdata
@@ -565,14 +557,11 @@ class GanttChart(FigureCanvas):
             
             # Determine vertical hover range based on task type
             if task.is_milestone:
-                # For milestones, a small vertical range around the point
-                vertical_hit_range = 0.5
+                vertical_hit_range = constants.GANTT_MILESTONE_HIT_RANGE
             elif task.is_summary:
-                # For summary tasks, height is 0.6, so range is +/- 0.3 from center
-                vertical_hit_range = 0.3
+                vertical_hit_range = constants.GANTT_SUMMARY_TASK_HIT_RANGE
             else:
-                # For regular tasks, height is 0.4, so range is +/- 0.2 from center
-                vertical_hit_range = 0.2
+                vertical_hit_range = constants.GANTT_REGULAR_TASK_HIT_RANGE
             
             if abs(event.ydata - y) <= vertical_hit_range and distance < min_distance:
                 # Check if x is within task range
@@ -581,7 +570,7 @@ class GanttChart(FigureCanvas):
                 
                 # For milestones, expand the hover area slightly
                 if task.is_milestone:
-                    hover_end_num = end_num + 0.5 # Give it a small width for hovering
+                    hover_end_num = end_num + constants.GANTT_MILESTONE_HOVER_OFFSET # Give it a small width for hovering
                 else:
                     hover_end_num = end_num
 
@@ -595,14 +584,14 @@ class GanttChart(FigureCanvas):
             # Create or update annotation
             if self.annotation is None:
                 self.annotation = self.ax.annotate(
-                    '', xy=(0, 0), xytext=(20, 20),
+                    '', xy=(0, 0), xytext=(constants.GANTT_TOOLTIP_OFFSET_X, constants.GANTT_TOOLTIP_OFFSET_Y),
                     textcoords='offset points',
-                    bbox=dict(boxstyle='round,pad=0.5', 
-                            facecolor='yellow' if not self.dark_mode else '#444444',
-                            edgecolor='black',
-                            alpha=0.95,
+                    bbox=dict(boxstyle=f'round,pad={constants.GANTT_TOOLTIP_PAD}', 
+                            facecolor=constants.GANTT_TOOLTIP_LIGHT_BG_COLOR if not self.dark_mode else constants.GANTT_TOOLTIP_DARK_BG_COLOR,
+                            edgecolor=constants.GANTT_TOOLTIP_EDGE_COLOR,
+                            alpha=constants.GANTT_TOOLTIP_ALPHA,
                             zorder=11), # <--- Add zorder here
-                    fontsize=9,
+                    fontsize=constants.GANTT_TOOLTIP_FONT_SIZE,
                     color=self.text_color
                 )
             self.annotation.set_zorder(11) # <--- Also set zorder for the annotation text
