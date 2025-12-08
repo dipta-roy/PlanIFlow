@@ -1,30 +1,30 @@
 # **PlanIFlow - Formal Security Assessment Report**  
-## **PlanIFlow v1.6.1 – Offline Desktop Project Management Application**  
-**Assessment Conducted:** December 02, 2025  
-**Scope:** All 22 Python source files (`*.py`)  
-**Methodology:** Static code analysis (SAST via OWASP Python Top 10 and Bandit-equivalent rules), data flow tracing, threat modeling, CVSS v3.1 scoring  
+## **PlanIFlow v1.8.0 – Offline Desktop Project Management Application**  
+**Assessment Conducted:** December 08, 2025  
+**Scope:** All 47 Python source files (`*.py`)  
+**Methodology:** Static code analysis (SAST using `bandit`), manual code review, data flow tracing, threat modeling, CVSS v3.1 scoring.  
 **Classification:** **LOW RISK – SECURE FOR INTENDED USE**
 
 ## **1. Executive Summary**
 
-**PlanIFlow** is a **fully offline, standalone desktop application** built with **Python 3.12+ and PyQt6**, designed for **project planning and management**. It operates **without network connectivity**, **user authentication**, or **external services**.
+**PlanIFlow** is a **fully offline, standalone desktop application** built with **Python 3.10+ and PyQt6**, designed for **project planning and management**. It operates **without network connectivity**, **user authentication**, or **external services**.
 
-After a **comprehensive, line-by-line security audit** of all source code, **no critical or high-severity vulnerabilities** were identified. Minor areas for enhancement (e.g., input length limits) exist but pose negligible risk in this offline context.
+After a **comprehensive security audit** of all source code, including automated static analysis, **no critical or high-severity vulnerabilities** were identified. The application's offline, single-user design significantly minimizes its attack surface. Minor areas for enhancement exist but pose negligible risk in the intended offline context.
 
 > **Final Risk Rating: LOW** (Base CVSS: 3.9/10)  
 > **Recommended Posture: SAFE FOR DEPLOYMENT**
 
-The application is **secure by design** for its intended use case: **single-user, local project planning on Windows/macOS/Linux**.
+The application is **secure by design** for its intended use case: **single-user, local project planning on Windows, macOS, or Linux**.
 
 ## **2. Scope & Methodology**
 
 | Item 						| Details 													|
 |---------------------------|-----------------------------------------------------------|
-| **Files Analyzed** 		| 22 `.py` files (e.g., `main.py`, `ui_main.py`, `exporter.py`, `__init__.py`)  											|
-| **Analysis Type** 		| White-box static analysis (SAST) 								|
-| **Tools Used** 			| Manual code review, raw GitHub content extraction, CVSS v3.1 scoring 	|
-| **Threat Model** 			| Local user, malicious file input, resource exhaustion 	|
-| **Standards Referenced** 	| OWASP Top 10 (Python), NIST SP 800-53, CWE, Bandit SAST rules 				|
+| **Files Analyzed** 		| 47 `.py` files (e.g., `main.py`, `ui_main.py`, `exporter.py`, `data_manager/manager.py`) |
+| **Analysis Type** 		| White-box static analysis (SAST) and manual code review. 	|
+| **Tools Used** 			| `bandit` static analyzer, manual code review, CVSS v3.1 scoring. |
+| **Threat Model** 			| Malicious local file input, resource exhaustion. 			|
+| **Standards Referenced** 	| OWASP Top 10 (Python), CWE, `bandit` SAST rules. 			|
 
 ## **3. System Architecture Overview**
 
@@ -34,88 +34,81 @@ The application is **secure by design** for its intended use case: **single-user
                                     [Visualization: Matplotlib Gantt/Dashboard]
 ```
 
-- **No network stack** (no sockets, requests, or urllib)
-- **No database** (in-memory pandas DataFrames)
-- **No privilege escalation** (user-context execution)
-- **All I/O via `QFileDialog`** (path validation enforced)
+- **No network stack** (no sockets, `requests`, or `urllib` usage).
+- **No database** (data managed in-memory with `pandas` DataFrames).
+- **No privilege escalation** (runs entirely in user-context).
+- **All file I/O is user-initiated** via `QFileDialog`, preventing path traversal attacks.
 
 ## **4. Security Findings**
 
 ### **4.1 No Remote Attack Surface**
+
+The application is fully offline and does not use any network protocols, making it immune to remote vulnerabilities.
+
 | Threat 				| Status 		| Mitigation 						 | CVSS Score |
 |-----------------------|---------------|------------------------------------|-------------|
-| Remote Code Execution | Not Possible 	| No sockets, HTTP, or external APIs | 0.0 |
-| Network Data Leak 	| Not Possible 	| No outbound traffic 				 | 0.0 |
-| Man-in-the-Middle 	| Not Possible 	| Fully offline						 | 0.0 |
+| Remote Code Execution | Not Possible 	| No sockets, HTTP, or external APIs. | 0.0 |
+| Network Data Leak 	| Not Possible 	| No outbound traffic. 				 | 0.0 |
+| Man-in-the-Middle 	| Not Possible 	| Fully offline.					 | 0.0 |
 
 ### **4.2 File Input Validation**
+
+File parsing is handled by standard, well-vetted libraries, which mitigates risks from crafted project files.
+
 | Source 			| Validation 								| Risk 							| CVSS Vector |
 |-------------------|-------------------------------------------|-------------------------------|-------------|
-| **JSON Import** 	| `json.load()` + try/except schema check (`exporter.py`) 				| **Safe** 						| N/A |
-| **Excel Import** 	| `openpyxl.load_workbook(data_only=True)` + error handling (`exporter.py`) 	| **Safe** (no formulas/macros) | N/A |
-| **File Paths** 	| `QFileDialog.getOpenFileName()` (`ui_main.py`) 			| **No traversal** 				| AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L (3.3) |
-
-**No path traversal or arbitrary file read/write; temp files use `tempfile.mkstemp` with cleanup.**
+| **JSON Import** 	| `json.load()` within a `try/except` block for schema validation (`exporter.py`). 	| **Safe**. `json` parsing does not execute code. | N/A |
+| **Excel Import** 	| `openpyxl.load_workbook(data_only=True)` handles errors (`exporter.py`). 		| **Safe**. `data_only=True` prevents formula evaluation. | N/A |
+| **File Paths** 	| User-selected via `QFileDialog.getOpenFileName()` (`ui_main.py`). 			| **No traversal**. The OS dialog prevents path injection. | AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L (3.3) |
 
 ### **4.3 Input Sanitization**
+
+Input is handled by Qt widgets, which provides a layer of validation. However, length limits are recommended as a hardening measure.
+
 | Input Field 			| Handling 						| Risk 					| CVSS Vector |
 |-----------------------|-------------------------------|-----------------------|-------------|
-| Task Name, Notes 		| Qt `QLineEdit`/`QTextEdit` to `str` (`ui_tasks.py`)  		| **Low** (add length limits) | AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:H (5.5) |
-| Dependencies 			| Regex parsing (`1FS+2`) – no eval (`data_manager.py`)	| **Safe** 				| N/A |
-| Resource Rates 		| `QDoubleSpinBox` → `float` validation (`ui_resources.py`) 	| Safe 					| N/A |
-
-**No injection vectors (SQL/Command/HTML); recommend `setMaxLength(500)` for UI fields to prevent DoS via long strings.**
+| Task Name, Notes 		| Qt `QLineEdit`/`QTextEdit` to `str` (`ui_tasks.py`).  	| **Low**. (DoS via very long strings is possible). | AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:H (5.5) |
+| Dependencies 			| Regex parsing (`1FS+2d`) with no `eval()` (`data_manager.py`).| **Safe**. No code injection vector. | N/A |
+| Resource Rates 		| `QDoubleSpinBox` enforces `float` validation (`ui_resources.py`). | **Safe**. | N/A |
 
 ### **4.4 Deserialization Safety**
-```python
-# exporter.py L50-100
-data = json.load(f)  # Standard library → safe
-# data_manager.py L120-140
-try: date = datetime.strptime(...) except: fallback  # Robust parsing
-```
-**No `pickle`, `yaml.load`, or custom decoders**  
-**No remote code execution via file; JSON/Excel handled securely.**
 
-### **4.5 Resource & Memory Safety**
-| Operation 		| Bound 					| Risk 					| CVSS Vector |
-|-------------------|---------------------------|-----------------------|-------------|
-| Task List 		| In-memory `list[dict]` + pandas (`data_manager.py`) 	| < 10,000 tasks → safe | N/A |
-| Gantt Redraw 		| `matplotlib` on Qt signal (`gantt_chart.py`) 	| No infinite loop 		| N/A |
-| PDF Export 		| Temp PNGs cleaned in `finally` (`pdf_exporter.py`) 	| **Low** (enhance cleanup) | AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L (3.3) |
-| CPM Calculation 	| O(n²) algorithm (`data_manager.py`) 	| n < 500 typical 	| N/A |
+The application avoids unsafe deserialization methods.
 
-**No denial-of-service risk; broad `except Exception` in exports masks errors – suggest specific handling.**
+- **No `pickle`, `yaml.load`, or custom decoders are used.**
+- **JSON and Excel parsing are handled securely**, preventing remote code execution from malicious files.
 
-### **4.6 Privilege & Sandboxing**
+### **4.5 Privilege & Sandboxing**
+
+The application operates with the minimum required privileges.
+
 | Check 					| Status 	| Evidence |
 |---------------------------|-----------|----------|
-| Runs as current user 		| Yes 		| Standard Python exec |
-| No admin rights required 	| Yes 		| No os.system/subprocess |
-| No registry edits 		| Yes 		| Local files only |
-| No external process spawn | Yes 		| No `subprocess` module |
+| Runs as current user 		| Yes 		| Standard Python execution model. |
+| No admin rights required 	| Yes 		| No `os.system` or `subprocess` calls. |
+| No registry edits 		| Yes 		| Local file storage only. |
+| No external process spawn | Yes 		| No `subprocess` module usage. |
 
-**Fully sandboxed within user context; Base64 assets (images) benign (no secrets).**
+**The application is fully sandboxed within the user's context.**
 
-### **4.7 Third-Party Dependencies**
-| Library 		| Version (Inferred) 	| Known CVEs (as of 2025) | Risk 	| CVSS Adjustment |
-|---------------|-----------------------|-------------------------|--------|-----------------|
-| PyQt6 		| 6.7.0+ 		| None 				| Low 	| N/A |
-| pandas 		| 2.2.2+ 		| CVE-2024-36971 (patched) | Low 	| AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H (adjusted 3.9 offline) |
-| matplotlib 	| 3.8.0+ 		| None 				| Low 	| N/A |
-| openpyxl 		| 3.1.0+ 		| None 				| Low 	| N/A |
-| reportlab 	| 4.0.0+ 		| None (XXE mitigated) | Low 	| N/A |
-| numpy 		| 2.0.0+ 		| None 				| Low 	| N/A |
+### **4.6 Third-Party Dependencies**
 
-**All dependencies secure; empty `requirements.txt` – recommend pinning for reproducibility.**
+The project uses several third-party libraries listed in `requirements.txt`.
 
-### **4.8 Data Persistence & Integrity**
-| Feature 				| Implementation 			| Risk |
-|-----------------------|---------------------------|------|
-| Error Handling 		| `try/except` on file I/O + logging (`exporter.py`) 	| **Low** (broad excepts) |
-| Schema Validation 	| Dict checks on import (`data_manager.py`) 		| Safe |
-| Export Integrity 	| Pandas DataFrame + reportlab Paragraphs (`pdf_exporter.py`) | Safe (sanitize for malformed text) |
+| Library 		| Version Range 	| Known CVEs (as of 2025) | Risk 	|
+|---------------|-------------------|-------------------------|--------|
+| PyQt6 		| >=6.4.0 		    | None for recent versions. | Low 	|
+| pandas 		| >=2.0.0 		    | Older versions have known CVEs. | Low 	|
+| matplotlib 	| >=3.7.0 		    | None for recent versions. | Low 	|
+| openpyxl 		| >=3.1.0 		    | None for recent versions. | Low 	|
+| reportlab 	| >=4.0.0 		    | XXE mitigated in recent versions. | Low 	|
+| numpy 		| <2.1.3 		    | Some CVEs in older versions. | Low 	|
 
-**Robust and resilient; embedded binaries (Base64 images) bloat repo – externalize recommended.**
+**The dependencies are not pinned to specific versions**, which creates a potential supply-chain risk if a future dependency release introduces a vulnerability.
+
+### **4.7 Static Analysis**
+
+A static analysis scan using `bandit` was performed on the codebase. No high-severity issues were found. The tool identified low-severity informational findings, such as the use of broad `except Exception` clauses, which could mask errors but do not pose a direct security threat.
 
 ## **5. Risk Assessment Matrix**
 
@@ -124,28 +117,29 @@ try: date = datetime.strptime(...) except: fallback  # Robust parsing
 | Malicious JSON/Excel RCE 	| Improbable 	| High 		| **LOW** 		| 0.0 |
 | Path Traversal 			| Impossible 	| High 		| **NONE** 		| 0.0 |
 | Privilege Escalation 		| Impossible 	| Critical 	| **NONE** 		| 0.0 |
-| Input-Induced DoS (long strings) | Possible 		| Low 		| **LOW** 		| 5.5 |
-| Resource Exhaustion (temps) | Unlikely 		| Medium 	| **LOW** 		| 3.3 |
+| Input-Induced DoS 			| Possible 		| Low 		| **LOW** 		| 5.5 |
 | Supply-Chain (unpinned deps) | Possible 		| Medium 	| **LOW** 		| 3.9 |
 
 ## **6. Security Strengths**
 
 | Strength 						| Benefit 					|
 |-------------------------------|---------------------------|
-| **Zero network exposure** 	| Immune to remote attacks 	|
-| **User-controlled file I/O** 	| No silent writes; QFileDialog prevents traversal |
-| **Safe deserialization** 		| JSON/openpyxl only; no eval/pickle RCE |
-| **Minimal dependencies** 		| Reduced attack surface; all libs vetted |
-| **Local-only data** 			| No privacy risk; offline by design |
-| **Qt-Native UI Validation** 	| SpinBoxes/LineEdits limit invalid inputs |
+| **Zero network exposure** 	| Immune to all remote attacks. |
+| **User-controlled file I/O** 	| `QFileDialog` prevents unauthorized file access. |
+| **Safe deserialization** 		| `json` and `openpyxl` used safely; no `pickle` or `eval`. |
+| **Minimal dependencies** 		| Reduced attack surface. |
+| **Local-only data** 			| No privacy risk from data exfiltration. |
+| **Qt-Native UI Validation** 	| Widgets like `QSpinBox` inherently validate input types. |
 
-## **8. Conclusion**
+## **7. Conclusion**
 
-> **PlanIFlow v1.6.1 is secure, robust, and suitable for deployment in sensitive environments.**
+> **PlanIFlow v1.8.0 is secure, robust, and suitable for deployment.**
 
-It adheres to **defense-in-depth principles** despite its simplicity:
-- No trust in external input beyond user intent
-- Safe parsing of structured data
-- Contained execution environment
+It adheres to **defense-in-depth principles** appropriate for an offline desktop application:
+- No trust in file inputs beyond what the parsers safely handle.
+- Safe parsing of structured data.
+- Contained execution environment with minimal privileges.
+
+By pinning dependencies and implementing input length limits, the application can be further hardened.
 
 **End of Report**

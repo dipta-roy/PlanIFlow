@@ -1,0 +1,472 @@
+"""
+Baseline Comparison Tab - Compare current project state against baselines
+"""
+
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
+                             QLabel, QTreeWidget, QTreeWidgetItem, QPushButton,
+                             QGroupBox, QFormLayout, QMessageBox, QFileDialog)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QBrush
+import pandas as pd
+
+
+class BaselineComparisonTab(QWidget):
+    """Tab for comparing current project against baselines"""
+    
+    def __init__(self, data_manager, parent=None):
+        super().__init__(parent)
+        self.data_manager = data_manager
+        self.current_comparison = None
+        
+        self._create_ui()
+        self.refresh_baselines()  # Populate dropdown on initialization
+    
+    def showEvent(self, event):
+        """Refresh baselines when tab becomes visible"""
+        super().showEvent(event)
+        self.refresh_baselines()
+    
+    def _create_ui(self):
+        """Create the comparison tab UI"""
+        layout = QVBoxLayout(self)
+        
+        # Header and baseline selector
+        header_layout = QHBoxLayout()
+        
+        header_layout.addWidget(QLabel("<h3>Baseline Comparison</h3>"))
+        header_layout.addStretch()
+        
+        header_layout.addWidget(QLabel("Select Baseline:"))
+        self.baseline_combo = QComboBox()
+        self.baseline_combo.currentTextChanged.connect(self._on_baseline_selected)
+        header_layout.addWidget(self.baseline_combo)
+        
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.refresh_baselines)
+        header_layout.addWidget(refresh_btn)
+        
+        export_btn = QPushButton("Export to Excel")
+        export_btn.clicked.connect(self._export_comparison)
+        header_layout.addWidget(export_btn)
+        
+        layout.addLayout(header_layout)
+        
+        # Summary statistics
+        self.summary_group = QGroupBox("Comparison Summary")
+        summary_layout = QFormLayout(self.summary_group)
+        
+        self.baseline_date_label = QLabel("-")
+        self.total_tasks_label = QLabel("-")
+        self.on_track_label = QLabel("-")
+        self.late_label = QLabel("-")
+        self.early_label = QLabel("-")
+        self.new_tasks_label = QLabel("-")
+        self.deleted_tasks_label = QLabel("-")
+        self.avg_duration_var_label = QLabel("-")
+        self.avg_completion_var_label = QLabel("-")
+        
+        summary_layout.addRow("Baseline Date:", self.baseline_date_label)
+        summary_layout.addRow("Total Tasks:", self.total_tasks_label)
+        summary_layout.addRow("On Track:", self.on_track_label)
+        summary_layout.addRow("Late:", self.late_label)
+        summary_layout.addRow("Early:", self.early_label)
+        summary_layout.addRow("New Tasks:", self.new_tasks_label)
+        summary_layout.addRow("Deleted Tasks:", self.deleted_tasks_label)
+        summary_layout.addRow("Avg Duration Variance:", self.avg_duration_var_label)
+        summary_layout.addRow("Avg Completion Variance:", self.avg_completion_var_label)
+        
+        layout.addWidget(self.summary_group)
+        
+        # Comparison tree
+        tree_label = QLabel("<b>Task-by-Task Comparison</b>")
+        layout.addWidget(tree_label)
+        
+        self.comparison_tree = QTreeWidget()
+        self.comparison_tree.setHeaderLabels([
+            "Task", "WBS",
+            "Current Start", "Baseline Start", "Start Var (days)",
+            "Current End", "Baseline End", "End Var (days)",
+            "Current Duration", "Baseline Duration", "Duration Var",
+            "Current %", "Baseline %", "% Var"
+        ])
+
+        # Add tooltips to headers
+        header = self.comparison_tree.headerItem()
+        tooltips = [
+            "Name of the task",
+            "Work Breakdown Structure code",
+            "The currently planned start date of the task",
+            "The start date of the task in the selected baseline",
+            "The variance in the start date, in days (Current - Baseline)",
+            "The currently planned end date of the task",
+            "The end date of the task in the selected baseline",
+            "The variance in the end date, in days (Current - Baseline)",
+            "The currently planned duration of the task",
+            "The duration of the task in the selected baseline",
+            "The variance in duration (Current - Baseline)",
+            "The current percentage of completion for the task",
+            "The percentage of completion for the task in the selected baseline",
+            "The variance in the percentage of completion (Current - Baseline)"
+        ]
+        for i, tooltip in enumerate(tooltips):
+            header.setToolTip(i, tooltip)
+        
+        # Set column widths
+        for i in range(self.comparison_tree.columnCount()):
+            self.comparison_tree.setColumnWidth(i, 120)
+        
+        self.comparison_tree.setAlternatingRowColors(True)
+        layout.addWidget(self.comparison_tree)
+        
+        # Legend
+        legend_layout = QHBoxLayout()
+        legend_layout.addWidget(QLabel("<b>Legend:</b>"))
+        
+        late_label = QLabel("■ Late/Over")
+        late_label.setStyleSheet("color: #D32F2F;")
+        legend_layout.addWidget(late_label)
+        
+        early_label = QLabel("■ Early/Under")
+        early_label.setStyleSheet("color: #388E3C;")
+        legend_layout.addWidget(early_label)
+        
+        on_track_label = QLabel("■ On Track")
+        on_track_label.setStyleSheet("color: #1976D2;")
+        legend_layout.addWidget(on_track_label)
+        
+        new_label = QLabel("■ New Task")
+        new_label.setStyleSheet("color: #7B1FA2;")
+        legend_layout.addWidget(new_label)
+        
+        deleted_label = QLabel("■ Deleted Task")
+        deleted_label.setStyleSheet("color: #757575;")
+        legend_layout.addWidget(deleted_label)
+        
+        legend_layout.addStretch()
+        layout.addLayout(legend_layout)
+    
+    def refresh_baselines(self):
+        """Refresh the baseline dropdown"""
+        current_text = self.baseline_combo.currentText()
+        self.baseline_combo.clear()
+        
+        baselines = self.data_manager.get_all_baselines()
+        
+        if not baselines:
+            self.baseline_combo.addItem("No baselines available")
+            self._clear_comparison()
+            return
+        
+        for baseline in baselines:
+            self.baseline_combo.addItem(baseline.name)
+        
+        # Try to restore previous selection
+        if current_text:
+            index = self.baseline_combo.findText(current_text)
+            if index >= 0:
+                self.baseline_combo.setCurrentIndex(index)
+    
+    def _on_baseline_selected(self, baseline_name):
+        """Handle baseline selection"""
+        if not baseline_name or baseline_name == "No baselines available":
+            self._clear_comparison()
+            return
+        
+        # Get comparison data
+        comparison_data = self.data_manager.get_baseline_comparison(baseline_name)
+        
+        if not comparison_data:
+            self._clear_comparison()
+            return
+        
+        self.current_comparison = comparison_data
+        self._update_summary(comparison_data['summary'], comparison_data['baseline_date'])
+        self._update_comparison_tree(comparison_data['comparisons'])
+    
+    def _update_summary(self, summary, baseline_date):
+        """Update summary statistics"""
+        self.baseline_date_label.setText(baseline_date.strftime('%Y-%m-%d %H:%M:%S'))
+        self.total_tasks_label.setText(str(summary['total_tasks']))
+        self.on_track_label.setText(str(summary['tasks_on_track']))
+        
+        # Color code late/early
+        late_count = summary['tasks_late']
+        self.late_label.setText(str(late_count))
+        if late_count > 0:
+            self.late_label.setStyleSheet("color: #D32F2F; font-weight: bold;")
+        else:
+            self.late_label.setStyleSheet("")
+        
+        early_count = summary['tasks_early']
+        self.early_label.setText(str(early_count))
+        if early_count > 0:
+            self.early_label.setStyleSheet("color: #388E3C; font-weight: bold;")
+        else:
+            self.early_label.setStyleSheet("")
+        
+        self.new_tasks_label.setText(str(summary['tasks_new']))
+        self.deleted_tasks_label.setText(str(summary['tasks_deleted']))
+        
+        # Format variances
+        duration_var = summary['avg_duration_variance']
+        self.avg_duration_var_label.setText(f"{duration_var:+.2f}")
+        if duration_var > 0:
+            self.avg_duration_var_label.setStyleSheet("color: #D32F2F;")
+        elif duration_var < 0:
+            self.avg_duration_var_label.setStyleSheet("color: #388E3C;")
+        else:
+            self.avg_duration_var_label.setStyleSheet("")
+        
+        completion_var = summary['avg_completion_variance']
+        self.avg_completion_var_label.setText(f"{completion_var:+.1f}%")
+        if completion_var < 0:
+            self.avg_completion_var_label.setStyleSheet("color: #D32F2F;")
+        elif completion_var > 0:
+            self.avg_completion_var_label.setStyleSheet("color: #388E3C;")
+        else:
+            self.avg_completion_var_label.setStyleSheet("")
+    
+    def _update_comparison_tree(self, comparisons):
+        """Update the comparison tree with task data"""
+        self.comparison_tree.clear()
+        
+        for comp in comparisons:
+            item = QTreeWidgetItem()
+            
+            # Task name and WBS
+            item.setText(0, comp['task_name'])
+            item.setText(1, comp['wbs'])
+            
+            # Determine row color based on status
+            status = comp['end_status']
+            if status == 'late':
+                color = QColor(255, 235, 238)  # Light red
+            elif status == 'early':
+                color = QColor(232, 245, 233)  # Light green
+            elif status == 'on-track':
+                color = QColor(227, 242, 253)  # Light blue
+            elif status == 'new':
+                color = QColor(243, 229, 245)  # Light purple
+            elif status == 'deleted':
+                color = QColor(245, 245, 245)  # Light gray
+            else:
+                color = QColor(255, 255, 255)  # White
+            
+            # Set background for all columns
+            for col in range(self.comparison_tree.columnCount()):
+                item.setBackground(col, QBrush(color))
+            
+            # Start dates and variance
+            if comp['current_start']:
+                item.setText(2, comp['current_start'].strftime('%Y-%m-%d'))
+            else:
+                item.setText(2, "-")
+            
+            if comp['baseline_start']:
+                item.setText(3, comp['baseline_start'].strftime('%Y-%m-%d'))
+            else:
+                item.setText(3, "-")
+            
+            if comp['start_variance_days'] is not None:
+                var_text = f"{comp['start_variance_days']:+d}"
+                item.setText(4, var_text)
+                if comp['start_variance_days'] > 0:
+                    item.setForeground(4, QBrush(QColor(211, 47, 47)))  # Red
+                elif comp['start_variance_days'] < 0:
+                    item.setForeground(4, QBrush(QColor(56, 142, 60)))  # Green
+            else:
+                item.setText(4, "-")
+            
+            # End dates and variance
+            if comp['current_end']:
+                item.setText(5, comp['current_end'].strftime('%Y-%m-%d'))
+            else:
+                item.setText(5, "-")
+            
+            if comp['baseline_end']:
+                item.setText(6, comp['baseline_end'].strftime('%Y-%m-%d'))
+            else:
+                item.setText(6, "-")
+            
+            if comp['end_variance_days'] is not None:
+                var_text = f"{comp['end_variance_days']:+d}"
+                item.setText(7, var_text)
+                if comp['end_variance_days'] > 0:
+                    item.setForeground(7, QBrush(QColor(211, 47, 47)))  # Red
+                elif comp['end_variance_days'] < 0:
+                    item.setForeground(7, QBrush(QColor(56, 142, 60)))  # Green
+            else:
+                item.setText(7, "-")
+            
+            # Duration and variance
+            if comp['current_duration'] is not None:
+                item.setText(8, f"{comp['current_duration']:.1f}")
+            else:
+                item.setText(8, "-")
+            
+            if comp['baseline_duration'] is not None:
+                item.setText(9, f"{comp['baseline_duration']:.1f}")
+            else:
+                item.setText(9, "-")
+            
+            if comp['duration_variance'] is not None:
+                var_text = f"{comp['duration_variance']:+.1f}"
+                item.setText(10, var_text)
+                if comp['duration_variance'] > 0:
+                    item.setForeground(10, QBrush(QColor(211, 47, 47)))  # Red
+                elif comp['duration_variance'] < 0:
+                    item.setForeground(10, QBrush(QColor(56, 142, 60)))  # Green
+            else:
+                item.setText(10, "-")
+            
+            # Completion and variance
+            if comp['current_complete'] is not None:
+                item.setText(11, f"{comp['current_complete']}%")
+            else:
+                item.setText(11, "-")
+            
+            if comp['baseline_complete'] is not None:
+                item.setText(12, f"{comp['baseline_complete']}%")
+            else:
+                item.setText(12, "-")
+            
+            if comp['completion_variance'] is not None:
+                var_text = f"{comp['completion_variance']:+d}%"
+                item.setText(13, var_text)
+                if comp['completion_variance'] < 0:
+                    item.setForeground(13, QBrush(QColor(211, 47, 47)))  # Red (behind schedule)
+                elif comp['completion_variance'] > 0:
+                    item.setForeground(13, QBrush(QColor(56, 142, 60)))  # Green (ahead of schedule)
+            else:
+                item.setText(13, "-")
+            
+            self.comparison_tree.addTopLevelItem(item)
+        
+        # Expand all items
+        self.comparison_tree.expandAll()
+    
+    def _clear_comparison(self):
+        """Clear the comparison display"""
+        self.current_comparison = None
+        self.comparison_tree.clear()
+        
+        self.baseline_date_label.setText("-")
+        self.total_tasks_label.setText("-")
+        self.on_track_label.setText("-")
+        self.late_label.setText("-")
+        self.early_label.setText("-")
+        self.new_tasks_label.setText("-")
+        self.deleted_tasks_label.setText("-")
+        self.avg_duration_var_label.setText("-")
+        self.avg_completion_var_label.setText("-")
+        
+        # Clear styles
+        self.late_label.setStyleSheet("")
+        self.early_label.setStyleSheet("")
+        self.avg_duration_var_label.setStyleSheet("")
+        self.avg_completion_var_label.setStyleSheet("")
+    
+    def _export_comparison(self):
+        """Export baseline comparison to Excel"""
+        if not self.current_comparison:
+            QMessageBox.warning(self, "No Comparison", 
+                              "Please select a baseline to compare before exporting.")
+            return
+        
+        # Get file path from user
+        baseline_name = self.current_comparison['baseline_name']
+        suggested_name = f"Baseline_Comparison_{baseline_name}.xlsx"
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Baseline Comparison", suggested_name, "Excel Files (*.xlsx)"
+        )
+        
+        if not file_path:
+            return
+        
+        if not file_path.endswith('.xlsx'):
+            file_path += '.xlsx'
+        
+        try:
+            # Prepare comparison data
+            comparison_data = []
+            for comp in self.current_comparison['comparisons']:
+                comparison_data.append({
+                    'Task ID': comp['task_id'],
+                    'Task Name': comp['task_name'],
+                    'WBS': comp['wbs'],
+                    'Current Start': comp['current_start'].strftime('%Y-%m-%d') if comp['current_start'] else '-',
+                    'Baseline Start': comp['baseline_start'].strftime('%Y-%m-%d') if comp['baseline_start'] else '-',
+                    'Start Variance (days)': comp['start_variance_days'] if comp['start_variance_days'] is not None else '-',
+                    'Current End': comp['current_end'].strftime('%Y-%m-%d') if comp['current_end'] else '-',
+                    'Baseline End': comp['baseline_end'].strftime('%Y-%m-%d') if comp['baseline_end'] else '-',
+                    'End Variance (days)': comp['end_variance_days'] if comp['end_variance_days'] is not None else '-',
+                    'Current Duration': f"{comp['current_duration']:.1f}" if comp['current_duration'] is not None else '-',
+                    'Baseline Duration': f"{comp['baseline_duration']:.1f}" if comp['baseline_duration'] is not None else '-',
+                    'Duration Variance': f"{comp['duration_variance']:+.1f}" if comp['duration_variance'] is not None else '-',
+                    'Current % Complete': f"{comp['current_complete']}%" if comp['current_complete'] is not None else '-',
+                    'Baseline % Complete': f"{comp['baseline_complete']}%" if comp['baseline_complete'] is not None else '-',
+                    '% Complete Variance': f"{comp['completion_variance']:+d}%" if comp['completion_variance'] is not None else '-',
+                    'Status': comp['end_status']
+                })
+            
+            # Prepare summary data
+            summary = self.current_comparison['summary']
+            summary_data = {
+                'Metric': [
+                    'Baseline Name',
+                    'Baseline Date',
+                    'Total Tasks',
+                    'Tasks On Track',
+                    'Tasks Late',
+                    'Tasks Early',
+                    'New Tasks',
+                    'Deleted Tasks',
+                    'Avg Duration Variance',
+                    'Avg Completion Variance'
+                ],
+                'Value': [
+                    baseline_name,
+                    self.current_comparison['baseline_date'].strftime('%Y-%m-%d %H:%M:%S'),
+                    summary['total_tasks'],
+                    summary['tasks_on_track'],
+                    summary['tasks_late'],
+                    summary['tasks_early'],
+                    summary['tasks_new'],
+                    summary['tasks_deleted'],
+                    f"{summary['avg_duration_variance']:+.2f}",
+                    f"{summary['avg_completion_variance']:+.1f}%"
+                ]
+            }
+            
+            # Write to Excel
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                # Write summary
+                df_summary = pd.DataFrame(summary_data)
+                df_summary.to_excel(writer, sheet_name='Summary', index=False)
+                
+                # Write comparison
+                df_comparison = pd.DataFrame(comparison_data)
+                df_comparison.to_excel(writer, sheet_name='Comparison', index=False)
+                
+                # Format sheets
+                workbook = writer.book
+                
+                # Format summary sheet
+                summary_sheet = writer.sheets['Summary']
+                for col in summary_sheet.columns:
+                    max_length = max(len(str(cell.value)) for cell in col)
+                    summary_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
+                
+                # Format comparison sheet
+                comparison_sheet = writer.sheets['Comparison']
+                for col in comparison_sheet.columns:
+                    max_length = max(len(str(cell.value)) for cell in col)
+                    comparison_sheet.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
+            
+            QMessageBox.information(self, "Success", 
+                                  f"Baseline comparison exported successfully to:\n{file_path}")
+        
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", 
+                               f"Failed to export baseline comparison:\n{str(e)}")

@@ -108,6 +108,62 @@ def create_menu_bar(window):
     convert_action.setShortcut("Ctrl+Shift+M")
     convert_action.triggered.connect(window._convert_to_milestone)
     edit_menu.addAction(convert_action)
+    
+    # Format Menu
+    format_menu = menubar.addMenu("F&ormat")
+    
+    bold_action = QAction("&Bold", window)
+    bold_action.setShortcut("Ctrl+B")
+    bold_action.setCheckable(True)
+    bold_action.triggered.connect(window._toggle_bold)
+    format_menu.addAction(bold_action)
+    window.bold_action = bold_action
+    
+    italic_action = QAction("&Italic", window)
+    italic_action.setShortcut("Ctrl+I")
+    italic_action.setCheckable(True)
+    italic_action.triggered.connect(window._toggle_italic)
+    format_menu.addAction(italic_action)
+    window.italic_action = italic_action
+    
+    underline_action = QAction("&Underline", window)
+    underline_action.setShortcut("Ctrl+U")
+    underline_action.setCheckable(True)
+    underline_action.triggered.connect(window._toggle_underline)
+    format_menu.addAction(underline_action)
+    window.underline_action = underline_action
+    
+    format_menu.addSeparator()
+    
+    font_color_action = QAction("Font &Color...", window)
+    font_color_action.triggered.connect(window._change_font_color)
+    format_menu.addAction(font_color_action)
+    
+    bg_color_action = QAction("&Background Color...", window)
+    bg_color_action.triggered.connect(window._change_background_color)
+    format_menu.addAction(bg_color_action)
+    
+    format_menu.addSeparator()
+    
+    font_size_menu = format_menu.addMenu("Font &Size")
+    for size in [8, 9, 10, 11, 12, 14, 16, 18, 20, 24]:
+        size_action = QAction(f"{size} pt", window)
+        size_action.triggered.connect(lambda checked, s=size: window._change_font_size(s))
+        font_size_menu.addAction(size_action)
+    
+    font_family_menu = format_menu.addMenu("Font &Family")
+    fonts = ["Arial", "Times New Roman", "Calibri", "Verdana", "Tahoma", 
+             "Georgia", "Courier New", "Comic Sans MS", "Impact", "Trebuchet MS"]
+    for font in fonts:
+        font_action = QAction(font, window)
+        font_action.triggered.connect(lambda checked, f=font: window._change_font_family(f))
+        font_family_menu.addAction(font_action)
+    
+    format_menu.addSeparator()
+    
+    clear_format_action = QAction("&Clear Formatting", window)
+    clear_format_action.triggered.connect(window._clear_formatting)
+    format_menu.addAction(clear_format_action)
 
     # View Menu
     view_menu = menubar.addMenu("&View")
@@ -205,8 +261,6 @@ def create_menu_bar(window):
     # Settings Menu
     settings_menu = menubar.addMenu("&Settings")
 
-
-
     calendar_action = QAction("&Calendar Settings...", window)
     calendar_action.triggered.connect(window._show_calendar_settings)
     settings_menu.addAction(calendar_action)
@@ -214,6 +268,19 @@ def create_menu_bar(window):
     date_format_action = QAction("&Date Format...", window)
     date_format_action.triggered.connect(window._show_date_format_settings)
     settings_menu.addAction(date_format_action)
+    
+    settings_menu.addSeparator()
+    
+    # Baseline Management
+    baseline_menu = settings_menu.addMenu("&Baselines")
+    
+    set_baseline_action = QAction("&Set Baseline...", window)
+    set_baseline_action.triggered.connect(window._manage_baselines)
+    baseline_menu.addAction(set_baseline_action)
+    
+    view_baseline_action = QAction("&View Baseline Comparison", window)
+    view_baseline_action.triggered.connect(window._show_baseline_comparison)
+    baseline_menu.addAction(view_baseline_action)
 
     view_menu.addSeparator()
 
@@ -341,9 +408,44 @@ def create_toolbar(window):
     toolbar.addAction(bulk_outdent_btn)
 
     toolbar.addSeparator()
+    
+    # Formatting Tools
+    bold_btn = QAction("B", window)
+    bold_btn.setToolTip("Bold (Ctrl+B)")
+    bold_btn.setCheckable(True)
+    bold_btn.triggered.connect(window._toggle_bold)
+    bold_btn.setFont(window.font())
+    toolbar.addAction(bold_btn)
+    window.toolbar_bold_btn = bold_btn
+    
+    italic_btn = QAction("I", window)
+    italic_btn.setToolTip("Italic (Ctrl+I)")
+    italic_btn.setCheckable(True)
+    italic_btn.triggered.connect(window._toggle_italic)
+    toolbar.addAction(italic_btn)
+    window.toolbar_italic_btn = italic_btn
+    
+    underline_btn = QAction("U", window)
+    underline_btn.setToolTip("Underline (Ctrl+U)")
+    underline_btn.setCheckable(True)
+    underline_btn.triggered.connect(window._toggle_underline)
+    toolbar.addAction(underline_btn)
+    window.toolbar_underline_btn = underline_btn
+    
+    font_color_btn = QAction("🎨", window)
+    font_color_btn.setToolTip("Font Color")
+    font_color_btn.triggered.connect(window._change_font_color)
+    toolbar.addAction(font_color_btn)
+    
+    bg_color_btn = QAction("🖌️", window)
+    bg_color_btn.setToolTip("Background Color")
+    bg_color_btn.triggered.connect(window._change_background_color)
+    toolbar.addAction(bg_color_btn)
+
+    toolbar.addSeparator()
 
     # *** ADD EXPAND/COLLAPSE BUTTONS ***
-    expand_selected_btn = QAction("⊕ Expand Selected", window)
+    expand_selected_btn = QAction("⊕", window)
     expand_selected_btn.setToolTip("Expand selected summary task and all subtasks")
     expand_selected_btn.triggered.connect(window._expand_selected)
     toolbar.addAction(expand_selected_btn)

@@ -17,11 +17,15 @@ class TaskOperationsMixin:
         if not task_name:
             return
         
-        # Create task with default values
+        # Create task with default values (8 AM to 4 PM today)
+        now = datetime.now()
+        start_date = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        end_date = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        
         task = Task(
             name=task_name,
-            start_date=datetime.now(),
-            end_date=datetime.now() + timedelta(days=1),
+            start_date=start_date,
+            end_date=end_date,
             percent_complete=0,
             predecessors=[],
             assigned_resources=[],
@@ -51,7 +55,14 @@ class TaskOperationsMixin:
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
-                schedule_type=task_data['schedule_type']
+                schedule_type=task_data['schedule_type'],
+                font_family=task_data.get('font_family', 'Arial'),
+                font_size=task_data.get('font_size', 10),
+                font_color=task_data.get('font_color', '#000000'),
+                background_color=task_data.get('background_color', '#FFFFFF'),
+                font_bold=task_data.get('font_bold', None),
+                font_italic=task_data.get('font_italic', None),
+                font_underline=task_data.get('font_underline', False)
             )
             
             if self.data_manager.add_task(task):
@@ -88,7 +99,14 @@ class TaskOperationsMixin:
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
-                schedule_type=task_data['schedule_type']
+                schedule_type=task_data['schedule_type'],
+                font_family=task_data.get('font_family', 'Arial'),
+                font_size=task_data.get('font_size', 10),
+                font_color=task_data.get('font_color', '#000000'),
+                background_color=task_data.get('background_color', '#FFFFFF'),
+                font_bold=task_data.get('font_bold', None),
+                font_italic=task_data.get('font_italic', None),
+                font_underline=task_data.get('font_underline', False)
             )
             
             if self.data_manager.add_task(task, parent_id=parent_id):
@@ -123,7 +141,16 @@ class TaskOperationsMixin:
                         assigned_resources=task_data['assigned_resources'],
                         notes=task_data['notes'],
                         task_id=task.id,
-                        schedule_type=task_data['schedule_type']
+                        is_milestone=task.is_milestone,  # Preserve milestone status
+                        is_summary=task.is_summary,  # Preserve summary status
+                        schedule_type=task_data['schedule_type'],
+                        font_family=task_data.get('font_family', 'Arial'),
+                        font_size=task_data.get('font_size', 10),
+                        font_color=task_data.get('font_color', '#000000'),
+                        background_color=task_data.get('background_color', '#FFFFFF'),
+                        font_bold=task_data.get('font_bold', None),
+                        font_italic=task_data.get('font_italic', None),
+                        font_underline=task_data.get('font_underline', False)
                     )
                     
                     if self.data_manager.update_task(task_id, updated_task):
@@ -315,7 +342,14 @@ class TaskOperationsMixin:
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
-                is_milestone=True  # *** MARK AS MILESTONE ***
+                is_milestone=True,  # *** MARK AS MILESTONE ***
+                font_family=task_data.get('font_family', 'Arial'),
+                font_size=task_data.get('font_size', 10),
+                font_color=task_data.get('font_color', '#000000'),
+                background_color=task_data.get('background_color', '#FFFFFF'),
+                font_bold=task_data.get('font_bold', None),
+                font_italic=None,  # Let automatic logic apply italic for milestones
+                font_underline=task_data.get('font_underline', False)
             )
             
             if self.data_manager.add_task(task):
@@ -376,7 +410,14 @@ class TaskOperationsMixin:
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
-                task_id=None  # Will be set by insert method
+                task_id=None,  # Will be set by insert method
+                font_family=task_data.get('font_family', 'Arial'),
+                font_size=task_data.get('font_size', 10),
+                font_color=task_data.get('font_color', '#000000'),
+                background_color=task_data.get('background_color', '#FFFFFF'),
+                font_bold=task_data.get('font_bold', None),
+                font_italic=task_data.get('font_italic', None),
+                font_underline=task_data.get('font_underline', False)
             )
             
             if self.data_manager.insert_task_before(new_task, selected_task.id):
@@ -450,7 +491,14 @@ class TaskOperationsMixin:
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
-                task_id=None  # Will be set by insert method
+                task_id=None,  # Will be set by insert method
+                font_family=task_data.get('font_family', 'Arial'),
+                font_size=task_data.get('font_size', 10),
+                font_color=task_data.get('font_color', '#000000'),
+                background_color=task_data.get('background_color', '#FFFFFF'),
+                font_bold=task_data.get('font_bold', None),
+                font_italic=task_data.get('font_italic', None),
+                font_underline=task_data.get('font_underline', False)
             )
             
             if self.data_manager.insert_task_at_position(new_task, selected_task.id):
@@ -500,6 +548,8 @@ class TaskOperationsMixin:
                 task.is_milestone = False
                 # Set default end date (7 days after start)
                 task.end_date = task.start_date + timedelta(days=6)
+                # Remove italic formatting when converting to task
+                task.font_italic = False
                 
                 self._update_all_views()
                 self.status_label.setText(f"✓ Converted '{task.name}' to regular task")
@@ -516,6 +566,8 @@ class TaskOperationsMixin:
             if reply == QMessageBox.StandardButton.Yes:
                 task.is_milestone = True
                 task.end_date = task.start_date
+                # Add italic formatting when converting to milestone
+                task.font_italic = True
                 
                 self._update_all_views()
                 self.status_label.setText(f"✓ Converted '{task.name}' to milestone")
@@ -539,7 +591,13 @@ class TaskOperationsMixin:
             return
         
         # Perform bulk indent
-        if self.data_manager.bulk_indent_tasks(task_ids):
+        # Perform bulk indent
+        affected_parents = self.data_manager.bulk_indent_tasks(task_ids)
+        if affected_parents:
+            # Add all new parents to expanded tasks set so they stay open
+            for parent_id in affected_parents:
+                self.expanded_tasks.add(parent_id)
+            
             self._update_all_views()
             self.status_label.setText(f"✓ Indented {len(task_ids)} task(s)")
         else:

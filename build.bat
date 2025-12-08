@@ -103,10 +103,10 @@ echo   Building PlanIFlow - ProjectPlanner
 echo ===============================================
 echo.
 
-set spec_file=PlanIFlow_1.7.exe.spec
+set spec_file=PlanIFlow_1.8.0.exe.spec
 
 echo [INFO] Generating spec file...
-set makespec_command=pyi-makespec --windowed --name="PlanIFlow_1.7.exe" ^
+set makespec_command=pyi-makespec --windowed --name="PlanIFlow_1.8.0.exe" ^
     %ICON_OPTION% ^
     --version-file=version_info.txt ^
     --add-data="images;images" ^
@@ -171,12 +171,12 @@ echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
 echo.
-echo [SUCCESS] Executable created: dist\PlanIFlow_1.7.exe
+echo [SUCCESS] Executable created: dist\PlanIFlow_1.8.0.exe
 echo [INFO] Icon has been embedded in the executable
 echo.
 
 REM Display file info
-for %%A in ("dist\PlanIFlow_1.7.exe") do (
+for %%A in ("dist\PlanIFlow_1.8.0.exe") do (
     set size=%%~zA
     set /a sizeMB=!size! / 1048576
     echo [INFO] File size: !sizeMB! MB

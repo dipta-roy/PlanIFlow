@@ -44,6 +44,12 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - **Resource Allocation Tracking**: Detect over-allocation
 - **Resource Exception**: Resources can now have exception days (holidays/leaves) that exclude them from work on specific dates. This affects their billing and effort calculations.
 - **Total Project Cost in Dashboard**: The dashboard now displays the total estimated cost of the project, calculated from all assigned resources and their billing rates.
+- **Project Baselining**: Create up to 3 project baselines to capture snapshots of your project at specific points in time. Compare current progress against baselines to track variances in start dates, end dates, duration, and completion percentages. Baselines are fully integrated with Excel and JSON import/export.
+- **Rich Text Task Formatting**: Customize the appearance of tasks with rich text formatting options. Make important tasks stand out or organize your project visually.
+    - **Font Styling**: Apply **bold**, *italic*, and underline to task names.
+    - **Coloring**: Change the font color and background color of tasks.
+    - **Font Selection**: Choose from a variety of font families and sizes.
+- **Duration Unit Selection**: Switch between 'Days' and 'Hours' for task duration calculations, allowing for more granular project planning.
 - **Dynamic Gantt Charts**: Real-time visualization with dependencies
 - **Project Dashboard**: Overview of project metrics, including total project cost.
 - **Excel Import/Export**: Share plans via Excel files
@@ -63,51 +69,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 
 ## Architecture Overview
 
-```
-PlanIFlow 1.7.0/
-├───__init__.py                # Marks the directory as a Python package.
-├───main.py                    # The main entry point of the application, responsible for initializing the GUI and loading initial data.
-├───prepare_spec.py            # Script used for preparing the PyInstaller spec file, possibly for custom build configurations.
-├───calendar_manager/          # Manages project calendars, including working days, holidays, and custom work schedules.
-│   ├───__init__.py            # Marks the calendar_manager directory as a Python package.
-│   └───calendar_manager.py    # Core logic for managing holidays, working days, and work schedules.
-├───constants/                 # Defines global constants and application-wide configurations.
-│   ├───__init__.py            # Marks the constants directory as a Python package.
-│   ├───app_images.py          # Contains Base64 encoded application images and icons used throughout the UI.
-│   └───constants.py           # Defines global constants and configuration values for the application.
-├───data_manager/              # Handles all data management operations, including tasks, resources, and critical path calculations.
-│   ├───__init__.py            # Marks the data_manager directory as a Python package.
-│   ├───manager.py             # The core data manager, handling tasks, resources, critical path method (CPM) calculations, and cost management.
-│   └───models.py              # Defines data models for tasks, resources, and other project entities.
-├───exporter/                  # Manages the import and export of project data to various formats.
-│   ├───__init__.py            # Marks the exporter directory as a Python package.
-│   ├───exporter.py            # Handles the import and export of project data in formats like JSON and Excel.
-│   └───pdf_exporter.py        # Responsible for exporting project reports and Gantt charts to PDF format.
-├───settings_manager/          # Manages application settings and user preferences.
-│   ├───__init__.py            # Marks the settings_manager directory as a Python package.
-│   └───settings_manager.py    # Manages application settings, such as duration units and theme preferences.
-└───ui/                        # Contains all user interface components and related logic.
-    ├───__init__.py            # Marks the ui directory as a Python package.
-    ├───gantt_chart.py         # Implements the dynamic Gantt chart visualization, including task dependencies and critical path highlighting.
-    ├───themes.py              # Manages the application's visual themes (e.g., light and dark mode).
-    ├───ui_calendar_settings_dialog.py # Defines the dialog for configuring project calendar settings.
-    ├───ui_dashboard.py        # Creates the project dashboard interface, displaying key metrics, charts, and status cards.
-    ├───ui_delegates.py        # Contains custom delegates for various UI editors, such as date pickers and resource selectors.
-    ├───ui_duration_unit_dialog.py # Defines the dialog for setting duration units (e.g., days, hours).
-    ├───ui_file_manager.py     # Manages file-related operations within the UI, such as opening and saving project files.
-    ├───ui_helpers.py          # Provides utility functions and helper methods for UI-related tasks, suchs as icon loading and path management.
-    ├───ui_main.py             # The main window of the user interface, containing tabs, menus, and the primary tree view.
-    ├───ui_menu_toolbar.py     # Handles actions and shortcuts for the application's menu and toolbar.
-    ├───ui_project_settings.py # Defines the dialog for configuring general project settings.
-    ├───ui_resource_dialog.py  # Defines the dialog for managing and editing resources.
-	├── ui_resource_exceptions_widget.py  # Exception management widget
-    ├───ui_resources.py        # Implements the resource table, displaying resource allocation and warnings.
-    ├───ui_task_dialog.py      # Defines the dialog for managing and editing individual tasks.
-    ├───ui_task_manager.py     # Manages task-related operations and interactions within the UI.
-    ├───ui_tasks.py            # Implements the task tree view, handling task hierarchy and dependencies.
-    ├───ui_tree_view_manager.py # Manages the overall behavior and interactions of the tree view widgets.
-    └───ui_view_manager.py     # Manages the different views and their transitions within the application.
-```
+The application follows a modular architecture, separating data management, UI, and business logic into distinct components. This design makes the application easier to maintain and extend.
 
 ## 🚀 Getting Started
 
@@ -128,7 +90,7 @@ run.bat
 
 or 
 
-Use the `build.bat` script to generate an `PlayIFlow 1.7.0.exe` file which will be saved at `dist/` folder.
+Use the `build.bat` script to generate an `PlayIFlow 1.8.0.exe` file which will be saved at `dist/` folder.
 
 ```bash
 build.bat
@@ -162,7 +124,7 @@ python3 main.py
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download PlanIFlow `PlanIFlow_1.7.0.zip`:
+Download PlanIFlow `PlanIFlow_1.8.0.zip`:
 Download Code Verification Certificate: [Dipta Roy](https://github.com/dipta-roy/dipta-roy.github.io/blob/main/downloads/Code%20Verifying%20Certificates.zip).
 ```
 - HOW TO TRUST
@@ -184,7 +146,7 @@ Download Code Verification Certificate: [Dipta Roy](https://github.com/dipta-roy
 
 Once verified,
 ```
-Run: PlanIFlow_1.7.0.exe
+Run: PlanIFlow_1.8.0.exe
 ```
 
 ## 💻 Usage
@@ -236,6 +198,32 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 - **Excel**: Import and export your projects to and from Excel files. This is useful for sharing your project with others who may not have the application.
 - **PDF**: Export your projects to and from PDF report.
 
+### Project Baselining
+
+Baselines allow you to capture snapshots of your project at key milestones and compare current progress against them.
+
+- **Creating a Baseline**:
+  - Go to `Settings > Baselines > Set Baseline...`
+  - Click "Create New Baseline" and enter a name (e.g., "Initial Plan", "Q1 Baseline")
+  - The baseline captures all task start dates, end dates, durations, and completion percentages
+  - You can create up to 3 baselines per project
+
+- **Viewing Baseline Comparison**:
+  - Go to `Settings > Baselines > View Baseline Comparison` or click the "📊 Baseline Comparison" tab
+  - Select a baseline from the dropdown to compare against current project state
+  - View detailed variance analysis including:
+    - Start/End date variances (in days)
+    - Duration variances
+    - Completion percentage variances
+    - Color-coded status indicators (late=red, early=green, on-track=blue)
+  - Summary statistics show overall project health
+
+- **Managing Baselines**:
+  - Rename baselines to reflect project phases
+  - Delete outdated baselines
+  - Baselines are automatically saved with your project in JSON and Excel formats
+  - When importing projects, baselines are restored with full backward compatibility
+
 ## ⌨️ Shortcuts
 
 | Shortcut         | Action                  |
@@ -252,6 +240,9 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 | `Space`          | Toggle Expand/Collapse  |
 | `+`              | Expand Selected         |
 | `-`              | Collapse Selected       |
+| `Ctrl+B`         | Bold Selected       	 |
+| `Ctrl+I`         | Italics Selected        |
+| `Ctrl+U`         | Underline Selected      |
 
 ## 🪟 Batch Scripts
 
@@ -271,64 +262,44 @@ To build a standalone executable from the source code, you can use the `build.ba
 
 ## 📂 Project Structure
 
-```
-PlanIFlow 1.7.0/
-├───__init__.py
-├───build.bat
-├───clean.bat
-├───main.py
-├───prepare_spec.py
-├───README.md
-├───requirements.txt
-├───run.bat
-├───SECURITY.md
-├───version_info.txt
-├───calendar_manager/
-│   ├───__init__.py
-│   └───calendar_manager.py
-├───constants/
-│   ├───__init__.py
-│   ├───app_images.py
-│   └───constants.py
-├───data_manager/
-│   ├───__init__.py
-│   ├───manager.py
-│   └───models.py
-├───exporter/
-│   ├───__init__.py
-│   ├───exporter.py
-│   └───pdf_exporter.py
-├───images/
-│   ├───logo_lg.ico
-│   ├───logo.ico
-│   └───Logo.png
-├───sample/
-│   └───Project_Replica.json
-├───settings_manager/
-│   ├───__init__.py
-│   └───settings_manager.py
-└───ui/
-    ├───__init__.py
-    ├───gantt_chart.py
-    ├───themes.py
-    ├───ui_calendar_settings_dialog.py
-    ├───ui_dashboard.py
-    ├───ui_delegates.py
-    ├───ui_duration_unit_dialog.py
-    ├───ui_file_manager.py
-    ├───ui_helpers.py
-    ├───ui_main.py
-    ├───ui_menu_toolbar.py
-    ├───ui_project_settings.py
-    ├───ui_resource_dialog.py
-    ├───ui_resource_exceptions_widget.py
-    ├───ui_resources.py
-    ├───ui_task_dialog.py
-    ├───ui_task_manager.py
-    ├───ui_tasks.py
-    ├───ui_tree_view_manager.py
-    └───ui_view_manager.py
-```
+| Path                                     | Description                                                                                             |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `main.py`                                | Main entry point of the application.                                                                    |
+| `build.bat`, `clean.bat`, `run.bat`      | Batch scripts for building, cleaning, and running the application on Windows.                           |
+| `prepare_spec.py`                        | Script to prepare the PyInstaller spec file for building the executable.                                |
+| `requirements.txt`                       | A list of Python packages required to run the application.                                              |
+| `calendar_manager/calendar_manager.py`   | Manages project calendars, including working days, holidays, and custom work schedules.                 |
+| `constants/app_images.py`                | Contains Base64 encoded application images and icons.                                                   |
+| `constants/constants.py`                 | Defines global constants and configuration values.                                                      |
+| `data_manager/models.py`                 | Defines data models for tasks, resources, and other project entities.                                   |
+| `data_manager/manager.py`                | The core data manager, handling tasks, resources, critical path, and cost management.                   |
+| `data_manager/baseline.py`               | Defines baseline data models for capturing project snapshots.                                           |
+| `exporter/exporter.py`                   | Handles the import and export of project data in formats like JSON and Excel.                           |
+| `exporter/pdf_exporter.py`               | Responsible for exporting project reports and Gantt charts to PDF format.                               |
+| `settings_manager/settings_manager.py`   | Manages application settings, such as duration units and theme preferences.                             |
+| `ui/ui_main.py`                          | The main window of the application, containing tabs, menus, and the primary tree view.                  |
+| `ui/ui_tasks.py`                         | Implements the task tree view, handling task hierarchy and dependencies.                                |
+| `ui/ui_resources.py`                     | Implements the resource table, displaying resource allocation and warnings.                             |
+| `ui/gantt_chart.py`                      | Implements the dynamic Gantt chart visualization.                                                       |
+| `ui/ui_dashboard.py`                     | Creates the project dashboard interface.                                                                |
+| `ui/ui_delegates.py`                     | Contains custom delegates for UI editors, such as date pickers and resource selectors.                  |
+| `ui/ui_baseline_comparison.py`           | Implements the baseline comparison tab for variance analysis.                                           |
+| `ui/ui_baseline_manager.py`              | Manages baseline-related operations and interactions.                                                   |
+| `ui/ui_baseline_dialog.py`               | Defines the dialog for managing project baselines.                                                      |
+| `ui/ui_calendar_settings_dialog.py`      | Defines the dialog for configuring project calendar settings.                                           |
+| `ui/ui_duration_unit_dialog.py`          | Defines the dialog for setting duration units (e.g., days, hours).                                      |
+| `ui/ui_file_manager.py`                  | Manages file-related operations within the UI.                                                          |
+| `ui/ui_formatting.py`                    | Implements the font and color formatting features.                                                      |
+| `ui/ui_helpers.py`                       | Provides utility functions and helper methods for UI-related tasks.                                     |
+| `ui/ui_menu_toolbar.py`                  | Handles actions and shortcuts for the application's menu and toolbar.                                   |
+| `ui/ui_project_settings.py`              | Defines the dialog for configuring general project settings.                                            |
+| `ui/ui_resource_dialog.py`               | Defines the dialog for managing and editing resources.                                                  |
+| `ui/ui_resource_exceptions_widget.py`    | Widget for managing resource exceptions (holidays/leaves).                                              |
+| `ui/ui_task_dialog.py`                   | Defines the dialog for managing and editing individual tasks.                                           |
+| `ui/ui_task_manager.py`                  | Manages task-related operations and interactions within the UI.                                         |
+| `ui/ui_tree_view_manager.py`             | Manages the overall behavior and interactions of the tree view widgets.                                 |
+| `ui/ui_view_manager.py`                  | Manages the different views and their transitions within the application.                               |
+| `ui/themes.py`                           | Manages the application's visual themes (e.g., light and dark mode).                                    |
 
 **Note:** The `build` and `dist` directories are generated during the build process and contain the compiled application and its dependencies. 
 
@@ -346,7 +317,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/87dbdb9200511849ab607a0bca3986d91fb488c700d9d79611e94a8628a0018d) - May detect as **false positive**, add to Exclusion if necessary.
+- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/fb7f68aa698c15aadd397d1e10d82b9ceba006a1a635bf27b05d4266c2be0c17) - May detect as **false positive**, add to Exclusion if necessary.
 
 ## 🙏 Acknowledgments
 

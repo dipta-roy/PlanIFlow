@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-                             QLineEdit, QDateEdit, QSpinBox, QTextEdit, QPushButton,
+                             QLineEdit, QDateEdit, QDateTimeEdit, QSpinBox, QTextEdit, QPushButton,
                              QMessageBox, QLabel, QComboBox, QCompleter, QWidget, QDoubleSpinBox,
-                             QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QColorDialog, QTabWidget)
 from PyQt6.QtCore import Qt, QDate
 from datetime import datetime, timedelta
 import re
@@ -16,7 +16,13 @@ from calendar_manager.calendar_manager import CalendarManager
 class TaskDialog(QDialog):
     def __init__(self, parent=None, data_manager: DataManager = None, task: Task = None, parent_task: Task = None, is_milestone: bool = False):
         super().__init__(parent)
-        self.setWindowTitle("Edit Task" if task else "Add Task")
+        # Set appropriate title based on task type
+        if task:
+            title = "Edit Milestone" if task.is_milestone else "Edit Task"
+        else:
+            title = "Add Milestone" if is_milestone else "Add Task"
+        self.setWindowTitle(title)
+        self.resize(600, 450)
         self.data_manager = data_manager
         self.original_task = task
         self.setup_ui()
@@ -36,134 +42,32 @@ class TaskDialog(QDialog):
     
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
-        form_layout = QFormLayout()
+        
+        # Create Tab Widget
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
+        
+        # Initialize Tabs
+        self.general_tab = QWidget()
+        self.predecessors_tab = QWidget()
+        self.resources_tab = QWidget()
+        self.notes_tab = QWidget()
+        self.formatting_tab = QWidget()
+        
+        self.tabs.addTab(self.general_tab, "General")
+        self.tabs.addTab(self.predecessors_tab, "Predecessors")
+        self.tabs.addTab(self.resources_tab, "Resources")
+        self.tabs.addTab(self.notes_tab, "Notes")
+        self.tabs.addTab(self.formatting_tab, "Formatting")
+        
+        # Setup content for each tab
+        self._setup_general_tab()
+        self._setup_predecessors_tab()
+        self._setup_resources_tab()
+        self._setup_notes_tab()
+        self._setup_formatting_tab()
 
-        self.name_input = QLineEdit()
-        form_layout.addRow("Task Name:", self.name_input)
-
-        self.schedule_type_combo = QComboBox()
-        self.schedule_type_combo.addItems([st.value for st in ScheduleType])
-        self.schedule_type_combo.currentIndexChanged.connect(self._update_ui_for_schedule_type)
-        form_layout.addRow("Schedule Type:", self.schedule_type_combo)
-
-        # Start Date
-        self.start_date_input = QDateEdit()
-        self.start_date_input.setCalendarPopup(True)
-        self.start_date_input.setDate(QDate.currentDate())
-        
-        if self.is_milestone:
-            self.start_date_input.dateChanged.connect(self._on_milestone_date_changed)
-            form_layout.addRow("Date:", self.start_date_input)
-        else:
-            self.start_date_input.dateChanged.connect(self._on_date_changed)
-            form_layout.addRow("Start Date:", self.start_date_input)
-        
-        # End Date (hidden for milestones)
-        self.end_date_input = QDateEdit()
-        self.end_date_input.setCalendarPopup(True)
-        self.end_date_input.setDate(QDate.currentDate().addDays(7))
-        self.end_date_input.dateChanged.connect(self._on_date_changed)
-        
-        if not self.is_milestone:
-            form_layout.addRow("End Date:", self.end_date_input)
-        
-        # Duration
-        duration_layout = QHBoxLayout()
-        self.duration_input = QDoubleSpinBox()
-        self.duration_input.setRange(0.1, 10000)
-        self.duration_input.setDecimals(1 if self.data_manager.settings.duration_unit == DurationUnit.HOURS else 0)
-        self.duration_input.setValue(1)
-        self.duration_input.valueChanged.connect(self._on_duration_changed)
-        
-        # Make sure keyboard editing is allowed and behaved
-        self.duration_input.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        # keyboard tracking controls whether valueChanged fires while typing; keep it on for immediate feedback
-        self.duration_input.setKeyboardTracking(True)
-        try:
-            self.duration_input.setReadOnly(False)
-        except Exception:
-            # Older/odd PyQt bindings might not expose setReadOnly; ignore safely
-            pass
-
-        self.duration_input.valueChanged.connect(self._on_duration_changed)
-        duration_layout.addWidget(self.duration_input)
-        self.duration_unit_label = QLabel(self.data_manager.settings.duration_unit.value)
-        duration_layout.addWidget(self.duration_unit_label)
-        duration_layout.addStretch()
-        
-        self.duration_row_widget = QWidget() # Create a widget to hold the duration row
-        self.duration_row_widget.setLayout(duration_layout)
-        form_layout.addRow("Duration:", self.duration_row_widget) # Add the widget to the form layout
-
-        # Initially hide the duration row if it's a milestone
-        if self.is_milestone:
-            self.duration_row_widget.setVisible(False)
-            
-            # Update mode selection
-            update_layout = QHBoxLayout()
-            update_label = QLabel("When duration changes, update:")
-            self.update_end_radio = QCheckBox("End Date")
-            self.update_end_radio.setChecked(True)
-            self.update_start_radio = QCheckBox("Start Date")
-            
-            self.update_end_radio.toggled.connect(lambda checked: self.update_start_radio.setChecked(not checked) if checked else None)
-            self.update_start_radio.toggled.connect(lambda checked: self.update_end_radio.setChecked(not checked) if checked else None)
-            
-            update_layout.addWidget(self.update_end_radio)
-            update_layout.addWidget(self.update_start_radio)
-            update_layout.addStretch()
-            
-            form_layout.addRow(update_label, update_layout)
-
-        self.percent_complete_input = QSpinBox()
-        self.percent_complete_input.setRange(0, 100)
-        self.percent_complete_input.setSuffix("%")
-        form_layout.addRow("% Complete:", self.percent_complete_input)
-        
-        # Predecessors
-        form_layout.addRow(QLabel("Predecessors:"))
-        
-        self.predecessors_widget = QWidget()
-        pred_layout = QVBoxLayout(self.predecessors_widget)
-        pred_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.predecessor_rows = []
-        
-        add_pred_btn = QPushButton("+ Add Predecessor")
-        add_pred_btn.clicked.connect(self._add_predecessor_row)
-        pred_layout.addWidget(add_pred_btn)
-        
-        self.pred_container = QWidget()
-        self.pred_container_layout = QVBoxLayout(self.pred_container)
-        self.pred_container_layout.setContentsMargins(0, 0, 0, 0)
-        pred_layout.addWidget(self.pred_container)
-        
-        form_layout.addRow(self.predecessors_widget)
-        
-        # Resources
-        self.resources_table = QTableWidget()
-        self.resources_table.setColumnCount(2)
-        self.resources_table.setHorizontalHeaderLabels(["Resource", "Allocation (%)"])
-        self.resources_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.resources_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.resources_table.setMaximumHeight(150)
-        form_layout.addRow("Assigned Resources:", self.resources_table)
-
-        add_resource_btn = QPushButton("+ Add Resource Assignment")
-        add_resource_btn.clicked.connect(self._add_resource_row)
-        form_layout.addRow(add_resource_btn)
-
-        remove_resource_btn = QPushButton("- Remove Selected Resource")
-        remove_resource_btn.clicked.connect(self._remove_selected_resource_row)
-        form_layout.addRow(remove_resource_btn)
-        
-        # Notes
-        self.notes_input = QTextEdit()
-        self.notes_input.setFixedHeight(60)
-        form_layout.addRow("Notes:", self.notes_input)
-
-        main_layout.addLayout(form_layout)
-
+        # Dialog Buttons
         button_layout = QHBoxLayout()
         self.ok_button = QPushButton("OK")
         self.ok_button.clicked.connect(self.accept)
@@ -181,12 +85,228 @@ class TaskDialog(QDialog):
         self.info_label.setStyleSheet("color: blue; padding: 5px;")
         main_layout.addWidget(self.info_label)
         
-
-
-
         self._update_date_format()
         self.data_manager.settings.add_listener(self._on_settings_changed)
         self._update_ui_for_schedule_type() # Set initial UI state based on schedule type
+
+    def _setup_general_tab(self):
+        layout = QFormLayout(self.general_tab)
+        
+        self.name_input = QLineEdit()
+        layout.addRow("Task Name:", self.name_input)
+
+        self.schedule_type_combo = QComboBox()
+        self.schedule_type_combo.addItems([st.value for st in ScheduleType])
+        self.schedule_type_combo.currentIndexChanged.connect(self._update_ui_for_schedule_type)
+        layout.addRow("Schedule Type:", self.schedule_type_combo)
+
+        # Start Date
+        self.start_date_input = QDateTimeEdit()
+        self.start_date_input.setCalendarPopup(True)
+        
+        # Default to today 8:00 AM
+        now = datetime.now()
+        default_start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        self.start_date_input.setDateTime(default_start)
+        
+        if self.is_milestone:
+            self.start_date_input.dateTimeChanged.connect(self._on_milestone_date_changed)
+            layout.addRow("Date:", self.start_date_input)
+        else:
+            self.start_date_input.dateTimeChanged.connect(self._on_date_changed)
+            layout.addRow("Start Date:", self.start_date_input)
+        
+        # End Date (hidden for milestones)
+        self.end_date_input = QDateTimeEdit()
+        self.end_date_input.setCalendarPopup(True)
+        
+        # Default to today 4:00 PM (16:00) for tasks, or match start for milestones
+        if self.is_milestone:
+            self.end_date_input.setDateTime(default_start) # 8 AM
+        else:
+            # For tasks, default to same day 4 PM if duration is 1 day (default)
+            default_end = now.replace(hour=16, minute=0, second=0, microsecond=0)
+            self.end_date_input.setDateTime(default_end)
+            
+        self.end_date_input.dateTimeChanged.connect(self._on_date_changed)
+        
+        if not self.is_milestone:
+            layout.addRow("End Date:", self.end_date_input)
+        
+        # Duration
+        duration_layout = QHBoxLayout()
+        self.duration_input = QDoubleSpinBox()
+        self.duration_input.setRange(0.0, 10000)
+        self.duration_input.setDecimals(1 if self.data_manager.settings.duration_unit == DurationUnit.HOURS else 0)
+        # Set default duration: 0 for milestones, 1 for tasks
+        self.duration_input.setValue(0 if self.is_milestone else 1)
+        self.duration_input.valueChanged.connect(self._on_duration_changed)
+        
+        # Make sure keyboard editing is allowed and behaved
+        self.duration_input.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.duration_input.setKeyboardTracking(True)
+        try:
+            self.duration_input.setReadOnly(False)
+        except Exception:
+            pass
+
+        self.duration_input.valueChanged.connect(self._on_duration_changed)
+        duration_layout.addWidget(self.duration_input)
+        self.duration_unit_label = QLabel(self.data_manager.settings.duration_unit.value)
+        duration_layout.addWidget(self.duration_unit_label)
+        duration_layout.addStretch()
+        
+        self.duration_row_widget = QWidget()
+        self.duration_row_widget.setLayout(duration_layout)
+        layout.addRow("Duration:", self.duration_row_widget)
+
+        # Update mode selection (visible only for manually scheduled tasks)
+        update_layout = QHBoxLayout()
+        # Create a dummy label for consistency with addRow, but it will be hidden/controlled with the widget
+        self.update_mode_label = QLabel("When duration changes, update:")
+        self.update_end_radio = QCheckBox("End Date")
+        self.update_end_radio.setChecked(True)
+        self.update_start_radio = QCheckBox("Start Date")
+        
+        self.update_end_radio.toggled.connect(lambda checked: self.update_start_radio.setChecked(not checked) if checked else None)
+        self.update_start_radio.toggled.connect(lambda checked: self.update_end_radio.setChecked(not checked) if checked else None)
+        
+        update_layout.addWidget(self.update_end_radio)
+        update_layout.addWidget(self.update_start_radio)
+        update_layout.addStretch()
+        
+        self.update_mode_widget = QWidget() # Group them for easy hiding/showing
+        self.update_mode_widget.setLayout(update_layout)
+        # Add the label and widget to the layout
+        layout.addRow(self.update_mode_label, self.update_mode_widget)
+
+        # Initially hide the duration row and update mode widget if it's a milestone
+        if self.is_milestone:
+            self.duration_row_widget.setVisible(False)
+            self.update_mode_widget.setVisible(False)
+            self.update_mode_label.setVisible(False)
+
+        self.percent_complete_input = QSpinBox()
+        self.percent_complete_input.setRange(0, 100)
+        self.percent_complete_input.setSuffix("%")
+        layout.addRow("% Complete:", self.percent_complete_input)
+
+    def _setup_predecessors_tab(self):
+        layout = QVBoxLayout(self.predecessors_tab)
+        
+        self.predecessors_widget = QWidget()
+        pred_layout = QVBoxLayout(self.predecessors_widget)
+        pred_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.predecessor_rows = []
+        
+        add_pred_btn = QPushButton("+ Add Predecessor")
+        add_pred_btn.clicked.connect(self._add_predecessor_row)
+        pred_layout.addWidget(add_pred_btn)
+        
+        self.pred_container = QWidget()
+        self.pred_container_layout = QVBoxLayout(self.pred_container)
+        self.pred_container_layout.setContentsMargins(0, 0, 0, 0)
+        pred_layout.addWidget(self.pred_container)
+        
+        # Add a scroll area if there are many predecessors? 
+        # For now, just add to layout. The dialog can be resized.
+        layout.addWidget(self.predecessors_widget)
+        layout.addStretch()
+
+    def _setup_resources_tab(self):
+        layout = QVBoxLayout(self.resources_tab)
+        
+        self.resources_table = QTableWidget()
+        self.resources_table.setColumnCount(2)
+        self.resources_table.setHorizontalHeaderLabels(["Resource", "Allocation (%)"])
+        self.resources_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.resources_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self.resources_table)
+
+        btn_layout = QHBoxLayout()
+        add_resource_btn = QPushButton("+ Add Resource Assignment")
+        add_resource_btn.clicked.connect(self._add_resource_row)
+        btn_layout.addWidget(add_resource_btn)
+
+        remove_resource_btn = QPushButton("- Remove Selected Resource")
+        remove_resource_btn.clicked.connect(self._remove_selected_resource_row)
+        btn_layout.addWidget(remove_resource_btn)
+        
+        layout.addLayout(btn_layout)
+
+    def _setup_notes_tab(self):
+        layout = QVBoxLayout(self.notes_tab)
+        self.notes_input = QTextEdit()
+        layout.addWidget(self.notes_input)
+
+    def _setup_formatting_tab(self):
+        layout = QFormLayout(self.formatting_tab)
+        
+        # Font Family
+        self.font_family_combo = QComboBox()
+        common_fonts = ["Arial", "Times New Roman", "Calibri", "Verdana", "Tahoma", 
+                       "Georgia", "Courier New", "Comic Sans MS", "Impact", "Trebuchet MS"]
+        self.font_family_combo.addItems(common_fonts)
+        self.font_family_combo.currentTextChanged.connect(self._update_preview)
+        layout.addRow("Font Family:", self.font_family_combo)
+        
+        # Font Size
+        self.font_size_spin = QSpinBox()
+        self.font_size_spin.setRange(6, 72)
+        self.font_size_spin.setValue(10)
+        self.font_size_spin.valueChanged.connect(self._update_preview)
+        layout.addRow("Font Size:", self.font_size_spin)
+        
+        # Font Color
+        font_color_layout = QHBoxLayout()
+        self.font_color_input = QLineEdit("#000000")
+        self.font_color_input.setMaximumWidth(100)
+        self.font_color_input.textChanged.connect(self._update_preview)
+        font_color_btn = QPushButton("Pick Color")
+        font_color_btn.clicked.connect(self._pick_font_color)
+        font_color_layout.addWidget(self.font_color_input)
+        font_color_layout.addWidget(font_color_btn)
+        font_color_layout.addStretch()
+        layout.addRow("Font Color:", font_color_layout)
+        
+        # Background Color
+        bg_color_layout = QHBoxLayout()
+        self.bg_color_input = QLineEdit("#FFFFFF")
+        self.bg_color_input.setMaximumWidth(100)
+        self.bg_color_input.textChanged.connect(self._update_preview)
+        bg_color_btn = QPushButton("Pick Color")
+        bg_color_btn.clicked.connect(self._pick_bg_color)
+        bg_color_layout.addWidget(self.bg_color_input)
+        bg_color_layout.addWidget(bg_color_btn)
+        bg_color_layout.addStretch()
+        layout.addRow("Background Color:", bg_color_layout)
+        
+        # Text Style Checkboxes
+        style_layout = QHBoxLayout()
+        self.bold_checkbox = QCheckBox("Bold")
+        self.bold_checkbox.stateChanged.connect(self._update_preview)
+        self.italic_checkbox = QCheckBox("Italic")
+        self.italic_checkbox.stateChanged.connect(self._update_preview)
+        self.underline_checkbox = QCheckBox("Underline")
+        self.underline_checkbox.stateChanged.connect(self._update_preview)
+        style_layout.addWidget(self.bold_checkbox)
+        style_layout.addWidget(self.italic_checkbox)
+        style_layout.addWidget(self.underline_checkbox)
+        style_layout.addStretch()
+        layout.addRow("Text Style:", style_layout)
+        
+        # Preview Label
+        self.preview_label = QLabel("Preview: Sample Text")
+        self.preview_label.setMinimumHeight(40)
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addRow("Preview:", self.preview_label)
+        
+        # Set default italic for new milestones (AFTER preview_label is created)
+        if self.is_milestone and not self.original_task:
+            self.italic_checkbox.setChecked(True)
+        
+        self._update_preview()
     
     def setup_ui(self):
         # This is a placeholder since the original file includes full UI setup.
@@ -210,11 +330,11 @@ class TaskDialog(QDialog):
         """Converts the DateFormat enum to a QDateEdit compatible format string."""
         date_format_enum = self.data_manager.settings.default_date_format
         if date_format_enum == DateFormat.DD_MM_YYYY:
-            return "dd-MM-yyyy"
+            return "dd-MM-yyyy HH:mm"
         elif date_format_enum == DateFormat.DD_MMM_YYYY:
-            return "dd-MMM-yyyy"
+            return "dd-MMM-yyyy HH:mm"
         else: # DateFormat.YYYY_MM_DD
-            return "yyyy-MM-dd" # Default fallback
+            return "yyyy-MM-dd HH:mm" # Default fallback
 
     def _get_strftime_format_string(self) -> str:
         """Converts the DateFormat enum to a strftime compatible format string."""
@@ -321,45 +441,60 @@ class TaskDialog(QDialog):
         for row in selected_rows:
             self.resources_table.removeRow(row)
 
-    def _on_milestone_date_changed(self, date: QDate):
+    def _on_milestone_date_changed(self, datetime_val):
         """When milestone date changes, set end date to be the same."""
-        self.end_date_input.setDate(date)
+        self.end_date_input.setDateTime(datetime_val)
 
     def _on_date_changed(self):
         """Recalculate duration when start or end date changes."""
         if self.is_milestone:
             return # Milestones have 0 duration, handled by _on_milestone_date_changed
 
-        start = self.start_date_input.date()
-        end = self.end_date_input.date()
+        start = self.start_date_input.dateTime()
+        end = self.end_date_input.dateTime()
 
         if start > end:
             # If start date becomes after end date, adjust end date
-            self.end_date_input.setDate(start)
+            self.end_date_input.setDateTime(start)
             end = start
         
-        # Calculate duration based on working days
-        start_dt = datetime(start.year(), start.month(), start.day())
-        end_dt = datetime(end.year(), end.month(), end.day())
+        # Calculate duration based on working days/hours
+        # Calculate duration based on working days/hours
+        start_dt = start.toPyDateTime()
+        end_dt = end.toPyDateTime()
         
-        if self.data_manager.settings.duration_unit == DurationUnit.DAYS:
-            duration = self.data_manager.calendar_manager.calculate_working_days(start_dt, end_dt)
+        hours_per_day = self.data_manager.calendar_manager.hours_per_day
+        
+        if start_dt.date() == end_dt.date():
+            # Intra-day: Use exact time difference
+            duration_hours = (end_dt - start_dt).total_seconds() / 3600.0
+            
+            if self.data_manager.settings.duration_unit == DurationUnit.DAYS:
+                duration = duration_hours / hours_per_day
+            else:
+                duration = duration_hours
         else:
-            duration = self.data_manager.calendar_manager.calculate_working_hours(start_dt, end_dt)
+            if self.data_manager.settings.duration_unit == DurationUnit.DAYS:
+                # If using days, we still want to benefit from time if possible, 
+                # but calendar manager might rely on full days.
+                # However, logic in models.py uses calculate_working_days with datetimes.
+                duration = self.data_manager.calendar_manager.calculate_working_days(start_dt, end_dt)
+            else:
+                duration = self.data_manager.calendar_manager.calculate_working_hours(start_dt, end_dt)
             
         self.duration_input.blockSignals(True)
         self.duration_input.setValue(duration)
         self.duration_input.blockSignals(False)
+        self.duration_input.blockSignals(False)
 
     def _on_duration_changed(self, value: float):
         """Recalculate end date or start date when duration changes."""
-        # Update is_milestone based on duration
-        self.is_milestone = (value == 0)
-        #self._update_ui_for_schedule_type() # Update UI based on new milestone status
-
+        # Don't automatically change milestone status based on duration
+        # Milestones should only be changed via the Convert menu or is_milestone flag
+        
         if self.is_milestone:
             # For milestones, ensure start and end dates are the same
-            self.end_date_input.setDate(self.start_date_input.date())
+            self.end_date_input.setDateTime(self.start_date_input.dateTime())
             return
 
         current_schedule_type = ScheduleType(self.schedule_type_combo.currentText())
@@ -378,32 +513,51 @@ class TaskDialog(QDialog):
         if current_schedule_type == ScheduleType.AUTO_SCHEDULED:
             # For auto-scheduled tasks, the start date is fixed by predecessors.
             # Update the end date based on the new duration.
-            start = self.start_date_input.date()
-            start_dt = datetime(start.year(), start.month(), start.day())
+            start = self.start_date_input.dateTime()
+            start_dt = start.toPyDateTime()
             
-            new_end_dt = self.data_manager.calendar_manager.add_working_days(start_dt, days_to_shift)
+            # Convert duration to hours
+            if self.data_manager.settings.duration_unit == DurationUnit.DAYS:
+                total_hours = value * self.data_manager.calendar_manager.hours_per_day
+            else:
+                total_hours = value
+            
+            # Use calendar manager to add working hours correctly across days
+            new_end_dt = self.data_manager.calendar_manager.add_working_hours(start_dt, total_hours)
             
             self.end_date_input.blockSignals(True)
-            self.end_date_input.setDate(QDate(new_end_dt.year, new_end_dt.month, new_end_dt.day))
+            self.end_date_input.setDateTime(new_end_dt)
             self.end_date_input.blockSignals(False)
         elif current_schedule_type == ScheduleType.MANUALLY_SCHEDULED:
-            start = self.start_date_input.date()
-            end = self.end_date_input.date()
+            start = self.start_date_input.dateTime()
+            end = self.end_date_input.dateTime()
             
-            start_dt = datetime(start.year(), start.month(), start.day())
-            end_dt = datetime(end.year(), end.month(), end.day())
+            start_dt = start.toPyDateTime()
+            end_dt = end.toPyDateTime()
 
             if self.update_end_radio.isChecked():
                 # Calculate new end date
-                new_end_dt = self.data_manager.calendar_manager.add_working_days(start_dt, days_to_shift)
+                # Convert duration to hours
+                if self.data_manager.settings.duration_unit == DurationUnit.DAYS:
+                    total_hours = value * self.data_manager.calendar_manager.hours_per_day
+                else:
+                    total_hours = value
+                
+                new_end_dt = self.data_manager.calendar_manager.add_working_hours(start_dt, total_hours)
+
                 self.end_date_input.blockSignals(True)
-                self.end_date_input.setDate(QDate(new_end_dt.year, new_end_dt.month, new_end_dt.day))
+                self.end_date_input.setDateTime(new_end_dt)
                 self.end_date_input.blockSignals(False)
             elif self.update_start_radio.isChecked():
                 # Calculate new start date
-                new_start_dt = self.data_manager.calendar_manager.subtract_working_days(end_dt, days_to_shift)
+                if self.data_manager.settings.duration_unit == DurationUnit.DAYS:
+                    total_hours = value * self.data_manager.calendar_manager.hours_per_day
+                else:
+                    total_hours = value
+                    
+                new_start_dt = end_dt - timedelta(hours=total_hours)
                 self.start_date_input.blockSignals(True)
-                self.start_date_input.setDate(QDate(new_start_dt.year, new_start_dt.month, new_start_dt.day))
+                self.start_date_input.setDateTime(new_start_dt)
                 self.start_date_input.blockSignals(False)
 
     def _update_ui_for_schedule_type(self):
@@ -456,13 +610,61 @@ class TaskDialog(QDialog):
             radios_enabled = duration_enabled and (current_schedule_type == ScheduleType.MANUALLY_SCHEDULED)
             self.update_end_radio.setEnabled(radios_enabled)
             self.update_start_radio.setEnabled(radios_enabled)
+            # Control visibility: hide for milestones, and for auto-scheduled tasks
+            self.update_mode_widget.setVisible(not self.is_milestone and radios_enabled)
+            self.update_mode_label.setVisible(not self.is_milestone and radios_enabled)
+    
+    def _pick_font_color(self):
+        """Open color dialog to pick font color."""
+        current_color = self.font_color_input.text()
+        from PyQt6.QtGui import QColor
+        color = QColorDialog.getColor(QColor(current_color), self, "Select Font Color")
+        if color.isValid():
+            self.font_color_input.setText(color.name())
+    
+    def _pick_bg_color(self):
+        """Open color dialog to pick background color."""
+        current_color = self.bg_color_input.text()
+        from PyQt6.QtGui import QColor
+        color = QColorDialog.getColor(QColor(current_color), self, "Select Background Color")
+        if color.isValid():
+            self.bg_color_input.setText(color.name())
+    
+    def _update_preview(self):
+        """Update the preview label with current formatting."""
+        font_family = self.font_family_combo.currentText()
+        font_size = self.font_size_spin.value()
+        font_color = self.font_color_input.text()
+        bg_color = self.bg_color_input.text()
+        is_bold = self.bold_checkbox.isChecked()
+        is_italic = self.italic_checkbox.isChecked()
+        is_underline = self.underline_checkbox.isChecked()
+        
+        # Build style string
+        style_parts = [
+            f"font-family: {font_family}",
+            f"font-size: {font_size}pt",
+            f"color: {font_color}",
+            f"background-color: {bg_color}",
+            "padding: 5px"
+        ]
+        
+        if is_bold:
+            style_parts.append("font-weight: bold")
+        if is_italic:
+            style_parts.append("font-style: italic")
+        if is_underline:
+            style_parts.append("text-decoration: underline")
+        
+        style = "; ".join(style_parts)
+        self.preview_label.setStyleSheet(style)
 
     def _load_task_data(self, task: Task):
 
         self.name_input.setText(task.name)
         self.schedule_type_combo.setCurrentText(task.schedule_type.value)
-        self.start_date_input.setDate(task.start_date.date())
-        self.end_date_input.setDate(task.end_date.date())
+        self.start_date_input.setDateTime(task.start_date)
+        self.end_date_input.setDateTime(task.end_date)
         
         if not self.is_milestone:
             duration = task.get_duration(self.data_manager.settings.duration_unit, self.data_manager.calendar_manager)
@@ -480,6 +682,32 @@ class TaskDialog(QDialog):
             self._add_resource_row(resource_name, allocation)
         
         self.notes_input.setText(task.notes)
+        
+        # Load formatting properties with validation
+        # Check if font family exists in combo box, otherwise use default
+        font_family = task.font_family
+        if self.font_family_combo.findText(font_family) == -1:
+            # Font not in combo box, add it or use default
+            from PyQt6.QtGui import QFontDatabase
+            available_families = QFontDatabase.families()
+            if font_family in available_families:
+                # Font exists on system but not in combo, add it
+                self.font_family_combo.addItem(font_family)
+                self.font_family_combo.setCurrentText(font_family)
+            else:
+                # Font doesn't exist on system, use Arial as fallback
+                self.font_family_combo.setCurrentText('Arial')
+        else:
+            self.font_family_combo.setCurrentText(font_family)
+        
+        self.font_size_spin.setValue(task.font_size)
+        self.font_color_input.setText(task.font_color)
+        self.bg_color_input.setText(task.background_color)
+        self.bold_checkbox.setChecked(task.font_bold)
+        self.italic_checkbox.setChecked(task.font_italic)
+        self.underline_checkbox.setChecked(task.font_underline)
+        self._update_preview()
+        
         self._update_ui_for_schedule_type() # Update UI state after loading task data
         # Ensure duration spinbox can get keyboard focus (helps in some Qt versions)
         self.duration_input.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -488,8 +716,8 @@ class TaskDialog(QDialog):
 
     def _load_parent_task_defaults(self, parent_task: Task):
         """Set default values based on parent task for subtasks."""
-        self.start_date_input.setDate(parent_task.start_date.date())
-        self.end_date_input.setDate(parent_task.end_date.date())
+        self.start_date_input.setDateTime(parent_task.start_date)
+        self.end_date_input.setDateTime(parent_task.end_date)
         self.schedule_type_combo.setCurrentText(parent_task.schedule_type.value)
         if self.is_milestone:
             self.duration_input.setValue(0)
@@ -506,14 +734,14 @@ class TaskDialog(QDialog):
             return
 
         schedule_type = ScheduleType(self.schedule_type_combo.currentText())
-        start_date_q = self.start_date_input.date()
-        end_date_q = self.end_date_input.date()
+        start_date_q = self.start_date_input.dateTime()
+        end_date_q = self.end_date_input.dateTime()
         duration = self.duration_input.value() if not self.is_milestone else 0
         percent_complete = self.percent_complete_input.value()
         notes = self.notes_input.toPlainText().strip()
 
-        start_date = datetime(start_date_q.year(), start_date_q.month(), start_date_q.day())
-        end_date = datetime(end_date_q.year(), end_date_q.month(), end_date_q.day())
+        start_date = start_date_q.toPyDateTime()
+        end_date = end_date_q.toPyDateTime()
 
         if start_date > end_date:
             QMessageBox.warning(self, "Input Error", "Start Date cannot be after End Date.")
@@ -573,7 +801,15 @@ class TaskDialog(QDialog):
             'percent_complete': percent_complete,
             'predecessors': parsed_predecessors,
             'assigned_resources': parsed_resources,
-            'notes': notes
+            'notes': notes,
+            # Font styling properties
+            'font_family': self.font_family_combo.currentText(),
+            'font_size': self.font_size_spin.value(),
+            'font_color': self.font_color_input.text(),
+            'background_color': self.bg_color_input.text(),
+            'font_bold': self.bold_checkbox.isChecked(),
+            'font_italic': self.italic_checkbox.isChecked(),
+            'font_underline': self.underline_checkbox.isChecked()
         }
         super().accept()
 

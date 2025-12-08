@@ -134,12 +134,11 @@ class TreeViewOperationsMixin:
             
             item.setText(4, display_name)
             
-            # Apply font styling
+            # Apply font styling from task properties
             font = item.font(4)
-            if is_milestone:
-                font.setItalic(True)
-            elif is_summary:
-                font.setBold(True)
+            # Use actual font properties from the task
+            font.setBold(getattr(task, 'font_bold', False))
+            font.setItalic(getattr(task, 'font_italic', False))
             item.setFont(4, font)
             
             # COLUMN 5: Start Date
@@ -242,14 +241,16 @@ class TreeViewOperationsMixin:
             if width > 0: # Only restore if the width was saved
                 header.resizeSection(i, width)
         
-        # Restore sort state
-        if current_sort_col != -1:
-            self.task_tree.header().setSortIndicator(current_sort_col, current_sort_order)
-        else:
-            # Default to ID sort if no previous sort
-            self.task_tree.header().setSortIndicator(2, Qt.SortOrder.AscendingOrder)
-            
+        # Enable sorting first
         self.task_tree.setSortingEnabled(True)
+        
+        # Restore sort state or apply default ID sort
+        if current_sort_col != -1:
+            # Restore previous sort
+            self.task_tree.sortByColumn(current_sort_col, current_sort_order)
+        else:
+            # Default to ID ascending sort
+            self.task_tree.sortByColumn(2, Qt.SortOrder.AscendingOrder)
 
     def _filter_tasks(self):
         """Apply filters to task tree"""
@@ -566,6 +567,10 @@ class TreeViewOperationsMixin:
                     self.expanded_tasks.add(task_id)
                 else:
                     self.expanded_tasks.discard(task_id)
+        
+        # Update formatting buttons to reflect selected task's formatting
+        if hasattr(self, '_update_formatting_buttons'):
+            self._update_formatting_buttons()
     
     def _on_task_item_changed(self, item: QTreeWidgetItem, column: int):
         """Handle inline editing of task properties"""
@@ -625,11 +630,13 @@ class TreeViewOperationsMixin:
                 new_duration = float(new_value)
                 if task.is_milestone and new_duration > 0:
                     task.is_milestone = False
+                    task.font_italic = False  # Remove italic when converting to task
                     task.set_duration_and_update_end(new_duration, self.data_manager.settings.duration_unit, self.calendar_manager)
                     changed = True
                 elif not task.is_milestone and new_duration == 0:
                     task.is_milestone = True
                     task.end_date = task.start_date
+                    task.font_italic = True  # Add italic when converting to milestone
                     changed = True
                 elif not task.is_milestone:
                     current_duration_unit = self.data_manager.settings.duration_unit

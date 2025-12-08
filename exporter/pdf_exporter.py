@@ -369,6 +369,9 @@ class PDFExporter:
         
 
     def add_task_details(self):
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib import colors as rl_colors
+        
         self.story.append(Paragraph("Task Details", self.styles['h2']))
         self.story.append(Spacer(1, 0.1 * inch))
 
@@ -403,9 +406,11 @@ class PDFExporter:
             Paragraph("<b>Resources</b>", header_style),
             Paragraph("<b>%</b>", header_style),
             Paragraph("<b>Status</b>", header_style),
+            Paragraph("<b>Notes</b>", header_style),
         ]
         
         table_data = [headers]
+        task_bg_colors = []  # Store background colors for each task row
 
         # Helper function to flatten tasks with indentation
         def flatten_tasks(task_list, level=0):
@@ -413,8 +418,77 @@ class PDFExporter:
                 indent = "&nbsp;" * level
                 display_name = f"{indent}{task.name}"
                 
-                # Wrap task name in Paragraph
-                task_name_para = Paragraph(display_name, task_style)
+                # Map custom font families to ReportLab's built-in fonts
+                font_family = getattr(task, 'font_family', 'Arial')
+                is_bold = getattr(task, 'font_bold', False)
+                is_italic = getattr(task, 'font_italic', False)
+                is_underline = getattr(task, 'font_underline', False)
+                
+                # Map to ReportLab font names
+                font_map = {
+                    'Arial': 'Helvetica',
+                    'Helvetica': 'Helvetica',
+                    'Times New Roman': 'Times-Roman',
+                    'Times': 'Times-Roman',
+                    'Courier New': 'Courier',
+                    'Courier': 'Courier'
+                }
+                
+                base_font = font_map.get(font_family, 'Helvetica')
+                
+                # Construct font name with bold/italic modifiers
+                if is_bold and is_italic:
+                    if base_font == 'Helvetica':
+                        font_name = 'Helvetica-BoldOblique'
+                    elif base_font == 'Times-Roman':
+                        font_name = 'Times-BoldItalic'
+                    elif base_font == 'Courier':
+                        font_name = 'Courier-BoldOblique'
+                    else:
+                        font_name = 'Helvetica-BoldOblique'
+                elif is_bold:
+                    if base_font == 'Helvetica':
+                        font_name = 'Helvetica-Bold'
+                    elif base_font == 'Times-Roman':
+                        font_name = 'Times-Bold'
+                    elif base_font == 'Courier':
+                        font_name = 'Courier-Bold'
+                    else:
+                        font_name = 'Helvetica-Bold'
+                elif is_italic:
+                    if base_font == 'Helvetica':
+                        font_name = 'Helvetica-Oblique'
+                    elif base_font == 'Times-Roman':
+                        font_name = 'Times-Italic'
+                    elif base_font == 'Courier':
+                        font_name = 'Courier-Oblique'
+                    else:
+                        font_name = 'Helvetica-Oblique'
+                else:
+                    font_name = base_font
+                
+                # Create custom style for this specific task based on its font properties
+                custom_task_style = ParagraphStyle(
+                    f'task_style_{task.id}',
+                    parent=task_style,
+                    fontName=font_name,
+                    fontSize=constants.PDF_TABLE_FONT_SIZE,  # Always use consistent font size
+                    textColor=rl_colors.HexColor(getattr(task, 'font_color', '#000000')),
+                    alignment=TA_LEFT
+                )
+                
+                # Apply underline using HTML tag if needed
+                if is_underline:
+                    formatted_display_name = f"<u>{display_name}</u>"
+                else:
+                    formatted_display_name = display_name
+                
+                # Wrap task name in Paragraph with custom style
+                task_name_para = Paragraph(formatted_display_name, custom_task_style)
+                
+                # Store background color for this task
+                bg_color = getattr(task, 'background_color', '#FFFFFF')
+                task_bg_colors.append(bg_color)
                 
                 # Format duration
                 duration = task.get_duration(
@@ -439,6 +513,10 @@ class PDFExporter:
                 
                 # Status
                 status_text = task.get_status_text()
+                
+                # Format notes with word wrapping
+                notes_text = task.notes if task.notes else "-"
+                notes_para = Paragraph(notes_text, task_style)
 
                 table_data.append([
                     str(task.id),
@@ -450,7 +528,8 @@ class PDFExporter:
                     dependencies,
                     resources,
                     f"{task.percent_complete}%",
-                    status_text
+                    status_text,
+                    notes_para
                 ])
                 
                 children = self.project_data.get_child_tasks(task.id)
@@ -476,20 +555,21 @@ class PDFExporter:
         # Calculate total fixed width
         fixed_width = id_width + wbs_width + duration_width + start_date_width + end_date_width + percent_width + status_width
         
-        # Remaining width for flexible columns (Task Name, Dependencies, Resources)
+        # Remaining width for flexible columns (Task Name, Dependencies, Resources, Notes)
         remaining_width = usable_width - fixed_width
         
         col_widths = [
             id_width,                       # ID
             wbs_width,                      # WBS
-            remaining_width * 0.35,         # Task Name (35% of remaining)
+            remaining_width * 0.25,         # Task Name (25% of remaining)
             duration_width,                 # Duration
             start_date_width,               # Start Date
             end_date_width,                 # End Date
-            remaining_width * 0.35,         # Dependencies (35% of remaining)
-            remaining_width * 0.3,          # Resources (30% of remaining)
+            remaining_width * 0.25,         # Dependencies (25% of remaining)
+            remaining_width * 0.2,          # Resources (20% of remaining)
             percent_width,                  # % Complete
             status_width,                   # Status
+            remaining_width * 0.3,          # Notes (30% of remaining)
         ]
         
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -511,10 +591,22 @@ class PDFExporter:
         style.add('ALIGN', (2, 1), (2, -1), 'LEFT')   # Task Name
         style.add('ALIGN', (6, 1), (6, -1), 'LEFT')   # Predecessor
         style.add('ALIGN', (7, 1), (7, -1), 'LEFT')   # Resource
+        style.add('ALIGN', (10, 1), (10, -1), 'LEFT')  # Notes
+        style.add('VALIGN', (10, 1), (10, -1), 'TOP')  # Notes align to top for better readability
         
         # Row backgrounds - alternating colors
         style.add('ROWBACKGROUNDS', (0, 1), (-1, -1), 
                  [constants.PDF_TABLE_BODY_BG_COLOR_ODD, constants.PDF_TABLE_BODY_BG_COLOR_EVEN])
+        
+        # Apply custom background colors to task name cells
+        for idx, bg_color in enumerate(task_bg_colors):
+            if bg_color and bg_color != '#FFFFFF':  # Only apply if not default white
+                row_idx = idx + 1  # +1 because row 0 is the header
+                try:
+                    hex_color = rl_colors.HexColor(bg_color)
+                    style.add('BACKGROUND', (2, row_idx), (2, row_idx), hex_color)
+                except:
+                    pass  # Skip if color is invalid
         
         table.setStyle(style)
         

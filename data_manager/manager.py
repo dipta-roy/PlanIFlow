@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any, Tuple
 from settings_manager.settings_manager import ProjectSettings, DurationUnit
 from data_manager.models import Task, Resource, DependencyType, TaskStatus, ScheduleType
+from data_manager.baseline import Baseline, TaskSnapshot
 
 class DataManager:
     """Manages all project data with hierarchy and dependency support"""
@@ -12,6 +13,7 @@ class DataManager:
         self.calendar_manager = calendar_manager
         self.project_name: str = "Untitled Project"
         self.settings = ProjectSettings()
+        self.baselines: List[Baseline] = []  # Maximum 3 baselines
     
     # Task CRUD Operations
     
@@ -47,8 +49,10 @@ class DataManager:
             parent = self.get_task(parent_id)
             if not parent:
                 return False
-            # Mark parent as summary task
-            parent.is_summary = True
+            # Mark parent as summary task and make it bold
+            if not parent.is_summary:  # Only update if not already a summary
+                parent.is_summary = True
+                parent.font_bold = True  # Auto-apply bold formatting
         
         # Validate predecessors
         if not self._validate_predecessors(task):
@@ -145,6 +149,7 @@ class DataManager:
                 children_remaining = self.get_child_tasks(task.parent_id)
                 if not children_remaining:
                     parent.is_summary = False
+                    parent.font_bold = False  # Remove bold formatting
                 else:
                     self._update_summary_task_dates(task.parent_id)
         
@@ -205,6 +210,7 @@ class DataManager:
                 remaining_children = self.get_child_tasks(old_parent_id)
                 if not remaining_children:
                     old_parent.is_summary = False
+                    old_parent.font_bold = False  # Remove bold formatting
                 else:
                     self._update_summary_task_dates(old_parent_id)
         
@@ -212,7 +218,9 @@ class DataManager:
         if new_parent_id is not None:
             new_parent = self.get_task(new_parent_id)
             if new_parent:
-                new_parent.is_summary = True
+                if not new_parent.is_summary:  # Only update if not already a summary
+                    new_parent.is_summary = True
+                    new_parent.font_bold = True  # Auto-apply bold formatting
                 self._update_summary_task_dates(new_parent_id)
         
         return True
@@ -332,11 +340,28 @@ class DataManager:
             if dep_type == DependencyType.FS:
                 # Finish-to-Start: task starts after predecessor ends
                 if self.calendar_manager:
-                    if lag_days >= 0:
-                        constraint_start = self.calendar_manager.add_working_days(predecessor.end_date, lag_days + 1)
+                    # Milestones start immediately after predecessor ends (plus lag)
+                    if task.is_milestone:
+                        if lag_days >= 0:
+                            constraint_start = self.calendar_manager.add_working_days(predecessor.end_date, lag_days)
+                        else:
+                            constraint_start = self.calendar_manager.subtract_working_days(predecessor.end_date, abs(lag_days))
+                    # For regular tasks
                     else:
-                        # For negative lag (lead), subtract working days from predecessor's end date
-                        constraint_start = self.calendar_manager.subtract_working_days(predecessor.end_date, abs(lag_days) - 1)
+                        start_from = predecessor.end_date
+                        days_to_add = lag_days
+
+                        # If predecessor is not a milestone, or if it ends late, we move to the next day
+                        # A bit of a simplification: assume "late" is after 4 PM (16:00)
+                        if not predecessor.is_milestone or start_from.hour >= 16:
+                            days_to_add += 1
+                        
+                        constraint_start = self.calendar_manager.add_working_days(start_from, days_to_add)
+                        
+                        # If we moved to a new day, snap to 8 AM
+                        if days_to_add > lag_days:
+                           constraint_start = constraint_start.replace(hour=8, minute=0, second=0, microsecond=0)
+
                 else:
                     constraint_start = predecessor.end_date + timedelta(days=1) + lag
 
@@ -368,8 +393,24 @@ class DataManager:
         if latest_start is not None:
             task.start_date = latest_start
             if latest_end is None: # Only update end_date if not constrained by FF/SF
-                if self.calendar_manager:
-                    task.end_date = self.calendar_manager.add_working_days(task.start_date, original_duration_days - 1)
+                if task.is_milestone:
+                    task.end_date = task.start_date
+                elif self.calendar_manager:
+                    # To calculate the end date, we find the target end day and then set the time.
+                    days_to_add = original_duration_days - 1
+                    if days_to_add < 0: days_to_add = 0
+                    
+                    end_day = self.calendar_manager.add_working_days(task.start_date, days_to_add)
+
+                    # The end time should correspond to the end of the work day.
+                    end_time_on_day = task.start_date + timedelta(hours=self.calendar_manager.hours_per_day)
+
+                    task.end_date = end_day.replace(
+                        hour=end_time_on_day.hour, 
+                        minute=end_time_on_day.minute, 
+                        second=end_time_on_day.second,
+                        microsecond=end_time_on_day.microsecond
+                    )
                 else:
                     task.end_date = task.start_date + timedelta(days=original_duration_days - 1)
 
@@ -521,8 +562,8 @@ class DataManager:
             }
         
         for task in self.tasks:
-            # Skip summary tasks
-            if task.is_summary:
+            # Skip summary tasks and milestones
+            if task.is_summary or task.is_milestone:
                 continue
             
             for resource_name, allocation_percent in task.assigned_resources:
@@ -553,8 +594,8 @@ class DataManager:
         resource_daily_hours = {}
         
         for task in self.tasks:
-            # Skip summary tasks
-            if task.is_summary:
+            # Skip summary tasks and milestones
+            if task.is_summary or task.is_milestone:
                 continue
             
             current_date = task.start_date
@@ -616,20 +657,22 @@ class DataManager:
         """Clear all data"""
         self.tasks.clear()
         self.resources.clear()
+        self.baselines.clear()
         self.project_name = "Untitled Project"
         Task._next_id = 1
     
-    def bulk_indent_tasks(self, task_ids: List[int]) -> bool:
-        """Indent multiple tasks at once"""
+    def bulk_indent_tasks(self, task_ids: List[int]) -> set:
+        """Indent multiple tasks at once. Returns set of new parent IDs."""
         # Sort tasks by their current position
         tasks = [self.get_task(tid) for tid in task_ids if self.get_task(tid)]
         if not tasks:
-            return False
+            return set()
         
         # Sort by ID to maintain order
         tasks.sort(key=lambda t: t.id)
         
-        success_count = 0
+        affected_parents = set()
+        
         for task in tasks:
             # Find previous sibling
             siblings = [t for t in self.get_all_tasks() 
@@ -642,9 +685,9 @@ class DataManager:
                 
                 # Try to move under previous task
                 if self.move_task(task.id, previous_task.id):
-                    success_count += 1
+                    affected_parents.add(previous_task.id)
         
-        return success_count > 0
+        return affected_parents
     
     def bulk_outdent_tasks(self, task_ids: List[int]) -> bool:
         """Outdent multiple tasks at once"""
@@ -684,6 +727,7 @@ class DataManager:
             'project_name': self.project_name,
             'tasks': [task.to_dict(date_format=self.settings.default_date_format) for task in self.tasks],
             'resources': [resource.to_dict() for resource in self.resources], # Include resources
+            'baselines': [baseline.to_dict(date_format=self.settings.default_date_format) for baseline in self.baselines], # Include baselines
         }
     
     def load_from_dict(self, data: Dict[str, Any]):
@@ -730,6 +774,12 @@ class DataManager:
         for task in self.get_top_level_tasks():
             if task.is_summary:
                 self._update_summary_task_dates(task.id)
+        
+        # Load baselines (with backward compatibility)
+        self.baselines.clear()
+        loaded_baselines_data = data.get('baselines')
+        if loaded_baselines_data is not None:
+            self.baselines = [Baseline.from_dict(b, date_format=self.settings.default_date_format) for b in loaded_baselines_data]
     
     def insert_task_at_position(self, task: Task, insert_after_id: int = None) -> bool:
         """
@@ -1082,7 +1132,7 @@ class DataManager:
             resource_costs_in_period = {res.name: 0.0 for res in self.resources}
 
             for task in self.tasks:
-                if task.is_summary: # Skip summary tasks
+                if task.is_summary or task.is_milestone: # Skip summary tasks and milestones
                     continue
 
                 # Determine overlap between task and current period
@@ -1112,3 +1162,230 @@ class DataManager:
             rows.append(row_data)
         
         return {'headers': column_headers, 'rows': rows}
+    
+    # Baseline Management
+    
+    def create_baseline(self, name: str) -> bool:
+        """
+        Create a new baseline from current project state
+        
+        Args:
+            name: Name for the baseline
+            
+        Returns:
+            True if successful, False if limit reached or name exists
+        """
+        # Check if we've reached the maximum of 3 baselines
+        if len(self.baselines) >= 3:
+            return False
+        
+        # Check if baseline name already exists
+        if any(b.name == name for b in self.baselines):
+            return False
+        
+        # Check if there are tasks to baseline
+        if not self.tasks:
+            return False
+        
+        # Create new baseline
+        baseline = Baseline(name=name, created_date=datetime.now())
+        
+        # Capture snapshots of all tasks
+        for task in self.tasks:
+            duration = task.get_duration(self.settings.duration_unit, self.calendar_manager)
+            snapshot = TaskSnapshot(
+                task_id=task.id,
+                task_name=task.name,
+                start_date=task.start_date,
+                end_date=task.end_date,
+                duration=duration,
+                percent_complete=task.percent_complete,
+                wbs=task.wbs
+            )
+            baseline.add_task_snapshot(snapshot)
+        
+        self.baselines.append(baseline)
+        return True
+    
+    def delete_baseline(self, name: str) -> bool:
+        """
+        Delete a baseline by name
+        
+        Args:
+            name: Name of the baseline to delete
+            
+        Returns:
+            True if successful, False if not found
+        """
+        initial_count = len(self.baselines)
+        self.baselines = [b for b in self.baselines if b.name != name]
+        return len(self.baselines) < initial_count
+    
+    def get_baseline(self, name: str) -> Optional[Baseline]:
+        """
+        Get a baseline by name
+        
+        Args:
+            name: Name of the baseline
+            
+        Returns:
+            Baseline object or None if not found
+        """
+        for baseline in self.baselines:
+            if baseline.name == name:
+                return baseline
+        return None
+    
+    def get_all_baselines(self) -> List[Baseline]:
+        """Get all baselines"""
+        return self.baselines.copy()
+    
+    def rename_baseline(self, old_name: str, new_name: str) -> bool:
+        """
+        Rename a baseline
+        
+        Args:
+            old_name: Current name of the baseline
+            new_name: New name for the baseline
+            
+        Returns:
+            True if successful, False if baseline not found or new name exists
+        """
+        # Check if new name already exists
+        if any(b.name == new_name for b in self.baselines):
+            return False
+        
+        baseline = self.get_baseline(old_name)
+        if not baseline:
+            return False
+        
+        baseline.name = new_name
+        return True
+    
+    def get_baseline_comparison(self, baseline_name: str) -> Dict[str, Any]:
+        """
+        Compare current project state against a baseline
+        
+        Args:
+            baseline_name: Name of the baseline to compare against
+            
+        Returns:
+            Dictionary containing comparison data with variances
+        """
+        baseline = self.get_baseline(baseline_name)
+        if not baseline:
+            return {}
+        
+        comparisons = []
+        
+        for task in self.tasks:
+            snapshot = baseline.get_task_snapshot(task.id)
+            
+            # Calculate current duration
+            current_duration = task.get_duration(self.settings.duration_unit, self.calendar_manager)
+            
+            if snapshot:
+                # Task exists in baseline - calculate variances
+                start_variance_days = (task.start_date - snapshot.start_date).days
+                end_variance_days = (task.end_date - snapshot.end_date).days
+                duration_variance = current_duration - snapshot.duration
+                completion_variance = task.percent_complete - snapshot.percent_complete
+                
+                comparisons.append({
+                    'task_id': task.id,
+                    'task_name': task.name,
+                    'wbs': task.wbs,
+                    'is_summary': task.is_summary,
+                    # Current values
+                    'current_start': task.start_date,
+                    'current_end': task.end_date,
+                    'current_duration': current_duration,
+                    'current_complete': task.percent_complete,
+                    # Baseline values
+                    'baseline_start': snapshot.start_date,
+                    'baseline_end': snapshot.end_date,
+                    'baseline_duration': snapshot.duration,
+                    'baseline_complete': snapshot.percent_complete,
+                    # Variances
+                    'start_variance_days': start_variance_days,
+                    'end_variance_days': end_variance_days,
+                    'duration_variance': duration_variance,
+                    'completion_variance': completion_variance,
+                    # Status indicators
+                    'start_status': 'late' if start_variance_days > 0 else ('early' if start_variance_days < 0 else 'on-track'),
+                    'end_status': 'late' if end_variance_days > 0 else ('early' if end_variance_days < 0 else 'on-track'),
+                    'duration_status': 'over' if duration_variance > 0 else ('under' if duration_variance < 0 else 'on-track'),
+                })
+            else:
+                # Task added after baseline
+                comparisons.append({
+                    'task_id': task.id,
+                    'task_name': task.name,
+                    'wbs': task.wbs,
+                    'is_summary': task.is_summary,
+                    'current_start': task.start_date,
+                    'current_end': task.end_date,
+                    'current_duration': current_duration,
+                    'current_complete': task.percent_complete,
+                    'baseline_start': None,
+                    'baseline_end': None,
+                    'baseline_duration': None,
+                    'baseline_complete': None,
+                    'start_variance_days': None,
+                    'end_variance_days': None,
+                    'duration_variance': None,
+                    'completion_variance': None,
+                    'start_status': 'new',
+                    'end_status': 'new',
+                    'duration_status': 'new',
+                })
+        
+        # Check for deleted tasks (in baseline but not in current)
+        for task_id, snapshot in baseline.get_all_snapshots().items():
+            if not self.get_task(task_id):
+                comparisons.append({
+                    'task_id': task_id,
+                    'task_name': snapshot.task_name + " (Deleted)",
+                    'wbs': snapshot.wbs,
+                    'is_summary': False,
+                    'current_start': None,
+                    'current_end': None,
+                    'current_duration': None,
+                    'current_complete': None,
+                    'baseline_start': snapshot.start_date,
+                    'baseline_end': snapshot.end_date,
+                    'baseline_duration': snapshot.duration,
+                    'baseline_complete': snapshot.percent_complete,
+                    'start_variance_days': None,
+                    'end_variance_days': None,
+                    'duration_variance': None,
+                    'completion_variance': None,
+                    'start_status': 'deleted',
+                    'end_status': 'deleted',
+                    'duration_status': 'deleted',
+                })
+        
+        # Sort comparisons by task ID
+        comparisons.sort(key=lambda x: x['task_id'])
+        
+        # Calculate summary statistics
+        active_comparisons = [c for c in comparisons if c['start_status'] not in ['new', 'deleted']]
+        
+        summary = {
+            'total_tasks': len(comparisons),
+            'tasks_on_track': sum(1 for c in active_comparisons if c['end_status'] == 'on-track'),
+            'tasks_late': sum(1 for c in active_comparisons if c['end_status'] == 'late'),
+            'tasks_early': sum(1 for c in active_comparisons if c['end_status'] == 'early'),
+            'tasks_new': sum(1 for c in comparisons if c['start_status'] == 'new'),
+            'tasks_deleted': sum(1 for c in comparisons if c['start_status'] == 'deleted'),
+            'avg_duration_variance': sum(c['duration_variance'] for c in active_comparisons if c['duration_variance'] is not None) / len(active_comparisons) if active_comparisons else 0,
+            'avg_completion_variance': sum(c['completion_variance'] for c in active_comparisons if c['completion_variance'] is not None) / len(active_comparisons) if active_comparisons else 0,
+        }
+        
+        return {
+            'baseline_name': baseline_name,
+            'baseline_date': baseline.created_date,
+            'comparisons': comparisons,
+            'summary': summary
+        }
+

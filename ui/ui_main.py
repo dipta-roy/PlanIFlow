@@ -38,17 +38,20 @@ from ui.ui_resource_dialog import ResourceDialog
 from ui.ui_calendar_settings_dialog import CalendarSettingsDialog
 from ui.ui_duration_unit_dialog import DurationUnitDialog
 from ui.ui_tasks import create_task_tree
+from ui.ui_baseline_comparison import BaselineComparisonTab
 
 # Mixins
 from ui.ui_file_manager import FileOperationsMixin
 from ui.ui_task_manager import TaskOperationsMixin
 from ui.ui_view_manager import GeneralViewOperationsMixin
 from ui.ui_tree_view_manager import TreeViewOperationsMixin
+from ui.ui_formatting import FormattingMixin
+from ui.ui_baseline_manager import BaselineOperationsMixin
 
 # Constants for ColorDelegate
 from constants.constants import CIRCLE_SIZE, LEFT_PADDING, TEXT_SHIFT, STATUS_ALL, STATUS_OVERDUE, STATUS_IN_PROGRESS, STATUS_UPCOMING, STATUS_COMPLETED, APP_NAME
 
-class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralViewOperationsMixin, TreeViewOperationsMixin):
+class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralViewOperationsMixin, TreeViewOperationsMixin, FormattingMixin, BaselineOperationsMixin):
     """Main application window with enhanced features"""
     
     def __init__(self):
@@ -199,6 +202,10 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         self.dashboard = self._create_dashboard()
         self.tabs.addTab(self.dashboard, "📈 Dashboard")
         
+        # Baseline Comparison Tab
+        self.baseline_comparison = self._create_baseline_comparison()
+        self.tabs.addTab(self.baseline_comparison, "📐 Baseline Comparison")
+        
         layout.addWidget(self.tabs)
     
     def _create_task_tree(self):
@@ -212,6 +219,10 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
     def _create_dashboard(self):
         self.dashboard = create_dashboard(self)
         return self.dashboard
+    
+    def _create_baseline_comparison(self):
+        self.baseline_comparison = BaselineComparisonTab(self.data_manager, self)
+        return self.baseline_comparison
 
     def _create_status_bar(self):
         """Create status bar"""

@@ -20,6 +20,20 @@ class ResourceSheet(QWidget):
             "Resource Name", "Max Hours/Day", "Total Hours", 
             "Tasks Assigned", "Billing Rate ($/hr)", "Total Amount ($)", "Exceptions", "Status"
         ])
+        # Add tooltips to headers
+        header = self.resource_table.horizontalHeader()
+        tooltips = [
+            "The name of the resource.",
+            "The maximum number of hours the resource can work per day.",
+            "The total hours assigned to the resource across all tasks.",
+            "The number of tasks assigned to the resource.",
+            "The billing rate for the resource in dollars per hour.",
+            "The total cost for the resource (Total Hours * Billing Rate).",
+            "Dates or date ranges when the resource is unavailable.",
+            "The allocation status of the resource (e.g., OK, Over-allocated)."
+        ]
+        for i in range(len(tooltips)):
+            self.resource_table.horizontalHeaderItem(i).setToolTip(tooltips[i])
         self.resource_table.setAlternatingRowColors(True)
         self.resource_table.horizontalHeader().setStretchLastSection(True)
         self.resource_table.doubleClicked.connect(self._edit_resource_dialog)

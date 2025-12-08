@@ -29,6 +29,10 @@ class GeneralViewOperationsMixin:
         self.project_name_label.setText(self.data_manager.project_name)
         if hasattr(self, 'dashboard_project_name'):
             self.dashboard_project_name.setText(f"<h2>{self.data_manager.project_name}</h2>")
+        
+        # Refresh baseline comparison if it exists
+        if hasattr(self, 'baseline_comparison'):
+            self.baseline_comparison.refresh_baselines()
     
     def _update_gantt_chart(self):
         """Update Gantt chart"""
@@ -180,16 +184,6 @@ class GeneralViewOperationsMixin:
             f"<p>App Version: {VERSION}</p>"
             f"<p>Developed by: <b>{AUTHOR}</b></p>" 
             f"<p>{ABOUT_TEXT}</p>"
-            "<p><b>Key Features:</b></p>"
-            "<ul>"
-            "<li>Manage Tasks</li>"
-            "<li>Manage Task Dependencies</li>"
-            "<li>Estimate and Plan Project Timeline</li>"
-            "<li>Track Project Status</li>"
-            "<li>Visualize Project Timeline</li>"
-            "<li>Resource Management</li>"
-            "<li>Budget Management</li>"
-            "</ul>"
         )
         
         about_box.exec()

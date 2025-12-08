@@ -9,7 +9,7 @@ import json
 from typing import Dict, Any, Tuple
 from datetime import datetime
 from data_manager.manager import DataManager
-from data_manager.models import Task, Resource, DependencyType
+from data_manager.models import Task, Resource, DependencyType, ScheduleType
 from settings_manager.settings_manager import DurationUnit
 from calendar_manager.calendar_manager import CalendarManager
 from settings_manager.settings_manager import DateFormat
@@ -65,6 +65,7 @@ class Exporter:
                     'WBS': task.wbs,
                     'Task Name': display_name,
                     'Type': 'Milestone' if task.is_milestone else ('Summary' if task.is_summary else 'Task'),  # *** ADD TYPE COLUMN ***
+                    'Schedule Mode': task.schedule_type.value,
                     'Level': level,
                     'Parent ID': task.parent_id if task.parent_id else '',
                     'Is Summary': 'Yes' if task.is_summary else 'No',
@@ -77,7 +78,15 @@ class Exporter:
                     'Status Color': status_color,
                     'Predecessors': pred_text,
                     'Assigned Resources': ', '.join([f"{name} ({alloc}%)" for name, alloc in task.assigned_resources]),
-                    'Notes': task.notes
+                    'Notes': task.notes,
+                    # Font styling properties
+                    'Font Family': getattr(task, 'font_family', 'Arial'),
+                    'Font Size': getattr(task, 'font_size', 10),
+                    'Font Color': getattr(task, 'font_color', '#000000'),
+                    'Background Color': getattr(task, 'background_color', '#FFFFFF'),
+                    'Font Bold': 'Yes' if getattr(task, 'font_bold', False) else 'No',
+                    'Font Italic': 'Yes' if getattr(task, 'font_italic', False) else 'No',
+                    'Font Underline': 'Yes' if getattr(task, 'font_underline', False) else 'No'
                 })
                 
                 # Add children
@@ -189,11 +198,14 @@ class Exporter:
                         max_length = max(len(str(cell.value)) for cell in col)
                         task_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
                     
-                    # Apply color coding to status column
-                    from openpyxl.styles import PatternFill
+                    # Apply color coding to status column and font styling to Task Name
+                    from openpyxl.styles import PatternFill, Font
                     
                     status_col_idx = df_tasks.columns.get_loc('Status Color') + 1
+                    task_name_col_idx = df_tasks.columns.get_loc('Task Name') + 1
+                    
                     for row_idx, row in df_tasks.iterrows():
+                        # Apply status color to entire row
                         cell = task_sheet.cell(row=row_idx + 2, column=status_col_idx)
                         color_name = row['Status Color']
                         
@@ -211,6 +223,36 @@ class Exporter:
                             # Apply to entire row
                             for col in range(1, len(df_tasks.columns) + 1):
                                 task_sheet.cell(row=row_idx + 2, column=col).fill = fill
+                        
+                        # Apply font styling to Task Name cell
+                        task_name_cell = task_sheet.cell(row=row_idx + 2, column=task_name_col_idx)
+                        
+                        # Get font styling from row data
+                        font_family = row.get('Font Family', 'Arial')
+                        font_size = row.get('Font Size', 10)
+                        font_color_hex = row.get('Font Color', '#000000').lstrip('#')
+                        bg_color_hex = row.get('Background Color', '#FFFFFF').lstrip('#')
+                        is_bold = row.get('Font Bold', 'No') == 'Yes'
+                        is_italic = row.get('Font Italic', 'No') == 'Yes'
+                        is_underline = row.get('Font Underline', 'No') == 'Yes'
+                        
+                        # Create and apply font
+                        cell_font = Font(
+                            name=font_family,
+                            size=font_size,
+                            bold=is_bold,
+                            italic=is_italic,
+                            underline='single' if is_underline else None,
+                            color=font_color_hex
+                        )
+                        task_name_cell.font = cell_font
+                        
+                        # Apply background color (override status color for this cell)
+                        if bg_color_hex != 'FFFFFF':  # Only apply if not default white
+                            bg_fill = PatternFill(start_color=bg_color_hex,
+                                                 end_color=bg_color_hex,
+                                                 fill_type='solid')
+                            task_name_cell.fill = bg_fill
                 
                 # Write resources
                 if resources_data:
@@ -237,6 +279,50 @@ class Exporter:
                 for col in df_deps.columns:
                         max_length = max(len(str(cell.value)) for cell in col)
                         df_deps.column_dimensions[col[0].column_letter].width = max_length + 2
+                
+                # Write baselines
+                baselines = data_manager.get_all_baselines()
+                if baselines:
+                    for baseline in baselines:
+                        baseline_data = []
+                        for task_id, snapshot in baseline.get_all_snapshots().items():
+                            baseline_data.append({
+                                'Task ID': snapshot.task_id,
+                                'Task Name': snapshot.task_name,
+                                'WBS': snapshot.wbs,
+                                'Start Date': snapshot.start_date.strftime(date_format_str),
+                                'End Date': snapshot.end_date.strftime(date_format_str),
+                                'Duration': snapshot.duration,
+                                '% Complete': snapshot.percent_complete
+                            })
+                        
+                        if baseline_data:
+                            df_baseline = pd.DataFrame(baseline_data)
+                            # Sanitize sheet name (Excel has 31 char limit and no special chars)
+                            sheet_name = f"BL_{baseline.name[:25]}"  # Prefix with BL_ and limit length
+                            df_baseline.to_excel(writer, sheet_name=sheet_name, index=False)
+                            
+                            baseline_sheet = writer.sheets[sheet_name]
+                            for col in baseline_sheet.columns:
+                                max_length = max(len(str(cell.value)) for cell in col)
+                                baseline_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
+                    
+                    # Write baseline metadata sheet
+                    baseline_meta_data = []
+                    for baseline in baselines:
+                        baseline_meta_data.append({
+                            'Baseline Name': baseline.name,
+                            'Created Date': baseline.created_date.strftime(date_format_str),
+                            'Tasks Captured': len(baseline.get_all_snapshots())
+                        })
+                    
+                    df_baseline_meta = pd.DataFrame(baseline_meta_data)
+                    df_baseline_meta.to_excel(writer, sheet_name='Baselines', index=False)
+                    
+                    baseline_meta_sheet = writer.sheets['Baselines']
+                    for col in baseline_meta_sheet.columns:
+                        max_length = max(len(str(cell.value)) for cell in col)
+                        baseline_meta_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
             
             return True
             
@@ -394,7 +480,16 @@ class Exporter:
                     parent_id=parent_id,
                     is_summary=is_summary,
                     is_milestone=is_milestone,
-                    wbs=row.get('WBS')
+                    wbs=row.get('WBS'),
+                    schedule_type=ScheduleType(str(row.get('Schedule Mode', 'Auto Scheduled'))) if str(row.get('Schedule Mode', 'Auto Scheduled')) in [item.value for item in ScheduleType] else ScheduleType.AUTO_SCHEDULED,
+                    # Font styling with backward compatibility
+                    font_family=str(row.get('Font Family', 'Arial')) if pd.notna(row.get('Font Family')) else 'Arial',
+                    font_size=int(row.get('Font Size', 10)) if pd.notna(row.get('Font Size')) else 10,
+                    font_color=str(row.get('Font Color', '#000000')) if pd.notna(row.get('Font Color')) else '#000000',
+                    background_color=str(row.get('Background Color', '#FFFFFF')) if pd.notna(row.get('Background Color')) else '#FFFFFF',
+                    font_bold=(str(row.get('Font Bold', 'No')).lower() in ['yes', 'true', '1']) if pd.notna(row.get('Font Bold')) else False,
+                    font_italic=(str(row.get('Font Italic', 'No')).lower() in ['yes', 'true', '1']) if pd.notna(row.get('Font Italic')) else False,
+                    font_underline=(str(row.get('Font Underline', 'No')).lower() in ['yes', 'true', '1']) if pd.notna(row.get('Font Underline')) else False
                 )
                 data_manager.tasks.append(task)
             
@@ -439,6 +534,52 @@ class Exporter:
                 print(f"Error importing resources from Excel: {e}")
                 import traceback
                 traceback.print_exc()
+            
+            # Import baselines (with backward compatibility)
+            try:
+                from data_manager.baseline import Baseline, TaskSnapshot
+                
+                # Try to read baseline metadata sheet
+                df_baseline_meta = pd.read_excel(filepath, sheet_name='Baselines')
+                
+                for _, meta_row in df_baseline_meta.iterrows():
+                    baseline_name = str(meta_row['Baseline Name'])
+                    created_date_str = str(meta_row['Created Date'])
+                    
+                    # Parse created date
+                    try:
+                        created_date = datetime.strptime(created_date_str, date_format_str)
+                    except:
+                        created_date = datetime.now()
+                    
+                    # Create baseline
+                    baseline = Baseline(name=baseline_name, created_date=created_date)
+                    
+                    # Read baseline task data from corresponding sheet
+                    sheet_name = f"BL_{baseline_name[:25]}"
+                    try:
+                        df_baseline_tasks = pd.read_excel(filepath, sheet_name=sheet_name)
+                        
+                        for _, task_row in df_baseline_tasks.iterrows():
+                            snapshot = TaskSnapshot(
+                                task_id=int(task_row['Task ID']),
+                                task_name=str(task_row['Task Name']),
+                                start_date=datetime.strptime(str(task_row['Start Date']), date_format_str),
+                                end_date=datetime.strptime(str(task_row['End Date']), date_format_str),
+                                duration=float(task_row['Duration']),
+                                percent_complete=int(task_row['% Complete']),
+                                wbs=str(task_row.get('WBS', ''))
+                            )
+                            baseline.add_task_snapshot(snapshot)
+                        
+                        data_manager.baselines.append(baseline)
+                    except Exception as sheet_error:
+                        print(f"Error reading baseline sheet {sheet_name}: {sheet_error}")
+                        continue
+                        
+            except Exception as e:
+                # Baselines sheet doesn't exist - backward compatibility
+                print(f"No baselines found in Excel file (backward compatibility): {e}")
             
             return data_manager, True
             

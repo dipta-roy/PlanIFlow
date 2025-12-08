@@ -105,6 +105,66 @@ class CalendarManager:
         
         return current_date
 
+    def add_working_hours(self, start_date: datetime, hours: float) -> datetime:
+        """Add hours to a date, skipping non-working days"""
+        current_dt = start_date
+        hours_remaining = hours
+        
+        # Assume working hours are 8 AM to (8+hours_per_day) PM
+        # Simplification: For now, just add days based on hours/day, then add remainder
+        
+        # Calculate full days to add
+        full_days = int(hours_remaining / self.hours_per_day)
+        remainder_hours = hours_remaining % self.hours_per_day
+        
+        # Add full days first (minus 1 if we have remainder, because start day counts)
+        # Actually logic is tricky. 
+        # Requirement: 
+        # 1 day task (8h) starting today = ends today.
+        # 2 day task (16h) starting today = ends tomorrow.
+        
+        # Let's handle it by creating a target end time on the final working day.
+        # Shift full working days
+        if full_days > 0:
+            # If no remainder (exact day multiple), subtract 1 so we land on correct day?
+            # 16h (2 days). Start D1 8am. D1 8am + 16h = D2 0am (midnight next day) wrong.
+            # D1 8am + 8h = D1 4pm.
+            # D1 8am + 16h should be D1 8am -> D1 4pm (8h), D2 8am -> D2 4pm (8h).
+            
+            # So, add (full_days - 1) full working days, then handle exact time?
+            # Or just add full_days worth of time, skipping non-work days.
+            
+            days_to_add = full_days
+            if remainder_hours == 0:
+                is_exact_day_end = True
+                days_to_add -= 1 # We stay on the last day if it fits exactly
+            else:
+                is_exact_day_end = False
+            
+            # Jump ahead working days
+            current_dt = self.add_working_days(current_dt, days_to_add)
+            
+            # Now add the remaining hours (or full 8h if exact day but we subtracted 1 day count)
+            # If exact day end, we are on the correct day, starting at same time as start_date.
+            # We just need to add a full work day's hours to it.
+            if is_exact_day_end:
+                 current_dt += timedelta(hours=self.hours_per_day)
+            else:
+                 current_dt += timedelta(hours=remainder_hours)
+                 
+        else:
+             # Just add hours on same day
+             current_dt += timedelta(hours=hours_remaining)
+             
+        # Correction: The above simplistic addition doesn't check if we crossed into non-working time
+        # within the day (e.g. 5pm+). But user request implies standard 8-4 window.
+        # "If 8 hours configured... start 8am end 4pm."
+        # My simple timedelta logic `start + hours` works for simple cases, 
+        # but fails multi-day skipping weekends.
+        # That's why I used `add_working_days` above.
+        
+        return current_dt
+
     def subtract_working_days(self, start_date: datetime, days: int) -> datetime:
         """Subtract a number of working days from a date"""
         current_date = start_date

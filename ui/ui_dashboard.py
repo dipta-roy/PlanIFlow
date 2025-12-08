@@ -138,7 +138,7 @@ def update_dashboard(main_window):
     total_effort = 0
     total_project_cost = 0
     for task in data_manager.tasks:
-        if not task.is_summary:
+        if not task.is_summary and not task.is_milestone:
             task_duration_hours = task.get_duration(data_manager.settings.duration_unit, data_manager.calendar_manager)
             
             for resource_name, allocation_percent in task.assigned_resources:
@@ -329,7 +329,7 @@ def update_cost_trend_line_chart(main_window, data_manager):
             while temp_date <= period_end:
                 daily_cost = 0.0
                 for task in data_manager.tasks:
-                    if task.is_summary:
+                    if task.is_summary or task.is_milestone:
                         continue
 
                     overlap_start = max(task.start_date, temp_date)
@@ -363,7 +363,7 @@ def update_cost_trend_line_chart(main_window, data_manager):
         while current_date <= end_date:
             daily_cost = 0.0
             for task in data_manager.tasks:
-                if task.is_summary:
+                if task.is_summary or task.is_milestone:
                     continue
 
                 overlap_start = max(task.start_date, current_date)

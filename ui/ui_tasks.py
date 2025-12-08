@@ -285,6 +285,89 @@ class ScheduleTypeDelegate(QStyledItemDelegate):
     def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
         editor.setGeometry(option.rect)
 
+class TaskNameDelegate(QStyledItemDelegate):
+    """Custom delegate for Task Name column with font styling"""
+    def __init__(self, parent=None, main_window=None):
+        super().__init__(parent)
+        self.main_window = main_window
+    
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        """Paint cell with custom font styling"""
+        # Get the tree widget item
+        tree_widget = self.parent()
+        if hasattr(tree_widget, 'itemFromIndex'):
+            item = tree_widget.itemFromIndex(index)
+        else:
+            # Fallback to default painting
+            super().paint(painter, option, index)
+            return
+        
+        if not item:
+            super().paint(painter, option, index)
+            return
+        
+        # Get task ID from column 2
+        task_id = item.data(2, Qt.ItemDataRole.UserRole)
+        if task_id is None or not self.main_window:
+            super().paint(painter, option, index)
+            return
+        
+        # Get task from data manager
+        task = self.main_window.data_manager.get_task(task_id)
+        if not task:
+            super().paint(painter, option, index)
+            return
+        
+        # Get font styling properties
+        font_family = getattr(task, 'font_family', 'Arial')
+        font_size = getattr(task, 'font_size', 10)
+        font_color = getattr(task, 'font_color', '#000000')
+        bg_color = getattr(task, 'background_color', '#FFFFFF')
+        is_bold = getattr(task, 'font_bold', False)
+        is_italic = getattr(task, 'font_italic', False)
+        is_underline = getattr(task, 'font_underline', False)
+        
+        # Validate font family and fallback to default if not available
+        from PyQt6.QtGui import QFontDatabase
+        available_families = QFontDatabase.families()
+        if font_family not in available_families:
+            # Try common fallbacks
+            fallback_fonts = ['Arial', 'Helvetica', 'Sans Serif', 'Segoe UI', 'Tahoma']
+            font_family = 'Arial'  # Default fallback
+            for fallback in fallback_fonts:
+                if fallback in available_families:
+                    font_family = fallback
+                    break
+        
+        # Draw background
+        painter.save()
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
+        else:
+            painter.fillRect(option.rect, QColor(bg_color))
+        
+        # Create and set font
+        font = QFont(font_family, font_size)
+        font.setBold(is_bold)
+        font.setItalic(is_italic)
+        font.setUnderline(is_underline)
+        painter.setFont(font)
+        
+        # Set text color
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.setPen(option.palette.highlightedText().color())
+        else:
+            painter.setPen(QColor(font_color))
+        
+        # Draw text
+        text = index.data(Qt.ItemDataRole.DisplayRole)
+        if text:
+            painter.drawText(option.rect.adjusted(5, 0, -5, 0), 
+                           Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, 
+                           text)
+        
+        painter.restore()
+
 def create_task_tree(main_window):
     """Create hierarchical task tree widget with sorting"""
     tree = QTreeWidget()
@@ -294,6 +377,25 @@ def create_task_tree(main_window):
         main_window.data_manager.settings.get_duration_label(),
         "% Complete", "Dependencies", "Resources", "Notes"
     ])
+
+    # Add tooltips to headers
+    header = tree.headerItem()
+    tooltips = [
+        "How the task is scheduled (e.g., Fixed Duration, Fixed Work)",
+        "The current status of the task (e.g., On Track, Late)",
+        "The unique identifier for the task",
+        "Work Breakdown Structure code",
+        "The name of the task",
+        "The start date of the task",
+        "The end date of the task",
+        "The duration of the task",
+        "The percentage of completion for the task",
+        "Predecessor tasks",
+        "Assigned resources",
+        "Additional notes for the task"
+    ]
+    for i, tooltip in enumerate(tooltips):
+        header.setToolTip(i, tooltip)
 
     # Configure tree
     tree.setAlternatingRowColors(True)
@@ -306,10 +408,13 @@ def create_task_tree(main_window):
 
     # Enable sorting
     tree.setSortingEnabled(False)
-    # tree.sortByColumn(1, Qt.SortOrder.AscendingOrder)
-
+    
     # Set column widths to allow interactive resizing and horizontal scrolling
     header = tree.header()
+    
+    # Set initial sort indicator to ID column (ascending)
+    header.setSortIndicator(2, Qt.SortOrder.AscendingOrder)
+    
     # First, resize all sections to their content
     for i in range(tree.columnCount()):
         header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
@@ -356,6 +461,10 @@ def create_task_tree(main_window):
     main_window.resource_delegate = ResourceDelegate(main_window, main_window.data_manager)
     tree.setItemDelegateForColumn(10, main_window.resource_delegate) # Resources (shifted from 9 to 10)
     main_window.resource_delegate.update_resource_list([r.name for r in main_window.data_manager.get_all_resources()])
+    
+    # Enable custom delegate for Task Name column (for font styling)
+    main_window.task_name_delegate = TaskNameDelegate(tree, main_window)
+    tree.setItemDelegateForColumn(4, main_window.task_name_delegate) # Task Name column
 
     # Enable inline editing (e.g., double-click or F2)
     tree.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.EditKeyPressed)

@@ -32,7 +32,10 @@ class Task:
                  assigned_resources: List[str] = None, notes: str = "",
                  task_id: int = None, parent_id: int = None, is_summary: bool = False,
                  is_milestone: bool = False, wbs: str = None,
-                 schedule_type: ScheduleType = ScheduleType.AUTO_SCHEDULED):
+                 schedule_type: ScheduleType = ScheduleType.AUTO_SCHEDULED,
+                 font_family: str = "Arial", font_size: int = 10, font_color: str = "#000000",
+                 font_bold: bool = None, font_italic: bool = None, font_underline: bool = False,
+                 background_color: str = "#FFFFFF"):
         """
         Initialize task with hierarchy support
         
@@ -85,6 +88,27 @@ class Task:
             self.assigned_resources = assigned_resources or []
         
         self.notes = notes
+        
+        # Font styling properties
+        self.font_family = font_family
+        self.font_size = font_size
+        self.font_color = font_color
+        
+        # Auto-apply formatting based on task type if not explicitly set
+        # Summary tasks should be bold by default (unless explicitly set to False)
+        if font_bold is None:
+            self.font_bold = True if is_summary else False
+        else:
+            self.font_bold = font_bold
+        
+        # Milestones should be italic by default (unless explicitly set to False)
+        if font_italic is None:
+            self.font_italic = True if is_milestone else False
+        else:
+            self.font_italic = font_italic
+            
+        self.font_underline = font_underline
+        self.background_color = background_color
         
         # Store original dates
         self._original_start = start_date
@@ -174,7 +198,14 @@ class Task:
             'is_summary': self.is_summary,
             'is_milestone': self.is_milestone,
             'wbs': self.wbs,
-            'schedule_type': self.schedule_type.value
+            'schedule_type': self.schedule_type.value,
+            'font_family': self.font_family,
+            'font_size': self.font_size,
+            'font_color': self.font_color,
+            'font_bold': self.font_bold,
+            'font_italic': self.font_italic,
+            'font_underline': self.font_underline,
+            'background_color': self.background_color
         }
     
     @staticmethod
@@ -258,7 +289,15 @@ class Task:
             is_summary=data.get('is_summary', False), # Pass is_summary from data
             is_milestone=data.get('is_milestone', False), # Pass is_milestone from data
             wbs=data.get('wbs'), # Pass wbs from data
-            schedule_type=schedule_type
+            schedule_type=schedule_type,
+            # Font styling with defaults for backward compatibility
+            font_family=data.get('font_family', 'Arial'),
+            font_size=data.get('font_size', 10),
+            font_color=data.get('font_color', '#000000'),
+            font_bold=data.get('font_bold', None),  # Use None to trigger automatic formatting
+            font_italic=data.get('font_italic', None),  # Use None to trigger automatic formatting
+            font_underline=data.get('font_underline', False),
+            background_color=data.get('background_color', '#FFFFFF')
         )
     def calculate_duration_days(self, calendar_manager=None) -> int:
         """Calculate duration in working days"""
@@ -301,20 +340,46 @@ class Task:
         
         if unit == DurationUnit.DAYS:
             if calendar_manager:
-                self.end_date = calendar_manager.add_working_days(self.start_date, int(duration) - 1)
+                start_is_working = calendar_manager.is_working_day(self.start_date)
+                
+                # A task of N days ends N-1 working days after it starts.
+                # We subtract 1 if the start day is a working day, as it counts as the first day.
+                days_to_add = int(duration) - (1 if start_is_working else 0)
+                if days_to_add < 0: days_to_add = 0 # Ensure non-negative
+                
+                end_day = calendar_manager.add_working_days(self.start_date, days_to_add)
+                
+                # The end time should correspond to the end of the work day.
+                # Assuming the workday starts at self.start_date's time and lasts for hours_per_day.
+                end_time_on_day = self.start_date + timedelta(hours=calendar_manager.hours_per_day)
+
+                self.end_date = end_day.replace(
+                    hour=end_time_on_day.hour, 
+                    minute=end_time_on_day.minute, 
+                    second=end_time_on_day.second,
+                    microsecond=end_time_on_day.microsecond
+                )
             else:
                 self.end_date = self.start_date + timedelta(days=int(duration) - 1)
         else:
             if calendar_manager:
                 hours_per_day = calendar_manager.hours_per_day
-                days_needed = duration / hours_per_day
+                days_span = int(duration / hours_per_day)
+                if duration % hours_per_day != 0:
+                    days_span += 1
+                
+                start_is_working = calendar_manager.is_working_day(self.start_date)
+                days_to_add = days_span - (1 if start_is_working else 0)
+                
                 self.end_date = calendar_manager.add_working_days(
                     self.start_date, 
-                    int(days_needed) if duration % hours_per_day == 0 else int(days_needed) + 1
+                    max(0, days_to_add)
                 )
             else:
-                days_needed = duration / 8.0
-                self.end_date = self.start_date + timedelta(days=int(days_needed))
+                days_span = int(duration / 8.0)
+                if duration % 8.0 != 0:
+                    days_span += 1
+                self.end_date = self.start_date + timedelta(days=max(0, days_span - 1))
     
     def set_duration_and_update_start(self, duration: float, unit: DurationUnit,
                                      calendar_manager=None):
@@ -326,29 +391,31 @@ class Task:
         
         if unit == DurationUnit.DAYS:
             if calendar_manager:
-                # Calculate backwards
-                temp_date = self.end_date
-                for _ in range(int(duration) - 1):
-                    temp_date -= timedelta(days=1)
-                    while not calendar_manager.is_working_day(temp_date):
-                        temp_date -= timedelta(days=1)
-                self.start_date = temp_date
+                end_is_working = calendar_manager.is_working_day(self.end_date)
+                # For backwards calculation, we want to find start such that [start, end] has duration
+                # If end is working, it counts as 1. Need to subtract (duration-1).
+                # If end is non-working, it counts as 0. Need to subtract duration.
+                # BUT subtract_working_days(date, 0) returns date.
+                days_to_sub = int(duration) - (1 if end_is_working else 0)
+                self.start_date = calendar_manager.subtract_working_days(self.end_date, max(0, days_to_sub))
             else:
                 self.start_date = self.end_date - timedelta(days=int(duration) - 1)
         else:
             if calendar_manager:
                 hours_per_day = calendar_manager.hours_per_day
-                days_needed = duration / hours_per_day
+                days_span = int(duration / hours_per_day)
+                if duration % hours_per_day != 0:
+                    days_span += 1
                 
-                temp_date = self.end_date
-                for _ in range(int(days_needed)):
-                    temp_date -= timedelta(days=1)
-                    while not calendar_manager.is_working_day(temp_date):
-                        temp_date -= timedelta(days=1)
-                self.start_date = temp_date
+                end_is_working = calendar_manager.is_working_day(self.end_date)
+                days_to_sub = days_span - (1 if end_is_working else 0)
+                
+                self.start_date = calendar_manager.subtract_working_days(self.end_date, max(0, days_to_sub))
             else:
-                days_needed = duration / 8.0
-                self.start_date = self.end_date - timedelta(days=int(days_needed))
+                days_span = int(duration / 8.0)
+                if duration % 8.0 != 0:
+                    days_span += 1
+                self.start_date = self.end_date - timedelta(days=max(0, days_span - 1))
                 
 class Resource:
     """Resource data model"""
