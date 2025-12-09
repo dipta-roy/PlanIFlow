@@ -1,12 +1,11 @@
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QGroupBox, QTextEdit, QTableWidget, QHeaderView, QTableWidgetItem, QScrollArea
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QGroupBox, QTableWidget, QHeaderView, QScrollArea, QTableWidgetItem
 from PyQt6.QtCore import Qt
 from datetime import datetime, timedelta
 from settings_manager.settings_manager import DurationUnit
 from data_manager.models import TaskStatus
 
 # Matplotlib imports
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 

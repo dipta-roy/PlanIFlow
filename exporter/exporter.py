@@ -1,18 +1,15 @@
 """
 Exporter - Handles Excel and JSON import/export
-Enhanced with hierarchy, dependency types, project name, and backward compatibility
 """
-
-import re
-import pandas as pd
 import json
-from typing import Dict, Any, Tuple
+import re
+from typing import Tuple
 from datetime import datetime
+import pandas as pd
 from data_manager.manager import DataManager
 from data_manager.models import Task, Resource, DependencyType, ScheduleType
-from settings_manager.settings_manager import DurationUnit
+from settings_manager.settings_manager import DateFormat, DurationUnit
 from calendar_manager.calendar_manager import CalendarManager
-from settings_manager.settings_manager import DateFormat
 
 class Exporter:
     """Handles data import/export operations with enhanced features"""
@@ -118,6 +115,8 @@ class Exporter:
                     'Project Name',
                     'Project Start Date',
                     'Project End Date',
+                    'Working Hours Start',
+                    'Working Hours End',
                     'Total Tasks',
                     'Summary Tasks',
                     'Work Tasks',
@@ -134,6 +133,8 @@ class Exporter:
                         if data_manager.get_project_start_date() else 'N/A',
                     data_manager.get_project_end_date().strftime(date_format_str)
                         if data_manager.get_project_end_date() else 'N/A',
+                    data_manager.calendar_manager.working_hours_start if data_manager.calendar_manager else '08:00',
+                    data_manager.calendar_manager.working_hours_end if data_manager.calendar_manager else '16:00',
                     len(data_manager.tasks),
                     sum(1 for t in data_manager.tasks if t.is_summary),
                     sum(1 for t in data_manager.tasks if not t.is_summary),
@@ -142,7 +143,7 @@ class Exporter:
                     (data_manager.get_project_end_date() - data_manager.get_project_start_date()).days + 1
                         if data_manager.get_project_start_date() and data_manager.get_project_end_date() else 'N/A',
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    '2.2',
+                    '2.3',
                     date_format_enum.value
                 ]
             }
@@ -285,7 +286,7 @@ class Exporter:
                 if baselines:
                     for baseline in baselines:
                         baseline_data = []
-                        for task_id, snapshot in baseline.get_all_snapshots().items():
+                        for snapshot in baseline.snapshots:
                             baseline_data.append({
                                 'Task ID': snapshot.task_id,
                                 'Task Name': snapshot.task_name,
@@ -313,7 +314,7 @@ class Exporter:
                         baseline_meta_data.append({
                             'Baseline Name': baseline.name,
                             'Created Date': baseline.created_date.strftime(date_format_str),
-                            'Tasks Captured': len(baseline.get_all_snapshots())
+                            'Tasks Captured': len(baseline.snapshots)
                         })
                     
                     df_baseline_meta = pd.DataFrame(baseline_meta_data)
@@ -336,6 +337,8 @@ class Exporter:
     def import_from_excel(filepath: str) -> Tuple[DataManager, bool]:
         """Import project from Excel file with backward compatibility"""
         data_manager = DataManager()
+        calendar_manager = CalendarManager()
+        data_manager.calendar_manager = calendar_manager
         date_format_enum = DateFormat.YYYY_MM_DD # Default
         
         try:
@@ -359,6 +362,26 @@ class Exporter:
                             date_format_enum = DateFormat(str(row['Value']))
                         except ValueError:
                             date_format_enum = DateFormat.YYYY_MM_DD # Fallback
+                    elif row['Metric'] == 'Working Hours Start':
+                        try:
+                            wh_start = str(row['Value'])
+                            if ':' in wh_start:
+                                calendar_manager.working_hours_start = wh_start
+                        except:
+                            pass
+                    elif row['Metric'] == 'Working Hours End':
+                        try:
+                            wh_end = str(row['Value'])
+                            if ':' in wh_end:
+                                calendar_manager.working_hours_end = wh_end
+                        except:
+                            pass
+            
+                # Recalculate hours per day based on imported times
+                calendar_manager.hours_per_day = calendar_manager._calculate_hours_from_times()
+                
+                # Set calendar manager reference immediately so it's available
+                data_manager.calendar_manager = calendar_manager
             except:
                 pass
             
@@ -537,7 +560,7 @@ class Exporter:
             
             # Import baselines (with backward compatibility)
             try:
-                from data_manager.baseline import Baseline, TaskSnapshot
+                from data_manager.models import Baseline, TaskSnapshot
                 
                 # Try to read baseline metadata sheet
                 df_baseline_meta = pd.read_excel(filepath, sheet_name='Baselines')
@@ -649,6 +672,10 @@ class Exporter:
             # Load project settings (new in v2.2)
             if 'project_settings' in data:
                 data_manager.settings.from_dict(data['project_settings'])
+
+            # Load calendar settings (new in v2.0)
+            if 'calendar_settings' in data:
+                calendar_manager.from_dict(data['calendar_settings'])
 
             # Load project data
             data_manager.load_from_dict(data.get('project_data', {}))

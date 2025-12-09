@@ -3,15 +3,12 @@ Contains task-related helper classes and a function to create the task tree widg
 This module exposes create_task_tree(main_window) -> QTreeWidget
 """
 
-from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem, QAbstractItemView, QHeaderView, QComboBox, QDateEdit, QCompleter, QStyleOptionViewItem, QWidget, QStyle
-from PyQt6.QtCore import Qt, QEvent, QModelIndex, QAbstractItemModel
-from PyQt6.QtGui import QShortcut, QKeySequence
+from PyQt6.QtWidgets import QTreeWidget, QHeaderView, QComboBox, QDateEdit, QStyleOptionViewItem, QWidget, QStyle, QAbstractItemView
+from PyQt6.QtCore import Qt, QModelIndex, QAbstractItemModel
 from PyQt6.QtGui import QColor, QBrush, QPainter, QStandardItemModel, QStandardItem
 from PyQt6.QtWidgets import QStyledItemDelegate
 from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QFont
-# Import typing for list[str] on older pythons
-from typing import List
 from settings_manager.settings_manager import DateFormat
 from data_manager.models import ScheduleType
 
@@ -341,10 +338,21 @@ class TaskNameDelegate(QStyledItemDelegate):
         
         # Draw background
         painter.save()
+        
+        # Determine background color
         if option.state & QStyle.StateFlag.State_Selected:
+            # Use default selection background
             painter.fillRect(option.rect, option.palette.highlight())
         else:
-            painter.fillRect(option.rect, QColor(bg_color))
+            # Respect task specfic background color if set to something other than white,
+            # otherwise transparent/base to let theme show through
+            if bg_color and bg_color.lower() != '#ffffff':
+                 painter.fillRect(option.rect, QColor(bg_color))
+            else:
+                 # Paint transparently to let tree background show 
+                 painter.fillRect(option.rect, Qt.BrushStyle.NoBrush) 
+                 # Or use base to be safe if transparency causes artifacts
+                 # painter.fillRect(option.rect, option.palette.base())
         
         # Create and set font
         font = QFont(font_family, font_size)
@@ -357,7 +365,14 @@ class TaskNameDelegate(QStyledItemDelegate):
         if option.state & QStyle.StateFlag.State_Selected:
             painter.setPen(option.palette.highlightedText().color())
         else:
-            painter.setPen(QColor(font_color))
+            # If color is default black/white, adapt to theme
+            # Check if font_color is strictly the default black
+            default_colors = ['#000000', '#00000000', 'black']
+            if str(font_color).lower() in default_colors:
+                 # Use theme text color (will be white in dark mode)
+                 painter.setPen(option.palette.text().color())
+            else:
+                 painter.setPen(QColor(font_color))
         
         # Draw text
         text = index.data(Qt.ItemDataRole.DisplayRole)

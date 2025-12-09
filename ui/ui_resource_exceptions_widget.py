@@ -6,14 +6,12 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                               QListWidget, QDateEdit, QLabel, QMessageBox,
                               QDialog, QRadioButton, QButtonGroup)
 from PyQt6.QtCore import QDate
-from datetime import datetime
 
 class ExceptionDialog(QDialog):
     """Dialog for adding a single day or date range exception"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Add Exception Day(s)")
         self.setModal(True)
         self.setMinimumWidth(400)
         

@@ -2,17 +2,16 @@
 Gantt Chart - Creates and updates Gantt chart visualization
 Enhanced with hierarchical tasks, dependency types, and status indicators
 """
-
+from typing import List, Optional
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
-import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional
-from data_manager.models import Task, DependencyType
+
 from data_manager.manager import DataManager
+from data_manager.models import Task, DependencyType
 import constants.constants as constants
 
 class GanttChart(FigureCanvas):
@@ -142,13 +141,27 @@ class GanttChart(FigureCanvas):
             
             task_labels.append(label)
         
+        # Calculate date range for the chart
+        if self.tasks:
+            min_date = min(task.start_date for task in self.tasks)
+            max_date = max(task.end_date for task in self.tasks)
+            total_days = (max_date - min_date).days
+        else:
+            min_date = datetime.now()
+            max_date = datetime.now() + timedelta(days=30)
+            total_days = 30
+        
+        # Draw non-working time shading in the background
+        self._draw_non_working_time(min_date, max_date)
+        
         # Plot bars
         for i, task in enumerate(display_tasks):
             y = y_pos[i]
             
             # Calculate bar dimensions
             start_num = mdates.date2num(task.start_date)
-            duration = (task.end_date - task.start_date).days + 1
+            end_num = mdates.date2num(task.end_date)
+            duration = end_num - start_num
             
             # Get status color
             status_color = self.status_colors.get(task.get_status_color(), '#9E9E9E')
@@ -158,12 +171,14 @@ class GanttChart(FigureCanvas):
                 self._draw_milestone(y, task, task.is_critical)
             elif task.is_summary:
                 start_num = mdates.date2num(task.start_date)
-                duration = (task.end_date - task.start_date).days + 1
+                end_num = mdates.date2num(task.end_date)
+                duration = end_num - start_num
                 status_color = self.status_colors.get(task.get_status_color(), '#9E9E9E')
                 self._draw_summary_task(y, start_num, duration, status_color, task, task.is_critical)
             else:
                 start_num = mdates.date2num(task.start_date)
-                duration = (task.end_date - task.start_date).days + 1
+                end_num = mdates.date2num(task.end_date)
+                duration = end_num - start_num
                 status_color = self.status_colors.get(task.get_status_color(), '#9E9E9E')
                 self._draw_regular_task(y, start_num, duration, status_color, task, task.is_critical)
             
@@ -206,15 +221,7 @@ class GanttChart(FigureCanvas):
         self.ax.set_title('Project Gantt Chart', fontsize=13, weight='bold', pad=20)
         
         # Format x-axis dates based on current_scale
-        # Determine overall project span
-        if self.tasks:
-            min_date = min(task.start_date for task in self.tasks)
-            max_date = max(task.end_date for task in self.tasks)
-            total_days = (max_date - min_date).days
-        else:
-            min_date = datetime.now()
-            max_date = datetime.now() + timedelta(days=30)
-            total_days = 30
+        # (min_date, max_date, total_days already calculated above)
 
         # Dynamic locator and formatter selection
         if self.current_scale == "Hours" and total_days < 7:
@@ -489,6 +496,110 @@ class GanttChart(FigureCanvas):
         
         # Return black for light backgrounds, white for dark
         return 'white' if luminance < 0.5 else 'black'
+    
+    def _draw_non_working_time(self, min_date: datetime, max_date: datetime):
+        """Draw shaded backgrounds for non-working time periods"""
+        if not self.data_manager or not self.data_manager.calendar_manager:
+            return
+        
+        calendar = self.data_manager.calendar_manager
+        
+        # Get the y-axis limits to cover the full chart height
+        y_min, y_max = self.ax.get_ylim()
+        
+        # Determine shading color based on theme
+        if self.dark_mode:
+            shade_color = '#1a1a1a'  # Darker shade for dark mode
+            shade_alpha = 0.5
+        else:
+            shade_color = '#e0e0e0'  # Light gray for light mode
+            shade_alpha = 0.3
+        
+        # Shade based on scale
+        if self.current_scale in ["Hours", "Days"]:
+            # Parse working hours from calendar
+            try:
+                work_start_parts = calendar.working_hours_start.split(':')
+                work_end_parts = calendar.working_hours_end.split(':')
+                work_start_hour = int(work_start_parts[0])
+                work_start_minute = int(work_start_parts[1])
+                work_end_hour = int(work_end_parts[0])
+                work_end_minute = int(work_end_parts[1])
+            except:
+                # Fallback to default 8 AM - 4 PM
+                work_start_hour, work_start_minute = 8, 0
+                work_end_hour, work_end_minute = 16, 0
+            
+            # Shade non-working days AND non-working hours
+            current_date = min_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = max_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            while current_date <= end_date:
+                # Check if this is a non-working day (weekend/holiday)
+                if not calendar.is_working_day(current_date):
+                    # Shade the entire day
+                    day_start = mdates.date2num(current_date)
+                    day_end = mdates.date2num(current_date + timedelta(days=1))
+                    
+                    self.ax.axvspan(day_start, day_end, 
+                                   facecolor=shade_color, 
+                                   alpha=shade_alpha, 
+                                   zorder=0)
+                else:
+                    # It's a working day - shade non-working hours
+                    
+                    # Shade before work starts (midnight to work start)
+                    if work_start_hour > 0 or work_start_minute > 0:
+                        day_midnight = current_date.replace(hour=0, minute=0, second=0)
+                        day_work_start = current_date.replace(hour=work_start_hour, 
+                                                             minute=work_start_minute, 
+                                                             second=0)
+                        
+                        before_work_start = mdates.date2num(day_midnight)
+                        before_work_end = mdates.date2num(day_work_start)
+                        
+                        self.ax.axvspan(before_work_start, before_work_end,
+                                       facecolor=shade_color,
+                                       alpha=shade_alpha,
+                                       zorder=0)
+                    
+                    # Shade after work ends (work end to midnight)
+                    if work_end_hour < 24 or work_end_minute < 59:
+                        day_work_end = current_date.replace(hour=work_end_hour, 
+                                                           minute=work_end_minute, 
+                                                           second=0)
+                        day_next_midnight = (current_date + timedelta(days=1)).replace(
+                            hour=0, minute=0, second=0)
+                        
+                        after_work_start = mdates.date2num(day_work_end)
+                        after_work_end = mdates.date2num(day_next_midnight)
+                        
+                        self.ax.axvspan(after_work_start, after_work_end,
+                                       facecolor=shade_color,
+                                       alpha=shade_alpha,
+                                       zorder=0)
+                
+                current_date += timedelta(days=1)
+        
+        elif self.current_scale in ["Week", "Month", "Year"]:
+            # Shade weekends (Saturday and Sunday)
+            current_date = min_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = max_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            while current_date <= end_date:
+                # Check if Saturday (5) or Sunday (6)
+                if current_date.weekday() in [5, 6]:
+                    day_start = mdates.date2num(current_date)
+                    day_end = mdates.date2num(current_date + timedelta(days=1))
+                    
+                    # Draw vertical rectangle for weekend day
+                    self.ax.axvspan(day_start, day_end, 
+                                   facecolor=shade_color, 
+                                   alpha=shade_alpha, 
+                                   zorder=0)
+                
+                current_date += timedelta(days=1)
+
     
     def _on_scroll(self, event):
         """Handle zoom on scroll"""

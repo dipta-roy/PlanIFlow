@@ -1,9 +1,11 @@
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTableWidget, QLabel, QMenu, QTextEdit, QTableWidgetItem, QMessageBox, QDialog, QHeaderView
-from PyQt6.QtGui import QAction, QBrush, QColor
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, 
+                             QHeaderView, QMessageBox, QMenu, QTextEdit, QLabel, QDialog)
+from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt
 from data_manager.models import Resource
 from ui.ui_resource_dialog import ResourceDialog
+
 
 class ResourceSheet(QWidget):
     def __init__(self, parent, data_manager):
@@ -130,11 +132,12 @@ class ResourceSheet(QWidget):
         dialog = ResourceDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             resource_data = dialog.get_resource_data()
-            
+
             resource = Resource(
                 name=resource_data['name'],
                 max_hours_per_day=resource_data['max_hours_per_day'],
-                exceptions=resource_data['exceptions']
+                exceptions=resource_data['exceptions'],
+                billing_rate=float(resource_data.get('billing_rate', 0.0))
             )
             
             if self.data_manager.add_resource(resource):

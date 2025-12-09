@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QListWidget, QListWidgetItem, QLabel, QMessageBox,
                              QInputDialog, QGroupBox, QFormLayout)
 from PyQt6.QtCore import Qt
-from datetime import datetime
+
 
 
 class BaselineDialog(QDialog):
@@ -117,7 +117,7 @@ class BaselineDialog(QDialog):
             if baseline:
                 self.name_label.setText(baseline.name)
                 self.date_label.setText(baseline.created_date.strftime('%Y-%m-%d %H:%M:%S'))
-                self.task_count_label.setText(str(len(baseline.get_all_snapshots())))
+                self.task_count_label.setText(str(len(baseline.snapshots)))
                 
                 self.rename_btn.setEnabled(True)
                 self.delete_btn.setEnabled(True)

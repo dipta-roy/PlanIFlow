@@ -1,14 +1,13 @@
-from PyQt6.QtWidgets import (QMessageBox, QDialog, QLabel, QHBoxLayout, QWidget)
-from PyQt6.QtCore import Qt, QByteArray, QBuffer, QIODevice
-from PyQt6.QtGui import QPixmap, QImage
-from settings_manager.settings_manager import DurationUnit, DateFormat
-from ui.themes import ThemeManager
-from ui.ui_dashboard import update_dashboard
-from ui.ui_calendar_settings_dialog import CalendarSettingsDialog
-from ui.ui_project_settings import ProjectSettingsDialog, DateFormatDialog
-from ui.ui_duration_unit_dialog import DurationUnitDialog
 from constants.app_images import LOGO_BASE64
 from constants.constants import APP_NAME, VERSION, AUTHOR, ABOUT_TEXT
+from PyQt6.QtWidgets import QMessageBox, QDialog, QHBoxLayout, QLabel, QWidget
+from PyQt6.QtCore import Qt, QByteArray
+from PyQt6.QtGui import QPixmap, QImage
+from ui.themes import ThemeManager
+from ui.ui_dashboard import update_dashboard
+from ui.ui_dashboard import update_dashboard
+from ui.ui_settings_dialog import SettingsDialog
+from settings_manager.settings_manager import DurationUnit
 
 class GeneralViewOperationsMixin:
     """Mixin for general view operations in MainWindow"""
@@ -120,9 +119,14 @@ class GeneralViewOperationsMixin:
 
     def _show_status_legend(self):
         """Show status indicator legend"""
-        legend = QMessageBox(self)
+        # Use QDialog instead of QMessageBox for custom sizing
+        legend = QDialog(self)
         legend.setWindowTitle("Legends")
-        legend.setText(
+        legend.setMinimumWidth(500)
+        
+        layout = QHBoxLayout(legend)
+        label = QLabel()
+        label.setText(
             "<h3>Task Status Indicators</h3>"
             "<p><b style='color: red;'>🔴 Overdue:</b> End date passed and not 100% complete</p>"
             "<p><b style='color: green;'>🟢 In Progress:</b> Started but not yet finished</p>"
@@ -134,6 +138,9 @@ class GeneralViewOperationsMixin:
             "<p><b>FF (Finish-to-Finish):</b> Task B finishes when Task A finishes</p>"
             "<p><b>SF (Start-to-Finish):</b> Task B finishes when Task A starts</p>"
         )
+        label.setWordWrap(True)
+        layout.addWidget(label)
+        
         legend.exec()
     
     def _show_about(self):
@@ -188,61 +195,30 @@ class GeneralViewOperationsMixin:
         
         about_box.exec()
 
-    def _show_duration_unit_settings(self):
-        """Show duration unit settings dialog"""
-        dialog = DurationUnitDialog(self, self.data_manager.settings)
+    def _show_settings_dialog(self, tab_index=0):
+        """Show unified settings dialog"""
+        dialog = SettingsDialog(self, self.data_manager)
+        dialog.tabs.setCurrentIndex(tab_index)
+        
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            new_unit = dialog.get_selected_unit()
-            old_unit = self.data_manager.settings.duration_unit
-            
-            if new_unit != old_unit:
-                # Confirm change if there are tasks
-                if self.data_manager.tasks:
-                    reply = QMessageBox.question(
-                        self, 
-                        "Change Duration Unit",
-                                f"Change duration unit from {old_unit.value} to {new_unit.value}?\n\n"
-                                "Task durations will be recalculated based on the new unit.\n"
-                                "This will update the display but preserve actual start/end dates.",
-                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                    if reply != QMessageBox.StandardButton.Yes:
-                        return
-                        
-                # Update setting (will trigger listener)
-                self.data_manager.settings.set_duration_unit(new_unit)
-                self.status_label.setText(f"Duration unit changed to {new_unit.value}")
+            self._update_all_views()
+            self.status_label.setText("Settings updated")
+
+    def _show_duration_unit_settings(self):
+        """Show duration unit settings (now via unified dialog)"""
+        self._show_settings_dialog(2)
 
     def _show_date_format_settings(self):
         """Show date format settings dialog"""
-        dialog = DateFormatDialog(self, self.data_manager.settings)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._update_all_views()
-            self.status_label.setText("Date format settings updated")
+        self._show_settings_dialog(2)
                     
     def _show_project_settings_dialog(self):
         """Show project settings dialog"""
-        dialog = ProjectSettingsDialog(self, self.data_manager)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            new_project_name = dialog.get_project_name()
-            new_start_date = dialog.get_project_start_date()
-
-            if new_project_name != self.data_manager.project_name:
-                self.data_manager.project_name = new_project_name
-                self.status_label.setText(f"Project renamed to '{new_project_name}'")
-            
-            # Update project start date if changed
-            if new_start_date and new_start_date != self.data_manager.settings.project_start_date:
-                self.data_manager.settings.project_start_date = new_start_date
-                self.status_label.setText("Project start date updated")
-
-            self._update_all_views()
+        self._show_settings_dialog(0)
     
     def _show_calendar_settings(self):
         """Show calendar settings dialog"""
-        dialog = CalendarSettingsDialog(self, self.calendar_manager)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._update_all_views()
-            self.status_label.setText("Calendar settings updated")
+        self._show_settings_dialog(1)
 
     def _on_settings_changed(self, old_unit: DurationUnit, new_unit: DurationUnit):
         """Handle settings changes"""

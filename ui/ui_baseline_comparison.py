@@ -4,10 +4,56 @@ Baseline Comparison Tab - Compare current project state against baselines
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
                              QLabel, QTreeWidget, QTreeWidgetItem, QPushButton,
-                             QGroupBox, QFormLayout, QMessageBox, QFileDialog)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QBrush
+                             QGroupBox, QFormLayout, QMessageBox, QFileDialog, 
+                             QStyledItemDelegate, QStyleOptionViewItem, QStyle)
+from PyQt6.QtGui import QColor, QBrush, QPainter
+from PyQt6.QtCore import Qt, QModelIndex
+
 import pandas as pd
+
+
+class BaselineStatusDelegate(QStyledItemDelegate):
+    """Delegate to draw status indicator circle"""
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        # Draw background
+        painter.fillRect(option.rect, option.palette.base())
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
+        else:
+            # Respect row background color if set
+            bg_brush = index.data(Qt.ItemDataRole.BackgroundRole)
+            if bg_brush and bg_brush != QBrush():
+                 painter.fillRect(option.rect, bg_brush)
+        
+        status = index.data(Qt.ItemDataRole.UserRole)
+        if not status:
+            return
+            
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Color mapping
+        color_map = {
+            'late': QColor(244, 67, 54),     # Red
+            'early': QColor(76, 175, 80),    # Green
+            'on-track': QColor(33, 150, 243), # Blue
+            'new': QColor(156, 39, 176),     # Purple
+            'deleted': QColor(158, 158, 158) # Grey
+        }
+        
+        color = color_map.get(status, QColor(128, 128, 128))
+        
+        # Draw circle centered
+        size = 12
+        rect = option.rect
+        x = rect.x() + (rect.width() - size) // 2
+        y = rect.y() + (rect.height() - size) // 2
+        
+        painter.setBrush(QBrush(color))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(x, y, size, size)
+        
+        painter.restore()
 
 
 class BaselineComparisonTab(QWidget):
@@ -83,7 +129,7 @@ class BaselineComparisonTab(QWidget):
         
         self.comparison_tree = QTreeWidget()
         self.comparison_tree.setHeaderLabels([
-            "Task", "WBS",
+            "Status", "Task", "WBS",  # Added Status column
             "Current Start", "Baseline Start", "Start Var (days)",
             "Current End", "Baseline End", "End Var (days)",
             "Current Duration", "Baseline Duration", "Duration Var",
@@ -93,6 +139,7 @@ class BaselineComparisonTab(QWidget):
         # Add tooltips to headers
         header = self.comparison_tree.headerItem()
         tooltips = [
+            "Status Indicator",
             "Name of the task",
             "Work Breakdown Structure code",
             "The currently planned start date of the task",
@@ -112,34 +159,40 @@ class BaselineComparisonTab(QWidget):
             header.setToolTip(i, tooltip)
         
         # Set column widths
-        for i in range(self.comparison_tree.columnCount()):
+        self.comparison_tree.setColumnWidth(0, 50) # Status column width
+        for i in range(1, self.comparison_tree.columnCount()):
             self.comparison_tree.setColumnWidth(i, 120)
         
-        self.comparison_tree.setAlternatingRowColors(True)
+        self.comparison_tree.setAlternatingRowColors(False) # Disable to allow custom colors to show
+        
+        # Set custom delegate for Status column
+        self.status_delegate = BaselineStatusDelegate()
+        self.comparison_tree.setItemDelegateForColumn(0, self.status_delegate)
+        
         layout.addWidget(self.comparison_tree)
         
         # Legend
         legend_layout = QHBoxLayout()
         legend_layout.addWidget(QLabel("<b>Legend:</b>"))
         
-        late_label = QLabel("■ Late/Over")
-        late_label.setStyleSheet("color: #D32F2F;")
+        late_label = QLabel("● Late/Over") # Using circle symbol to match indicator
+        late_label.setStyleSheet("color: #D32F2F; font-weight: bold;")
         legend_layout.addWidget(late_label)
         
-        early_label = QLabel("■ Early/Under")
-        early_label.setStyleSheet("color: #388E3C;")
+        early_label = QLabel("● Early/Under")
+        early_label.setStyleSheet("color: #388E3C; font-weight: bold;")
         legend_layout.addWidget(early_label)
         
-        on_track_label = QLabel("■ On Track")
-        on_track_label.setStyleSheet("color: #1976D2;")
+        on_track_label = QLabel("● On Track")
+        on_track_label.setStyleSheet("color: #1976D2; font-weight: bold;")
         legend_layout.addWidget(on_track_label)
         
-        new_label = QLabel("■ New Task")
-        new_label.setStyleSheet("color: #7B1FA2;")
+        new_label = QLabel("● New Task")
+        new_label.setStyleSheet("color: #9C27B0; font-weight: bold;")
         legend_layout.addWidget(new_label)
         
-        deleted_label = QLabel("■ Deleted Task")
-        deleted_label.setStyleSheet("color: #757575;")
+        deleted_label = QLabel("● Deleted Task")
+        deleted_label.setStyleSheet("color: #9E9E9E; font-weight: bold;")
         legend_layout.addWidget(deleted_label)
         
         legend_layout.addStretch()
@@ -233,12 +286,15 @@ class BaselineComparisonTab(QWidget):
         for comp in comparisons:
             item = QTreeWidgetItem()
             
-            # Task name and WBS
-            item.setText(0, comp['task_name'])
-            item.setText(1, comp['wbs'])
+            # Status Data (Column 0) - Store status string for delegate
+            status = comp['end_status']
+            item.setData(0, Qt.ItemDataRole.UserRole, status)
+
+            # Task name and WBS (Shifted to 1 and 2)
+            item.setText(1, comp['task_name'])
+            item.setText(2, comp['wbs'])
             
             # Determine row color based on status
-            status = comp['end_status']
             if status == 'late':
                 color = QColor(255, 235, 238)  # Light red
             elif status == 'early':
@@ -253,92 +309,94 @@ class BaselineComparisonTab(QWidget):
                 color = QColor(255, 255, 255)  # White
             
             # Set background for all columns
+            # Set background for all columns and force black text for readability
             for col in range(self.comparison_tree.columnCount()):
                 item.setBackground(col, QBrush(color))
+                item.setForeground(col, QBrush(QColor("black")))
             
-            # Start dates and variance
+            # Start dates and variance (Shifted +1)
             if comp['current_start']:
-                item.setText(2, comp['current_start'].strftime('%Y-%m-%d'))
-            else:
-                item.setText(2, "-")
-            
-            if comp['baseline_start']:
-                item.setText(3, comp['baseline_start'].strftime('%Y-%m-%d'))
+                item.setText(3, comp['current_start'].strftime('%Y-%m-%d'))
             else:
                 item.setText(3, "-")
             
-            if comp['start_variance_days'] is not None:
-                var_text = f"{comp['start_variance_days']:+d}"
-                item.setText(4, var_text)
-                if comp['start_variance_days'] > 0:
-                    item.setForeground(4, QBrush(QColor(211, 47, 47)))  # Red
-                elif comp['start_variance_days'] < 0:
-                    item.setForeground(4, QBrush(QColor(56, 142, 60)))  # Green
+            if comp['baseline_start']:
+                item.setText(4, comp['baseline_start'].strftime('%Y-%m-%d'))
             else:
                 item.setText(4, "-")
             
-            # End dates and variance
-            if comp['current_end']:
-                item.setText(5, comp['current_end'].strftime('%Y-%m-%d'))
+            if comp['start_variance_days'] is not None:
+                var_text = f"{comp['start_variance_days']:+d}"
+                item.setText(5, var_text)
+                if comp['start_variance_days'] > 0:
+                    item.setForeground(5, QBrush(QColor(211, 47, 47)))  # Red
+                elif comp['start_variance_days'] < 0:
+                    item.setForeground(5, QBrush(QColor(56, 142, 60)))  # Green
             else:
                 item.setText(5, "-")
             
-            if comp['baseline_end']:
-                item.setText(6, comp['baseline_end'].strftime('%Y-%m-%d'))
+            # End dates and variance (Shifted +1)
+            if comp['current_end']:
+                item.setText(6, comp['current_end'].strftime('%Y-%m-%d'))
             else:
                 item.setText(6, "-")
             
-            if comp['end_variance_days'] is not None:
-                var_text = f"{comp['end_variance_days']:+d}"
-                item.setText(7, var_text)
-                if comp['end_variance_days'] > 0:
-                    item.setForeground(7, QBrush(QColor(211, 47, 47)))  # Red
-                elif comp['end_variance_days'] < 0:
-                    item.setForeground(7, QBrush(QColor(56, 142, 60)))  # Green
+            if comp['baseline_end']:
+                item.setText(7, comp['baseline_end'].strftime('%Y-%m-%d'))
             else:
                 item.setText(7, "-")
             
-            # Duration and variance
-            if comp['current_duration'] is not None:
-                item.setText(8, f"{comp['current_duration']:.1f}")
+            if comp['end_variance_days'] is not None:
+                var_text = f"{comp['end_variance_days']:+d}"
+                item.setText(8, var_text)
+                if comp['end_variance_days'] > 0:
+                    item.setForeground(8, QBrush(QColor(211, 47, 47)))  # Red
+                elif comp['end_variance_days'] < 0:
+                    item.setForeground(8, QBrush(QColor(56, 142, 60)))  # Green
             else:
                 item.setText(8, "-")
             
-            if comp['baseline_duration'] is not None:
-                item.setText(9, f"{comp['baseline_duration']:.1f}")
+            # Duration and variance (Shifted +1)
+            if comp['current_duration'] is not None:
+                item.setText(9, f"{comp['current_duration']:.1f}")
             else:
                 item.setText(9, "-")
             
-            if comp['duration_variance'] is not None:
-                var_text = f"{comp['duration_variance']:+.1f}"
-                item.setText(10, var_text)
-                if comp['duration_variance'] > 0:
-                    item.setForeground(10, QBrush(QColor(211, 47, 47)))  # Red
-                elif comp['duration_variance'] < 0:
-                    item.setForeground(10, QBrush(QColor(56, 142, 60)))  # Green
+            if comp['baseline_duration'] is not None:
+                item.setText(10, f"{comp['baseline_duration']:.1f}")
             else:
                 item.setText(10, "-")
             
-            # Completion and variance
-            if comp['current_complete'] is not None:
-                item.setText(11, f"{comp['current_complete']}%")
+            if comp['duration_variance'] is not None:
+                var_text = f"{comp['duration_variance']:+.1f}"
+                item.setText(11, var_text)
+                if comp['duration_variance'] > 0:
+                    item.setForeground(11, QBrush(QColor(211, 47, 47)))  # Red
+                elif comp['duration_variance'] < 0:
+                    item.setForeground(11, QBrush(QColor(56, 142, 60)))  # Green
             else:
                 item.setText(11, "-")
             
-            if comp['baseline_complete'] is not None:
-                item.setText(12, f"{comp['baseline_complete']}%")
+            # Completion and variance (Shifted +1)
+            if comp['current_complete'] is not None:
+                item.setText(12, f"{comp['current_complete']}%")
             else:
                 item.setText(12, "-")
             
-            if comp['completion_variance'] is not None:
-                var_text = f"{comp['completion_variance']:+d}%"
-                item.setText(13, var_text)
-                if comp['completion_variance'] < 0:
-                    item.setForeground(13, QBrush(QColor(211, 47, 47)))  # Red (behind schedule)
-                elif comp['completion_variance'] > 0:
-                    item.setForeground(13, QBrush(QColor(56, 142, 60)))  # Green (ahead of schedule)
+            if comp['baseline_complete'] is not None:
+                item.setText(13, f"{comp['baseline_complete']}%")
             else:
                 item.setText(13, "-")
+            
+            if comp['completion_variance'] is not None:
+                var_text = f"{comp['completion_variance']:+d}%"
+                item.setText(14, var_text)
+                if comp['completion_variance'] < 0:
+                    item.setForeground(14, QBrush(QColor(211, 47, 47)))  # Red (behind schedule)
+                elif comp['completion_variance'] > 0:
+                    item.setForeground(14, QBrush(QColor(56, 142, 60)))  # Green (ahead of schedule)
+            else:
+                item.setText(14, "-")
             
             self.comparison_tree.addTopLevelItem(item)
         

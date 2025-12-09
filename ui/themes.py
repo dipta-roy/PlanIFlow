@@ -1,14 +1,7 @@
-"""
-Themes - Dark and Light mode handling
-"""
-
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt
 
 class ThemeManager:
-    """Manages application themes"""
-    
     @staticmethod
     def apply_light_mode():
         """Apply light mode theme"""
@@ -74,10 +67,14 @@ class ThemeManager:
                 QTreeWidget {
                     show-decoration-selected: 1;
                     outline: 0;
+                    background-color: #353535;
+                    color: white;
                 }
                 QTreeWidget::item {
                     border: 0px;
                     padding: 3px;
+                    background-color: transparent;
+                    color: white;
                 }
                 QTreeWidget::item:hover {
                     background-color: #3d3d3d;

@@ -3,6 +3,7 @@ from typing import List, Dict, Optional, Any, Tuple
 from enum import Enum
 from settings_manager.settings_manager import DurationUnit, DateFormat
 
+
 class DependencyType(Enum):
     """Dependency relationship types"""
     FS = "Finish-to-Start"  # Successor starts after predecessor finishes
@@ -422,6 +423,7 @@ class Resource:
     
     def __init__(self, name: str, max_hours_per_day: float = 8.0,
                  exceptions: List[str] = None, billing_rate: float = 0.0):
+
         self.name = name
         self.max_hours_per_day = max_hours_per_day
         self.exceptions = exceptions or []
@@ -444,4 +446,92 @@ class Resource:
             max_hours_per_day=data.get('max_hours_per_day', 8.0),
             exceptions=data.get('exceptions', []),
             billing_rate=data.get('billing_rate', 0.0)
+        )
+
+class TaskSnapshot:
+    """Snapshot of a task state for baseline comparison"""
+    def __init__(self, task_id: int, task_name: str, start_date: datetime, 
+                 end_date: datetime, duration: float, percent_complete: int,
+                 wbs: str = None):
+        self.task_id = task_id
+        self.task_name = task_name
+        self.start_date = start_date
+        self.end_date = end_date
+        self.duration = duration
+        self.percent_complete = percent_complete
+        self.wbs = wbs
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert snapshot to dictionary"""
+        return {
+            'task_id': self.task_id,
+            'task_name': self.task_name,
+            'start_date': self.start_date.isoformat() if self.start_date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'duration': self.duration,
+            'percent_complete': self.percent_complete,
+            'wbs': self.wbs
+        }
+
+    @staticmethod
+    def from_dict(data: Dict[str, Any]) -> 'TaskSnapshot':
+        """Create snapshot from dictionary"""
+        return TaskSnapshot(
+            task_id=data['task_id'],
+            task_name=data['task_name'],
+            start_date=datetime.fromisoformat(data['start_date']) if data.get('start_date') else None,
+            end_date=datetime.fromisoformat(data['end_date']) if data.get('end_date') else None,
+            duration=data['duration'],
+            percent_complete=data['percent_complete'],
+            wbs=data.get('wbs')
+        )
+
+class Baseline:
+    """Project baseline containing task snapshots"""
+    def __init__(self, name: str, created_date: datetime = None, snapshots: List[TaskSnapshot] = None):
+        self.name = name
+        self.created_date = created_date or datetime.now()
+        self.snapshots = snapshots or []
+
+    def add_task_snapshot(self, snapshot: TaskSnapshot):
+        """Add a task snapshot to the baseline"""
+        if not hasattr(self, 'snapshots'):
+            self.snapshots = []
+        self.snapshots.append(snapshot)
+    
+    def get_task_snapshot(self, task_id: int) -> Optional[TaskSnapshot]:
+        """Get snapshot for a specific task ID"""
+        snapshots = getattr(self, 'snapshots', [])
+        for snapshot in snapshots:
+            if snapshot.task_id == task_id:
+                return snapshot
+        return None
+
+    def to_dict(self, date_format: DateFormat = None) -> Dict[str, Any]:
+        """Convert baseline to dictionary"""
+        return {
+            'name': self.name,
+            'created_date': self.created_date.isoformat() if self.created_date else None,
+            'snapshots': [s.to_dict() for s in self.snapshots]
+        }
+
+    @staticmethod
+    def from_dict(data: Dict[str, Any], date_format: DateFormat = None) -> 'Baseline':
+        """Create baseline from dictionary - handles both list and dict formats"""
+        snapshots = []
+        
+        # Handle both formats: 'snapshots' (list) and 'task_snapshots' (dict)
+        if 'snapshots' in data:
+            # Original format: snapshots as a list
+            snapshots = [TaskSnapshot.from_dict(s) for s in data.get('snapshots', [])]
+        elif 'task_snapshots' in data:
+            # Excel import format: task_snapshots as a dictionary
+            task_snapshots_dict = data.get('task_snapshots', {})
+            for task_id_str, snapshot_data in task_snapshots_dict.items():
+                snapshots.append(TaskSnapshot.from_dict(snapshot_data))
+        
+        return Baseline(
+            name=data['name'],
+            created_date=datetime.fromisoformat(data['created_date']) if data.get('created_date') else None,
+            snapshots=snapshots
         )

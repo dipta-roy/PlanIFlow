@@ -3,40 +3,18 @@ Main UI - PyQt6 Application Interface
 Enhanced with hierarchical tasks, dependency types, and status indicators
 """
 
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QTableWidget, QTableWidgetItem, QPushButton, QTabWidget,
-                             QLabel, QMenuBar, QMenu, QToolBar, QStatusBar, QFileDialog,
-                             QDialog, QFormLayout, QLineEdit, QSpinBox, QDoubleSpinBox,
-                             QDateEdit, QTextEdit, QListWidget, QMessageBox, QCheckBox,
-                             QGroupBox, QSplitter, QAbstractItemView, QHeaderView,
-                             QComboBox, QScrollArea, QTreeWidget, QTreeWidgetItem,
-                             QStyledItemDelegate, QStyleOptionViewItem, QInputDialog, QStyle, QCompleter)
-from PyQt6.QtCore import Qt, QDate, QTimer, QModelIndex, QEvent, QAbstractItemModel, QSize
-from PyQt6.QtGui import QAction, QIcon, QColor, QBrush, QPainter, QFont, QPixmap
-from datetime import datetime, timedelta
-import os
-import sys
-import json
-import logging
-import re
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QPushButton, QTabWidget, QLabel, QLineEdit, QCheckBox, 
+                             QComboBox, QScrollArea, QStatusBar)
+from PyQt6.QtCore import Qt, QTimer, QEvent
 from data_manager.manager import DataManager
-from data_manager.models import Task, Resource, DependencyType, TaskStatus, ScheduleType
 from calendar_manager.calendar_manager import CalendarManager
 from ui.gantt_chart import GanttChart
-from exporter.exporter import Exporter
 from ui.themes import ThemeManager
-from settings_manager.settings_manager import ProjectSettings, DurationUnit, DateFormat
-from ui.ui_project_settings import ProjectSettingsDialog, DateFormatDialog
-from ui.ui_delegates import SortableTreeWidgetItem, ColorDelegate, DateDelegate, ResourceDelegate
-from ui.ui_helpers import get_resource_path, set_application_icon
+from ui.ui_helpers import set_application_icon
 from ui.ui_menu_toolbar import create_menu_bar, create_toolbar
-from ui.ui_dashboard import update_dashboard, create_dashboard
+from ui.ui_dashboard import create_dashboard
 from ui.ui_resources import ResourceSheet
-from exporter.pdf_exporter import PDFExporter
-from ui.ui_task_dialog import TaskDialog
-from ui.ui_resource_dialog import ResourceDialog
-from ui.ui_calendar_settings_dialog import CalendarSettingsDialog
-from ui.ui_duration_unit_dialog import DurationUnitDialog
 from ui.ui_tasks import create_task_tree
 from ui.ui_baseline_comparison import BaselineComparisonTab
 
@@ -49,7 +27,7 @@ from ui.ui_formatting import FormattingMixin
 from ui.ui_baseline_manager import BaselineOperationsMixin
 
 # Constants for ColorDelegate
-from constants.constants import CIRCLE_SIZE, LEFT_PADDING, TEXT_SHIFT, STATUS_ALL, STATUS_OVERDUE, STATUS_IN_PROGRESS, STATUS_UPCOMING, STATUS_COMPLETED, APP_NAME
+from constants.constants import STATUS_ALL, STATUS_OVERDUE, STATUS_IN_PROGRESS, STATUS_UPCOMING, STATUS_COMPLETED, APP_NAME
 
 class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralViewOperationsMixin, TreeViewOperationsMixin, FormattingMixin, BaselineOperationsMixin):
     """Main application window with enhanced features"""

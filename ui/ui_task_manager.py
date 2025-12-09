@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt, QDate
 from datetime import datetime, timedelta
 import traceback
 
-from data_manager.models import Task, Resource, ScheduleType, DependencyType
+from data_manager.models import Task, ScheduleType, Resource
 from ui.ui_task_dialog import TaskDialog
 from ui.ui_resource_dialog import ResourceDialog
 
@@ -17,10 +17,13 @@ class TaskOperationsMixin:
         if not task_name:
             return
         
-        # Create task with default values (8 AM to 4 PM today)
+        # Create task with default values based on calendar settings
         now = datetime.now()
-        start_date = now.replace(hour=8, minute=0, second=0, microsecond=0)
-        end_date = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        start_hour, start_minute = self.data_manager.calendar_manager.get_working_start_time()
+        end_hour, end_minute = self.data_manager.calendar_manager.get_working_end_time()
+        
+        start_date = now.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+        end_date = now.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
         
         task = Task(
             name=task_name,
@@ -315,7 +318,8 @@ class TaskOperationsMixin:
             resource = Resource(
                 name=resource_data['name'],
                 max_hours_per_day=resource_data['max_hours_per_day'],
-                exceptions=resource_data['exceptions']
+                exceptions=resource_data['exceptions'],
+                billing_rate=float(resource_data.get('billing_rate', 0.0))
             )
             
             if self.data_manager.add_resource(resource):
@@ -546,13 +550,23 @@ class TaskOperationsMixin:
             
             if reply == QMessageBox.StandardButton.Yes:
                 task.is_milestone = False
-                # Set default end date (7 days after start)
-                task.end_date = task.start_date + timedelta(days=6)
+                # Set default end date (1 day duration) based on working hours
+                end_h, end_m = self.data_manager.calendar_manager.get_working_end_time()
+                task.end_date = task.start_date.replace(hour=end_h, minute=end_m, second=0, microsecond=0)
+                
+                # Ensure end date is not before start date (e.g. if start was late in day)
+                if task.end_date <= task.start_date:
+                     task.end_date = task.start_date + timedelta(hours=1)
                 # Remove italic formatting when converting to task
                 task.font_italic = False
                 
-                self._update_all_views()
-                self.status_label.setText(f"✓ Converted '{task.name}' to regular task")
+                # Update task in data manager to trigger auto-adjustment of dependent tasks
+                if self.data_manager.update_task(task_id, task):
+                    self._update_all_views()
+                    self.status_label.setText(f"✓ Converted '{task.name}' to regular task")
+                else:
+                    QMessageBox.warning(self, "Update Failed", 
+                                      "Failed to update task. Please try again.")
         else:
             # Convert regular task to milestone
             reply = QMessageBox.question(
@@ -569,8 +583,14 @@ class TaskOperationsMixin:
                 # Add italic formatting when converting to milestone
                 task.font_italic = True
                 
-                self._update_all_views()
-                self.status_label.setText(f"✓ Converted '{task.name}' to milestone")
+                # Update task in data manager to trigger auto-adjustment of dependent tasks
+                if self.data_manager.update_task(task_id, task):
+                    self._update_all_views()
+                    self.status_label.setText(f"✓ Converted '{task.name}' to milestone")
+                else:
+                    QMessageBox.warning(self, "Update Failed", 
+                                      "Failed to update task. Please try again.")
+
 
     def _bulk_indent_tasks(self):
         """Indent multiple selected tasks"""

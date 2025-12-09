@@ -12,7 +12,11 @@ class CalendarManager:
         # Default working days (0 = Monday, 6 = Sunday)
         self.working_days: Set[int] = {0, 1, 2, 3, 4}  # Mon-Fri
         
-        # Default hours per day
+        # Working hours configuration (stored as hour:minute in 24h format)
+        self.working_hours_start: str = "08:00"  # 8:00 AM
+        self.working_hours_end: str = "16:00"    # 4:00 PM (8 hours later)
+        
+        # Default hours per day (calculated from working hours)
         self.hours_per_day: float = 8.0
         
         # Non-working days (holidays, special dates)
@@ -63,7 +67,52 @@ class CalendarManager:
         """Set working days (0-6, Mon-Sun)"""
         self.working_days = set(days)
     
+    def set_working_hours(self, start_time: str, end_time: str):
+        """Set working hours start and end times (format: HH:MM)"""
+        self.working_hours_start = start_time
+        self.working_hours_end = end_time
+        # Recalculate hours per day
+        self.hours_per_day = self._calculate_hours_from_times()
+    
+    def _calculate_hours_from_times(self) -> float:
+        """Calculate hours per day from start and end times"""
+        try:
+            start_parts = self.working_hours_start.split(':')
+            end_parts = self.working_hours_end.split(':')
+            
+            start_hours = int(start_parts[0]) + int(start_parts[1]) / 60.0
+            end_hours = int(end_parts[0]) + int(end_parts[1]) / 60.0
+            
+            # Calculate difference
+            hours_diff = end_hours - start_hours
+            
+            # Handle case where end is before start (crosses midnight)
+            if hours_diff < 0:
+                hours_diff += 24
+            
+            return max(0.0, hours_diff)
+            return max(0.0, hours_diff)
+        except:
+            return 8.0  # Default fallback
+            
+    def get_working_start_time(self) -> tuple[int, int]:
+        """Get working start time as (hour, minute)"""
+        try:
+            parts = self.working_hours_start.split(':')
+            return int(parts[0]), int(parts[1])
+        except:
+            return 8, 0
+            
+    def get_working_end_time(self) -> tuple[int, int]:
+        """Get working end time as (hour, minute)"""
+        try:
+            parts = self.working_hours_end.split(':')
+            return int(parts[0]), int(parts[1])
+        except:
+            return 16, 0
+    
     def set_hours_per_day(self, hours: float):
+
         """Set default working hours per day"""
         self.hours_per_day = max(0.0, hours)
     
@@ -81,10 +130,45 @@ class CalendarManager:
     
     def calculate_working_hours(self, start_date: datetime, end_date: datetime, max_hours_per_day: float = None, resource_exceptions: List[str] = None) -> float:
         """Calculate total working hours between two dates, considering resource-specific exceptions"""
-        if max_hours_per_day is None:
-            max_hours_per_day = self.hours_per_day
-        working_days = self.calculate_working_days(start_date, end_date, resource_exceptions)
-        return working_days * max_hours_per_day
+        total_hours = 0.0
+        
+        start_h, start_m = self.get_working_start_time()
+        end_h, end_m = self.get_working_end_time()
+        
+        # Normalize to just date for iteration
+        current_date_iter = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date_limit = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Determine working interval for a day relative to that day's midnight
+        # work_start_td = timedelta(hours=start_h, minutes=start_m)
+        # work_end_td = timedelta(hours=end_h, minutes=end_m)
+        
+        while current_date_iter <= end_date_limit:
+            # Check if this day is a working day
+            # We can pick a time (e.g. noon) to check, or just the date object if is_working_day handles it
+            check_dt = current_date_iter.replace(hour=12) 
+            if self.is_working_day(check_dt, resource_exceptions):
+                
+                # Define working window for this specific date
+                daily_work_start = current_date_iter.replace(hour=start_h, minute=start_m)
+                daily_work_end = current_date_iter.replace(hour=end_h, minute=end_m)
+                
+                # Handle overnight shifts? assuming day shift for now (end > start)
+                if daily_work_end < daily_work_start:
+                    daily_work_end += timedelta(days=1)
+                
+                # Determine overlap of task duration with today's working window
+                # Task interval: [max(start_date, daily_work_start), min(end_date, daily_work_end)]
+                
+                overlap_start = max(start_date, daily_work_start)
+                overlap_end = min(end_date, daily_work_end)
+                
+                if overlap_start < overlap_end:
+                     total_hours += (overlap_end - overlap_start).total_seconds() / 3600.0
+                     
+            current_date_iter += timedelta(days=1)
+            
+        return total_hours
     
     def get_next_working_day(self, date: datetime) -> datetime:
         """Get the next working day after the given date"""
@@ -106,64 +190,68 @@ class CalendarManager:
         return current_date
 
     def add_working_hours(self, start_date: datetime, hours: float) -> datetime:
-        """Add hours to a date, skipping non-working days"""
+        """Add hours to a date, respecting working hours and skipping non-working days"""
         current_dt = start_date
         hours_remaining = hours
         
-        # Assume working hours are 8 AM to (8+hours_per_day) PM
-        # Simplification: For now, just add days based on hours/day, then add remainder
+        # Get configured working hours
+        start_h, start_m = self.get_working_start_time()
+        end_h, end_m = self.get_working_end_time()
         
-        # Calculate full days to add
-        full_days = int(hours_remaining / self.hours_per_day)
-        remainder_hours = hours_remaining % self.hours_per_day
-        
-        # Add full days first (minus 1 if we have remainder, because start day counts)
-        # Actually logic is tricky. 
-        # Requirement: 
-        # 1 day task (8h) starting today = ends today.
-        # 2 day task (16h) starting today = ends tomorrow.
-        
-        # Let's handle it by creating a target end time on the final working day.
-        # Shift full working days
-        if full_days > 0:
-            # If no remainder (exact day multiple), subtract 1 so we land on correct day?
-            # 16h (2 days). Start D1 8am. D1 8am + 16h = D2 0am (midnight next day) wrong.
-            # D1 8am + 8h = D1 4pm.
-            # D1 8am + 16h should be D1 8am -> D1 4pm (8h), D2 8am -> D2 4pm (8h).
+        try:
+            # Normalize times to timedelta from midnight
+            work_start_td = timedelta(hours=start_h, minutes=start_m)
+            work_end_td = timedelta(hours=end_h, minutes=end_m)
             
-            # So, add (full_days - 1) full working days, then handle exact time?
-            # Or just add full_days worth of time, skipping non-work days.
+            # If work end is smaller than start (night shift), handle simply by assuming full 24h for now or error?
+            # Supporting typical day shifts for now.
+            if work_end_td <= work_start_td:
+                # Fallback to simple addition if invalid range
+                return current_dt + timedelta(hours=hours)
+
+            while hours_remaining > 0:
+                # 1. Ensure current_dt is inside working hours
+                
+                # If non-working day, move to next working day start
+                if not self.is_working_day(current_dt):
+                    current_dt = self.get_next_working_day(current_dt)
+                    current_dt = current_dt.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
+                    continue
+
+                # Get time of day
+                current_time_td = timedelta(hours=current_dt.hour, minutes=current_dt.minute, seconds=current_dt.second)
+                
+                # If before start, move to start
+                if current_time_td < work_start_td:
+                    current_dt = current_dt.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
+                    current_time_td = work_start_td
+                
+                # If after end, move to next working day start
+                if current_time_td >= work_end_td:
+                    current_dt = self.get_next_working_day(current_dt)
+                    current_dt = current_dt.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
+                    continue
+                
+                # 2. Calculate available hours today
+                time_until_end = (work_end_td - current_time_td).total_seconds() / 3600.0
+                
+                if hours_remaining <= time_until_end + 0.0001: # Epsilon for float comparison
+                    # Duration fits in today
+                    current_dt += timedelta(hours=hours_remaining)
+                    return current_dt
+                else:
+                    # Use up remainder of today
+                    hours_remaining -= time_until_end
+                    # Move to start of next working day
+                    current_dt = self.get_next_working_day(current_dt)
+                    current_dt = current_dt.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
             
-            days_to_add = full_days
-            if remainder_hours == 0:
-                is_exact_day_end = True
-                days_to_add -= 1 # We stay on the last day if it fits exactly
-            else:
-                is_exact_day_end = False
+            return current_dt
             
-            # Jump ahead working days
-            current_dt = self.add_working_days(current_dt, days_to_add)
-            
-            # Now add the remaining hours (or full 8h if exact day but we subtracted 1 day count)
-            # If exact day end, we are on the correct day, starting at same time as start_date.
-            # We just need to add a full work day's hours to it.
-            if is_exact_day_end:
-                 current_dt += timedelta(hours=self.hours_per_day)
-            else:
-                 current_dt += timedelta(hours=remainder_hours)
-                 
-        else:
-             # Just add hours on same day
-             current_dt += timedelta(hours=hours_remaining)
-             
-        # Correction: The above simplistic addition doesn't check if we crossed into non-working time
-        # within the day (e.g. 5pm+). But user request implies standard 8-4 window.
-        # "If 8 hours configured... start 8am end 4pm."
-        # My simple timedelta logic `start + hours` works for simple cases, 
-        # but fails multi-day skipping weekends.
-        # That's why I used `add_working_days` above.
-        
-        return current_dt
+        except Exception as e:
+            # Fallback
+            print(f"Error in add_working_hours: {e}")
+            return start_date + timedelta(hours=hours)
 
     def subtract_working_days(self, start_date: datetime, days: int) -> datetime:
         """Subtract a number of working days from a date"""
@@ -182,11 +270,38 @@ class CalendarManager:
         return {
             'working_days': list(self.working_days),
             'hours_per_day': self.hours_per_day,
-            'non_working_days': list(self.non_working_days)
+            'non_working_days': list(self.non_working_days),
+            'working_hours_start': self.working_hours_start,
+            'working_hours_end': self.working_hours_end
         }
     
     def from_dict(self, data: Dict[str, Any]):
         """Import calendar settings from dictionary"""
         self.working_days = set(data.get('working_days', [0, 1, 2, 3, 4]))
-        self.hours_per_day = data.get('hours_per_day', 8.0)
         self.non_working_days = set(data.get('non_working_days', []))
+        
+        # Backward compatibility: use hours_per_day if available
+        self.hours_per_day = data.get('hours_per_day', 8.0)
+        
+        if 'working_hours_start' in data:
+            self.working_hours_start = data['working_hours_start']
+        else:
+            self.working_hours_start = '08:00'
+        
+        if 'working_hours_end' in data:
+            self.working_hours_end = data['working_hours_end']
+        else:
+            # Fallback: calculate end time from start and hours_per_day
+            try:
+                start_h, start_m = map(int, self.working_hours_start.split(':'))
+                total_minutes = int(start_h * 60 + start_m + (self.hours_per_day * 60))
+                
+                # Handle overflow (next day) by wrapping around 24h
+                end_h = (total_minutes // 60) % 24
+                end_m = total_minutes % 60
+                self.working_hours_end = f"{end_h:02d}:{end_m:02d}"
+            except Exception:
+                 self.working_hours_end = '16:00'
+        
+        # Ensure consistency
+        self.hours_per_day = self._calculate_hours_from_times()

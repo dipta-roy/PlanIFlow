@@ -1,5 +1,6 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFormLayout, QDateEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit)
-from PyQt6.QtCore import QDate, Qt
+
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QFormLayout, QDateEdit, QComboBox, QLabel)
+from PyQt6.QtCore import QDate
 from datetime import datetime
 from settings_manager.settings_manager import DateFormat # Import DateFormat
 
@@ -8,6 +9,7 @@ class ProjectSettingsDialog(QDialog):
     def __init__(self, parent=None, data_manager=None):
         super().__init__(parent)
         self.setWindowTitle("Project Settings")
+        self.setMinimumWidth(500) # Increase width
         self.data_manager = data_manager
         
         self.layout = QVBoxLayout(self)
@@ -29,9 +31,16 @@ class ProjectSettingsDialog(QDialog):
                                  self.data_manager.settings.project_start_date.month,
                                  self.data_manager.settings.project_start_date.day)
         self.project_start_date_input.setDate(initial_date)
+        
         self.form_layout.addRow("Project Start Date:", self.project_start_date_input)
         
         self.layout.addLayout(self.form_layout)
+        
+        # Note about calendar and date format
+        note_label = QLabel("ℹ️ Note: For new projects, please ensure you also configure the Calendar (working hours) and Date Format settings.")
+        note_label.setWordWrap(True)
+        note_label.setStyleSheet("color: blue; font-style: italic; margin-top: 5px; margin-bottom: 5px;")
+        self.layout.addWidget(note_label)
         
         # Buttons
         self.button_layout = QHBoxLayout()

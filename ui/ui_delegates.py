@@ -6,14 +6,11 @@ from PyQt6.QtCore import Qt, QModelIndex, QDate, QAbstractItemModel
 from PyQt6.QtGui import QColor, QBrush, QPainter, QFont
 import sys
 import os
-import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Constants for ColorDelegate
 from constants.constants import CIRCLE_SIZE, LEFT_PADDING, TEXT_SHIFT, ICON_SIZE
 
-import logging
-from datetime import datetime, timedelta
 
 class SortableTreeWidgetItem(QTreeWidgetItem):
     """Custom tree widget item with proper sorting for different data types"""
@@ -332,7 +329,12 @@ class ExpandCollapseDelegate(QStyledItemDelegate):
     
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
         """Paint expand/collapse icon"""
-        super().paint(painter, option, index)
+        # Manually paint background to respect theme
+        painter.fillRect(option.rect, option.palette.base())
+        if option.state & QStyle.StateFlag.State_Selected:
+             painter.fillRect(option.rect, option.palette.highlight())
+
+        # super().paint(painter, option, index) # Avoid default painting which might enforce white background
         
         # Get the tree widget item
         item = self.tree_widget.itemFromIndex(index)

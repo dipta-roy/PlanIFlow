@@ -2,7 +2,7 @@
 Baseline Operations Mixin - Baseline management methods for MainWindow
 """
 
-from PyQt6.QtWidgets import QMessageBox
+
 from ui.ui_baseline_dialog import BaselineDialog
 
 

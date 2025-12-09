@@ -1,11 +1,9 @@
-from PyQt6.QtWidgets import (QMessageBox, QTreeWidgetItem, QHeaderView, QMenu)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QColor, QBrush, QFont
-from datetime import datetime
 import re
-import traceback
-
-from data_manager import Task, DependencyType, ScheduleType
+from datetime import datetime
+from PyQt6.QtWidgets import QTreeWidgetItem, QMessageBox, QMenu
+from PyQt6.QtGui import QAction, QColor, QBrush
+from PyQt6.QtCore import Qt
+from data_manager.models import Task, DependencyType, ScheduleType
 from settings_manager.settings_manager import DurationUnit, DateFormat
 from ui.ui_delegates import SortableTreeWidgetItem
 
@@ -668,12 +666,13 @@ class TreeViewOperationsMixin:
                         lag_days = 0
                         dep_type = DependencyType.FS.name
 
-                        # Regex to handle formats like "1", "1 FS", "1FS+2d", "1 (FS-1d)"
-                        # Updated regex: (?:([+-])(\d+)(d)?)?
-                        # Group 3: sign (+ or -)
-                        # Group 4: digits (the lag value)
-                        # Group 5: 'd' if present, None otherwise
-                        match = re.match(r'(\d+)\s*([A-Z]{2})?(?:([+-])(\d+)(d)?)?', pred_str)
+                        # Regex to handle formats like "1", "1 FS", "1FS+2d", "1 (FS-1d)", "1 FS + 2d"
+                        # Group 1: ID
+                        # Group 2: Type (optional)
+                        # Group 3: Sign (+ or -)
+                        # Group 4: Lag value
+                        # Group 5: 'd' (optional)
+                        match = re.match(r'(\d+)\s*([A-Z]{2})?\s*(?:([+-])\s*(\d+)\s*(d)?)?', pred_str)
                         if match:
                             pred_id = int(match.group(1))
                             if match.group(2):

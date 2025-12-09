@@ -1,17 +1,15 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-                             QLineEdit, QDateEdit, QDateTimeEdit, QSpinBox, QTextEdit, QPushButton,
-                             QMessageBox, QLabel, QComboBox, QCompleter, QWidget, QDoubleSpinBox,
-                             QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QColorDialog, QTabWidget)
-from PyQt6.QtCore import Qt, QDate
-from datetime import datetime, timedelta
-import re
-import logging
 import math
+from datetime import datetime, timedelta
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QLineEdit, 
+                             QComboBox, QDateTimeEdit, QCheckBox, QTextEdit, 
+                             QLabel, QTabWidget, QWidget, QDoubleSpinBox, 
+                             QSpinBox, QPushButton, QHBoxLayout, QTableWidget, 
+                             QHeaderView, QMessageBox, QCompleter, QColorDialog)
+from PyQt6.QtCore import Qt, QDate, QTime
 
 from data_manager.manager import DataManager
-from data_manager.models import Task, Resource, DependencyType, ScheduleType
-from settings_manager.settings_manager import DurationUnit, DateFormat, ProjectSettings
-from calendar_manager.calendar_manager import CalendarManager
+from data_manager.models import Task, DependencyType, ScheduleType
+from settings_manager.settings_manager import DurationUnit, DateFormat
 
 class TaskDialog(QDialog):
     def __init__(self, parent=None, data_manager: DataManager = None, task: Task = None, parent_task: Task = None, is_milestone: bool = False):
@@ -104,9 +102,12 @@ class TaskDialog(QDialog):
         self.start_date_input = QDateTimeEdit()
         self.start_date_input.setCalendarPopup(True)
         
-        # Default to today 8:00 AM
+        # Default to today at configured start time
         now = datetime.now()
-        default_start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        start_hour, start_minute = self.data_manager.calendar_manager.get_working_start_time()
+        end_hour, end_minute = self.data_manager.calendar_manager.get_working_end_time()
+        
+        default_start = now.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
         self.start_date_input.setDateTime(default_start)
         
         if self.is_milestone:
@@ -120,12 +121,12 @@ class TaskDialog(QDialog):
         self.end_date_input = QDateTimeEdit()
         self.end_date_input.setCalendarPopup(True)
         
-        # Default to today 4:00 PM (16:00) for tasks, or match start for milestones
+        # Default to configured end time for tasks, or match start for milestones
         if self.is_milestone:
-            self.end_date_input.setDateTime(default_start) # 8 AM
+            self.end_date_input.setDateTime(default_start) 
         else:
-            # For tasks, default to same day 4 PM if duration is 1 day (default)
-            default_end = now.replace(hour=16, minute=0, second=0, microsecond=0)
+            # For tasks, default to same day at configured end time
+            default_end = now.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
             self.end_date_input.setDateTime(default_end)
             
         self.end_date_input.dateTimeChanged.connect(self._on_date_changed)

@@ -1,12 +1,10 @@
 """ui_menu_toolbar.py - functions to build menu bar and toolbar for MainWindow"""
 
 
-from PyQt6.QtWidgets import QLabel, QToolBar, QMenu, QStatusBar, QApplication, QFileDialog, QMessageBox
 from PyQt6.QtGui import QAction, QPixmap
-from ui.ui_helpers import get_resource_path
-import os
 import base64
 from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtWidgets import QToolBar, QLabel
 from constants.app_images import LOGO_ICO_BASE64
 
 def create_menu_bar(window):
@@ -261,13 +259,11 @@ def create_menu_bar(window):
     # Settings Menu
     settings_menu = menubar.addMenu("&Settings")
 
-    calendar_action = QAction("&Calendar Settings...", window)
-    calendar_action.triggered.connect(window._show_calendar_settings)
-    settings_menu.addAction(calendar_action)
-
-    date_format_action = QAction("&Date Format...", window)
-    date_format_action.triggered.connect(window._show_date_format_settings)
-    settings_menu.addAction(date_format_action)
+    project_settings_action = QAction("&Project Settings...", window)
+    project_settings_action.triggered.connect(window._show_project_settings_dialog)
+    settings_menu.addAction(project_settings_action)
+    
+    # Removed separate Calendar and Date Format actions as they are now tabs in Project Settings
     
     settings_menu.addSeparator()
     

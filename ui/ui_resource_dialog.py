@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
 from data_manager.models import Resource
 from ui.ui_resource_exceptions_widget import ResourceExceptionsWidget
 
+
 class ResourceDialog(QDialog):
     """Dialog for adding/editing resources"""
     
@@ -41,10 +42,10 @@ class ResourceDialog(QDialog):
         # Billing Rate
         self.billing_rate_spin = QDoubleSpinBox()
         self.billing_rate_spin.setRange(0.0, 10000.0) # Assuming a reasonable range for billing rates
-        self.billing_rate_spin.setValue(0.0)
+        self.billing_rate_spin.setDecimals(2)
         self.billing_rate_spin.setPrefix("$")
         self.billing_rate_spin.setSuffix("/hr")
-        self.billing_rate_spin.setDecimals(2)
+        self.billing_rate_spin.setValue(100.0) # Set value after range is defined
         form_layout.addRow("Billing Rate:", self.billing_rate_spin)
         
         layout.addLayout(form_layout)
@@ -75,9 +76,11 @@ class ResourceDialog(QDialog):
     
     def get_resource_data(self):
         """Get resource data from form"""
+        billing_rate_value = self.billing_rate_spin.value()
+
         return {
             'name': self.name_edit.text(),
             'max_hours_per_day': self.hours_spin.value(),
             'exceptions': self.exceptions_widget.get_exceptions(),
-            'billing_rate': self.billing_rate_spin.value()
+            'billing_rate': billing_rate_value
         }

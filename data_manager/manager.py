@@ -1,12 +1,10 @@
+from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Any, Tuple
+import logging
+from data_manager.models import Task, Resource, DependencyType, TaskStatus, ScheduleType, Baseline, TaskSnapshot
 from settings_manager.settings_manager import ProjectSettings, DurationUnit
-from data_manager.models import Task, Resource, DependencyType, TaskStatus, ScheduleType
-from data_manager.baseline import Baseline, TaskSnapshot
 
 class DataManager:
-    """Manages all project data with hierarchy and dependency support"""
-    
     def __init__(self, calendar_manager=None):
         self.tasks: List[Task] = []
         self.resources: List[Resource] = [] # Initialize as empty, load_from_dict will handle default if needed
@@ -111,13 +109,21 @@ class DataManager:
                 
                 # Update summary task if this has a parent
                 if updated_task.parent_id is not None:
-                    self._update_summary_task_dates(updated_task.parent_id)
+                     changed_summaries = self._update_summary_task_dates(updated_task.parent_id)
+                     for sum_id in changed_summaries:
+                         sum_task = self.get_task(sum_id)
+                         if sum_task:
+                             self._auto_adjust_dependent_tasks(sum_task)
                 
-                # Update children if this is a summary task
+                # Update children if this is a summary task (re-calculate based on children)
                 if updated_task.is_summary:
-                    self._update_summary_task_dates(task_id)
+                    changed_summaries = self._update_summary_task_dates(task_id)
+                    for sum_id in changed_summaries:
+                         sum_task = self.get_task(sum_id)
+                         if sum_task:
+                             self._auto_adjust_dependent_tasks(sum_task)
                 
-                # Update dependent tasks
+                # Update dependent tasks of the task itself
                 self._auto_adjust_dependent_tasks(updated_task)
                 
                 return True
@@ -151,7 +157,11 @@ class DataManager:
                     parent.is_summary = False
                     parent.font_bold = False  # Remove bold formatting
                 else:
-                    self._update_summary_task_dates(task.parent_id)
+                    changed = self._update_summary_task_dates(task.parent_id)
+                    for sum_id in changed:
+                        sum_task = self.get_task(sum_id)
+                        if sum_task:
+                            self._auto_adjust_dependent_tasks(sum_task)
         
         return True
     
@@ -212,16 +222,27 @@ class DataManager:
                     old_parent.is_summary = False
                     old_parent.font_bold = False  # Remove bold formatting
                 else:
-                    self._update_summary_task_dates(old_parent_id)
+                    changed = self._update_summary_task_dates(old_parent_id)
+                    for sum_id in changed:
+                        sum_task = self.get_task(sum_id)
+                        if sum_task:
+                            self._auto_adjust_dependent_tasks(sum_task)
         
         # Update new parent
         if new_parent_id is not None:
             new_parent = self.get_task(new_parent_id)
             if new_parent:
                 if not new_parent.is_summary:  # Only update if not already a summary
+                    # Note: When converting to summary, we don't necessarily update dependent tasks
+                    # unless dates change, which _update_summary handles
                     new_parent.is_summary = True
                     new_parent.font_bold = True  # Auto-apply bold formatting
-                self._update_summary_task_dates(new_parent_id)
+                
+                changed = self._update_summary_task_dates(new_parent_id)
+                for sum_id in changed:
+                    sum_task = self.get_task(sum_id)
+                    if sum_task:
+                        self._auto_adjust_dependent_tasks(sum_task)
         
         return True
     
@@ -351,16 +372,17 @@ class DataManager:
                         start_from = predecessor.end_date
                         days_to_add = lag_days
 
+                        work_end_hour, work_end_min = self.calendar_manager.get_working_end_time()
                         # If predecessor is not a milestone, or if it ends late, we move to the next day
-                        # A bit of a simplification: assume "late" is after 4 PM (16:00)
-                        if not predecessor.is_milestone or start_from.hour >= 16:
+                        if not predecessor.is_milestone or (start_from.hour > work_end_hour) or (start_from.hour == work_end_hour and start_from.minute >= work_end_min):
                             days_to_add += 1
                         
                         constraint_start = self.calendar_manager.add_working_days(start_from, days_to_add)
                         
-                        # If we moved to a new day, snap to 8 AM
+                        # If we moved to a new day, snap to working start time
                         if days_to_add > lag_days:
-                           constraint_start = constraint_start.replace(hour=8, minute=0, second=0, microsecond=0)
+                           start_h, start_m = self.calendar_manager.get_working_start_time()
+                           constraint_start = constraint_start.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
 
                 else:
                     constraint_start = predecessor.end_date + timedelta(days=1) + lag
@@ -396,21 +418,11 @@ class DataManager:
                 if task.is_milestone:
                     task.end_date = task.start_date
                 elif self.calendar_manager:
-                    # To calculate the end date, we find the target end day and then set the time.
-                    days_to_add = original_duration_days - 1
-                    if days_to_add < 0: days_to_add = 0
+                    # Calculate total hours based on duration days
+                    total_hours = original_duration_days * self.calendar_manager.hours_per_day
                     
-                    end_day = self.calendar_manager.add_working_days(task.start_date, days_to_add)
-
-                    # The end time should correspond to the end of the work day.
-                    end_time_on_day = task.start_date + timedelta(hours=self.calendar_manager.hours_per_day)
-
-                    task.end_date = end_day.replace(
-                        hour=end_time_on_day.hour, 
-                        minute=end_time_on_day.minute, 
-                        second=end_time_on_day.second,
-                        microsecond=end_time_on_day.microsecond
-                    )
+                    # Use robust add_working_hours
+                    task.end_date = self.calendar_manager.add_working_hours(task.start_date, total_hours)
                 else:
                     task.end_date = task.start_date + timedelta(days=original_duration_days - 1)
 
@@ -445,9 +457,50 @@ class DataManager:
             if not task or task_id in finalized_ids:
                 continue
 
-            # Only auto-adjust AUTO_SCHEDULED tasks
+            # Special handling for Summary Tasks
+            # Summary tasks are driven by their children, but they drive their successors.
+            # If a summary task is in the queue, it means it was updated (by children) or needs propagation.
+            if task.is_summary:
+                finalized_ids.add(task_id)
+                
+                # Update parent summary if exists (upward propagation)
+                if task.parent_id is not None:
+                     changed = self._update_summary_task_dates(task.parent_id)
+                     for cid in changed:
+                        if cid not in queued_ids:
+                             queue.append(cid)
+                             queued_ids.add(cid)
+
+                # Propagate to successors
+                for successor in self.get_successors(task.id):
+                    # Only add AUTO_SCHEDULED successors to the queue
+                    if successor.schedule_type == ScheduleType.AUTO_SCHEDULED and successor.id not in queued_ids:
+                        queue.append(successor.id)
+                        queued_ids.add(successor.id)
+                
+                continue
+
+            # Manually scheduled tasks don't get auto-adjusted, but their successors should still be updated
             if task.schedule_type == ScheduleType.MANUALLY_SCHEDULED:
                 finalized_ids.add(task_id) # Mark as finalized to prevent re-processing
+                
+                # Update parent summary if exists
+                if task.parent_id is not None:
+                    changed_summaries = self._update_summary_task_dates(task.parent_id)
+                    for sum_id in changed_summaries:
+                        if sum_id not in queued_ids:
+                             queue.append(sum_id)
+                             queued_ids.add(sum_id)
+                
+                # Add all direct successors to the queue for re-evaluation
+                # This ensures that when a manually scheduled task's dates change,
+                # its auto-scheduled successors are still updated
+                for successor in self.get_successors(task.id):
+                    # Only add AUTO_SCHEDULED successors to the queue
+                    if successor.schedule_type == ScheduleType.AUTO_SCHEDULED and successor.id not in queued_ids:
+                        queue.append(successor.id)
+                        queued_ids.add(successor.id)
+                
                 continue
 
             original_start = task.start_date
@@ -462,7 +515,14 @@ class DataManager:
 
                 # Update parent summary if exists
                 if task.parent_id is not None:
-                    self._update_summary_task_dates(task.parent_id)
+                    changed_summaries = self._update_summary_task_dates(task.parent_id)
+                    # Add changed summary tasks to queue to propagate their date changes to dependents
+                    for sum_id in changed_summaries:
+                        if sum_id not in queued_ids:
+                            queue.append(sum_id)
+                            queued_ids.add(sum_id)
+                            # Also ensure the summary task itself is marked for processing if it has dependents
+                            # (Wait, queue logic handles processing. Just appending ID is enough)
                 
                 # Add all direct successors to the queue for re-evaluation
                 for successor in self.get_successors(task.id):
@@ -476,6 +536,7 @@ class DataManager:
         for task in sorted(self.tasks, key=lambda t: t.get_level(self.tasks), reverse=True):
             if task.is_summary:
                 self._update_summary_task_dates(task.id)
+
 
     
     def _update_summary_task_dates(self, summary_task_id: int):
@@ -510,12 +571,21 @@ class DataManager:
                 summary_task.percent_complete = int((completed / len(children)) * 100)
         
         # Update summary task dates
+        old_start = summary_task.start_date
+        old_end = summary_task.end_date
+        
         summary_task.start_date = earliest_start
         summary_task.end_date = latest_end
         
-        # Recursively update parent if exists
+        changed_ids = set()
+        if old_start != summary_task.start_date or old_end != summary_task.end_date:
+            changed_ids.add(summary_task_id)
+        
+        # Recursively update parent if exists and collect changed IDs
         if summary_task.parent_id is not None:
-            self._update_summary_task_dates(summary_task.parent_id)
+            changed_ids.update(self._update_summary_task_dates(summary_task.parent_id))
+            
+        return changed_ids
     
     # Project Analytics
     
@@ -723,12 +793,19 @@ class DataManager:
     
     def save_to_dict(self) -> Dict[str, Any]:
         """Export all data to dictionary"""
-        return {
+        data = {
             'project_name': self.project_name,
+            'settings': self.settings.to_dict(), # Include settings
             'tasks': [task.to_dict(date_format=self.settings.default_date_format) for task in self.tasks],
             'resources': [resource.to_dict() for resource in self.resources], # Include resources
             'baselines': [baseline.to_dict(date_format=self.settings.default_date_format) for baseline in self.baselines], # Include baselines
         }
+        
+        # Save calendar settings if manager exists
+        if self.calendar_manager:
+            data['calendar_settings'] = self.calendar_manager.to_dict()
+            
+        return data
     
     def load_from_dict(self, data: Dict[str, Any]):
         """Import all data from dictionary with backward compatibility"""
@@ -742,6 +819,10 @@ class DataManager:
             self.settings.from_dict(data['settings'])
         else:
             self.settings = ProjectSettings()
+            
+        # Load calendar settings if present
+        if 'calendar_settings' in data and self.calendar_manager:
+            self.calendar_manager.from_dict(data['calendar_settings'])
         
         # Load tasks using the retrieved date format
         self.tasks = [Task.from_dict(t, date_format=self.settings.default_date_format) for t in data.get('tasks', [])]
@@ -764,10 +845,9 @@ class DataManager:
         if not self.resources:
             self.resources.append(Resource(name="Default Resource", max_hours_per_day=8.0, billing_rate=50.0))
         
-        # Re-evaluate all task dates based on predecessors after loading
-        # This is crucial for correct dependency handling on import
-        for task in self.tasks:
-            self._auto_calculate_dates_from_predecessors(task)
+        # NOTE: We do NOT re-evaluate task dates on import to preserve the exact times
+        # from the JSON file. Date recalculation should only happen during explicit
+        # scheduling operations, not during import.
         
         # Update summary task dates after all individual task dates are set
         # This ensures hierarchy dates are correct
@@ -1341,10 +1421,11 @@ class DataManager:
                 })
         
         # Check for deleted tasks (in baseline but not in current)
-        for task_id, snapshot in baseline.get_all_snapshots().items():
-            if not self.get_task(task_id):
+        baseline_snapshots = getattr(baseline, 'snapshots', [])
+        for snapshot in baseline_snapshots:
+            if not self.get_task(snapshot.task_id):
                 comparisons.append({
-                    'task_id': task_id,
+                    'task_id': snapshot.task_id,
                     'task_name': snapshot.task_name + " (Deleted)",
                     'wbs': snapshot.wbs,
                     'is_summary': False,

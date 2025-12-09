@@ -2,7 +2,6 @@
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
 import os
 from datetime import datetime
-from reportlab.platypus.tableofcontents import TableOfContents
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -12,8 +11,7 @@ from ui.gantt_chart import GanttChart
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize
 from PIL import Image as PILImage
 import base64
 import io
