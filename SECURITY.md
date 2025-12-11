@@ -1,7 +1,7 @@
 # **PlanIFlow - Formal Security Assessment Report**  
-## **PlanIFlow v1.8.0 – Offline Desktop Project Management Application**  
-**Assessment Conducted:** December 08, 2025  
-**Scope:** All 47 Python source files (`*.py`)  
+## **PlanIFlow v2.0.0 – Offline Desktop Project Management Application**  
+**Assessment Conducted:** December 12, 2025  
+**Scope:** All 44 Python source files (`*.py`)  
 **Methodology:** Static code analysis (SAST using `bandit`), manual code review, data flow tracing, threat modeling, CVSS v3.1 scoring.  
 **Classification:** **LOW RISK – SECURE FOR INTENDED USE**
 
@@ -20,7 +20,7 @@ The application is **secure by design** for its intended use case: **single-user
 
 | Item 						| Details 													|
 |---------------------------|-----------------------------------------------------------|
-| **Files Analyzed** 		| 47 `.py` files (e.g., `main.py`, `ui_main.py`, `exporter.py`, `data_manager/manager.py`) |
+| **Files Analyzed** 		| 44`.py` files (e.g., `main.py`, `ui_main.py`, `exporter.py`, `data_manager/manager.py`) |
 | **Analysis Type** 		| White-box static analysis (SAST) and manual code review. 	|
 | **Tools Used** 			| `bandit` static analyzer, manual code review, CVSS v3.1 scoring. |
 | **Threat Model** 			| Malicious local file input, resource exhaustion. 			|
@@ -93,18 +93,19 @@ The application operates with the minimum required privileges.
 
 ### **4.6 Third-Party Dependencies**
 
-The project uses several third-party libraries listed in `requirements.txt`.
+The project's dependencies are explicitly pinned in `requirements.txt`. This is a strong security practice that ensures reproducible builds and protects against the unexpected introduction of vulnerabilities from newer, untracked dependency versions.
 
-| Library 		| Version Range 	| Known CVEs (as of 2025) | Risk 	|
-|---------------|-------------------|-------------------------|--------|
-| PyQt6 		| >=6.4.0 		    | None for recent versions. | Low 	|
-| pandas 		| >=2.0.0 		    | Older versions have known CVEs. | Low 	|
-| matplotlib 	| >=3.7.0 		    | None for recent versions. | Low 	|
-| openpyxl 		| >=3.1.0 		    | None for recent versions. | Low 	|
-| reportlab 	| >=4.0.0 		    | XXE mitigated in recent versions. | Low 	|
-| numpy 		| <2.1.3 		    | Some CVEs in older versions. | Low 	|
+An analysis of the currently pinned dependencies was conducted on December 12, 2025.
 
-**The dependencies are not pinned to specific versions**, which creates a potential supply-chain risk if a future dependency release introduces a vulnerability.
+| Library 		| Pinned Version 	| Known CVEs (in this version) | Risk 	|
+|---------------|-------------------|------------------------------|--------|
+| PyQt6 		| `6.10.1`		    | None. Includes fixes for prior Qt CVEs. | Low 	|
+| pandas 		| `2.3.3`		    | None. Older CVEs do	 not apply. | Low 	|
+| openpyxl 		| `3.1.5`		    | None. Used safely (`data_only=True`). | Low 	|
+| matplotlib 	| `3.10.7`		    | None. | Low 	|
+| reportlab 	| `4.4.5`		    | None. | Low 	|
+| numpy 		| `2.1.2`		    | None. Older CVEs do not apply. | Low 	|
+| Pillow        | `12.0.0`          | None reported. | Low 	|
 
 ### **4.7 Static Analysis**
 
@@ -118,7 +119,7 @@ A static analysis scan using `bandit` was performed on the codebase. No high-sev
 | Path Traversal 			| Impossible 	| High 		| **NONE** 		| 0.0 |
 | Privilege Escalation 		| Impossible 	| Critical 	| **NONE** 		| 0.0 |
 | Input-Induced DoS 			| Possible 		| Low 		| **LOW** 		| 5.5 |
-| Supply-Chain (unpinned deps) | Possible 		| Medium 	| **LOW** 		| 3.9 |
+| Supply-Chain (pinned deps) | Improbable | Low | **NONE** | 0.0 |
 
 ## **6. Security Strengths**
 
@@ -133,7 +134,7 @@ A static analysis scan using `bandit` was performed on the codebase. No high-sev
 
 ## **7. Conclusion**
 
-> **PlanIFlow v1.8.0 is secure, robust, and suitable for deployment.**
+> **PlanIFlow v2.0.0 is secure, robust, and suitable for deployment.**
 
 It adheres to **defense-in-depth principles** appropriate for an offline desktop application:
 - No trust in file inputs beyond what the parsers safely handle.

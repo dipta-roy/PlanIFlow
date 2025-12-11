@@ -17,6 +17,7 @@ from ui.ui_dashboard import create_dashboard
 from ui.ui_resources import ResourceSheet
 from ui.ui_tasks import create_task_tree
 from ui.ui_baseline_comparison import BaselineComparisonTab
+from ui.ui_monte_carlo import MonteCarloTab
 
 # Mixins
 from ui.ui_file_manager import FileOperationsMixin
@@ -184,6 +185,10 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         self.baseline_comparison = self._create_baseline_comparison()
         self.tabs.addTab(self.baseline_comparison, "📐 Baseline Comparison")
         
+        # Monte Carlo Simulation Tab
+        self.monte_carlo_tab = self._create_monte_carlo_tab()
+        self.tabs.addTab(self.monte_carlo_tab, "🎲 Risk Analysis")
+        
         layout.addWidget(self.tabs)
     
     def _create_task_tree(self):
@@ -202,6 +207,10 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         self.baseline_comparison = BaselineComparisonTab(self.data_manager, self)
         return self.baseline_comparison
 
+    def _create_monte_carlo_tab(self):
+        self.monte_carlo_tab = MonteCarloTab(self.data_manager)
+        return self.monte_carlo_tab
+
     def _create_status_bar(self):
         """Create status bar"""
         self.status_bar = QStatusBar()
@@ -212,6 +221,11 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         
         self.save_time_label = QLabel("")
         self.status_bar.addPermanentWidget(self.save_time_label)
+
+    def _show_monte_carlo_help(self):
+        """Show Monte Carlo help dialog"""
+        if hasattr(self, 'monte_carlo_tab'):
+            self.monte_carlo_tab.show_help()
     
     # Tree View Methods
     def eventFilter(self, obj, event):

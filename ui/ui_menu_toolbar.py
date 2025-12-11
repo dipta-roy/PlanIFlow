@@ -287,6 +287,10 @@ def create_menu_bar(window):
     legend_action.triggered.connect(window._show_status_legend)
     help_menu.addAction(legend_action)
 
+    mc_help_action = QAction("Monte Carlo &Analysis Help", window)
+    mc_help_action.triggered.connect(window._show_monte_carlo_help)
+    help_menu.addAction(mc_help_action)
+
     about_action = QAction("&About", window)
     about_action.triggered.connect(window._show_about)
     help_menu.addAction(about_action)

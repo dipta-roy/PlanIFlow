@@ -8,7 +8,7 @@ from reportlab.lib import colors
 
 # --- General Application Constants ---
 APP_NAME = "PlanIFlow"
-VERSION = "1.8.0"
+VERSION = "2.0.0"
 AUTHOR = "Dipta Roy"
 ABOUT_TEXT = "PlanIFlow is a project planning and management tool designed to help you organize tasks, resources, and schedules effectively."
 

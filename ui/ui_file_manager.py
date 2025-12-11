@@ -65,6 +65,8 @@ class FileOperationsMixin:
                 # Update baseline comparison tab reference
                 if hasattr(self, 'baseline_comparison'):
                     self.baseline_comparison.data_manager = self.data_manager
+                if hasattr(self, 'monte_carlo_tab'):
+                    self.monte_carlo_tab.data_manager = self.data_manager
                 self._update_all_views()
                 self._expand_all_tasks()
                 self.status_label.setText(f"Opened: {self.data_manager.project_name}")
@@ -121,6 +123,8 @@ class FileOperationsMixin:
                 # Update baseline comparison tab reference
                 if hasattr(self, 'baseline_comparison'):
                     self.baseline_comparison.data_manager = self.data_manager
+                if hasattr(self, 'monte_carlo_tab'):
+                    self.monte_carlo_tab.data_manager = self.data_manager
                 self._update_all_views()
                 self.status_label.setText("Imported from Excel")
             else:
@@ -201,6 +205,8 @@ class FileOperationsMixin:
                         # Update baseline comparison tab reference
                         if hasattr(self, 'baseline_comparison'):
                             self.baseline_comparison.data_manager = self.data_manager
+                        if hasattr(self, 'monte_carlo_tab'):
+                            self.monte_carlo_tab.data_manager = self.data_manager
                         self._update_all_views()
                         self._expand_all_tasks()
                         self.status_label.setText(f"Loaded: {self.data_manager.project_name}")

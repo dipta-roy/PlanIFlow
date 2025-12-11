@@ -21,6 +21,8 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
   - [Gantt Chart](#gantt-chart)
   - [Dashboard](#dashboard)
   - [Importing and Exporting Data](#importing-and-exporting-data)
+  - [Project Baselining](#project-baselining)
+  - [Monte Carlo Risk Analysis](#-monte-carlo-risk-analysis)
 - [Shortcuts](#️-shortcuts)
 - [Batch Scripts](#-batch-scripts)
 - [Building from Source](#️-building-from-source)
@@ -45,6 +47,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - **Resource Exception**: Resources can now have exception days (holidays/leaves) that exclude them from work on specific dates. This affects their billing and effort calculations.
 - **Total Project Cost in Dashboard**: The dashboard now displays the total estimated cost of the project, calculated from all assigned resources and their billing rates.
 - **Project Baselining**: Create up to 3 project baselines to capture snapshots of your project at specific points in time. Compare current progress against baselines to track variances in start dates, end dates, duration, and completion percentages. Baselines are fully integrated with Excel and JSON import/export.
+- **Monte Carlo Risk Analysis**: A risk assessment tool that simulates the project schedule hundreds or thousands of times to generate a probability distribution of possible project completion dates.
 - **Rich Text Task Formatting**: Customize the appearance of tasks with rich text formatting options. Make important tasks stand out or organize your project visually.
     - **Font Styling**: Apply **bold**, *italic*, and underline to task names.
     - **Coloring**: Change the font color and background color of tasks.
@@ -66,6 +69,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - Openpyxl
 - Reportlab
 - Numpy
+- Pillow
 
 ## Architecture Overview
 
@@ -76,7 +80,7 @@ The application follows a modular architecture, separating data management, UI, 
 ### Prerequisites
 
 - Windows Operating System
-- Python 3.10 or higher
+- Python 3.11 or higher
 
 ### Running the Application
 
@@ -90,7 +94,7 @@ run.bat
 
 or 
 
-Use the `build.bat` script to generate an `PlayIFlow 1.8.0.exe` file which will be saved at `dist/` folder.
+Use the `build.bat` script to generate an `PlayIFlow 2.0.0.exe` file which will be saved at `dist/` folder.
 
 ```bash
 build.bat
@@ -124,7 +128,7 @@ python3 main.py
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download PlanIFlow `PlanIFlow_1.8.0.zip`:
+Download PlanIFlow `PlanIFlow_2.0.0.zip`:
 Download Code Verification Certificate: [Dipta Roy - Code Verification Certificate](https://github.com/dipta-roy/dipta-roy.github.io/blob/main/downloads/Code%20Verifying%20Certificates.zip).
 ```
 - HOW TO TRUST
@@ -146,7 +150,7 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 
 Once verified,
 ```
-Run: PlanIFlow_1.8.0.exe
+Run: PlanIFlow_2.0.0.exe
 ```
 
 ## 💻 Usage
@@ -224,6 +228,23 @@ Baselines allow you to capture snapshots of your project at key milestones and c
   - Baselines are automatically saved with your project in JSON and Excel formats
   - When importing projects, baselines are restored with full backward compatibility
 
+## 🎲 Monte Carlo Risk Analysis
+
+The Monte Carlo analysis feature provides a powerful way to forecast project completion dates under uncertainty. Instead of relying on a single, deterministic schedule, it runs thousands of simulations to model a range of possible outcomes.
+
+- **How to Use**:
+  - Go to the `Monte Carlo` tab.
+  - Set the number of **Iterations** (e.g., 1000). More iterations lead to more accurate statistical results but take longer to run.
+  - Click **"Run Analysis"**.
+
+- **Interpreting the Results**:
+  - **Confidence Table**: This table shows the predicted completion dates for different confidence levels:
+    - **P50 (Median)**: The date by which there is a 50% chance of completion. This is the most likely outcome.
+    - **P80 (Low Risk)**: The date you can be 80% confident the project will be finished. A good target for stakeholder communication.
+    - **P90 (High Confidence)**: A very conservative date with a 90% chance of completion.
+  - **Top Risk Drivers**: This is a ranked list of tasks that most frequently appear on the critical path during the simulations. These are the tasks that have the biggest impact on your project's schedule. Focus on managing these tasks to reduce schedule risk.
+  - **Completion Date Distribution**: An ASCII histogram that visualizes the spread of possible completion dates, giving you a quick overview of the project's risk profile.
+
 ## ⌨️ Shortcuts
 
 | Shortcut         | Action                  |
@@ -274,6 +295,7 @@ To build a standalone executable from the source code, you can use the `build.ba
 | `data_manager/models.py`                 | Defines data models for tasks, resources, and other project entities.                                   |
 | `data_manager/manager.py`                | The core data manager, handling tasks, resources, critical path, and cost management.                   |
 | `data_manager/baseline.py`               | Defines baseline data models for capturing project snapshots.                                           |
+| `data_manager/monte_carlo.py`            | Handles Monte Carlo simulation for risk analysis.                                                       |
 | `exporter/exporter.py`                   | Handles the import and export of project data in formats like JSON and Excel.                           |
 | `exporter/pdf_exporter.py`               | Responsible for exporting project reports and Gantt charts to PDF format.                               |
 | `settings_manager/settings_manager.py`   | Manages application settings, such as duration units and theme preferences.                             |
@@ -292,6 +314,7 @@ To build a standalone executable from the source code, you can use the `build.ba
 | `ui/ui_formatting.py`                    | Implements the font and color formatting features.                                                      |
 | `ui/ui_helpers.py`                       | Provides utility functions and helper methods for UI-related tasks.                                     |
 | `ui/ui_menu_toolbar.py`                  | Handles actions and shortcuts for the application's menu and toolbar.                                   |
+| `ui/ui_monte_carlo.py`                   | Implements the Monte Carlo simulation tab.                                                              |
 | `ui/ui_project_settings.py`              | Defines the dialog for configuring general project settings.                                            |
 | `ui/ui_resource_dialog.py`               | Defines the dialog for managing and editing resources.                                                  |
 | `ui/ui_resource_exceptions_widget.py`    | Widget for managing resource exceptions (holidays/leaves).                                              |
@@ -306,7 +329,7 @@ To build a standalone executable from the source code, you can use the `build.ba
 ## 🐛 Troubleshooting
 
 -   **Resource Files Not Found (PyInstaller builds)**: If you encounter issues with the application not finding images or other data files when running a built executable, it might be related to how PyInstaller bundles resources. The application uses `sys._MEIPASS` to locate files in standalone executables. Ensure all necessary data directories (e.g., `images`, `constants`) are correctly included in the PyInstaller build process via `--add-data` flags in `build.bat`.
--   **Application does not start**: Ensure you have Python 3.10 or higher installed and that it is in your system's PATH.
+-   **Application does not start**: Ensure you have Python 3.11 or higher installed and that it is in your system's PATH.
 -   **`ModuleNotFoundError`**: If you get an error about a missing module, run `pip install -r requirements.txt` in the activated virtual environment.
 
 ## 📄 License
