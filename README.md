@@ -340,7 +340,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/808e0cd8724d6bd14321c56e0ccf57d2b665323404601e6564145a41cb279561) - May detect as **false positive**, add to Exclusion if necessary.
+- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/1b0b5e148e9b330bec05ff7df7b120854320e5911a53a87e0b6eca9751f5da69) - May detect as **false positive**, add to Exclusion if necessary.
 
 ## 🙏 Acknowledgments
 
