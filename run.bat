@@ -42,7 +42,8 @@ if not exist "venv\" (
 REM Activate virtual environment
 echo [INFO] Activating virtual environment...
 call venv\Scripts\activate.bat
-if errorlevel 1 (
+set VENV_ACTIVATION_ERROR=!errorlevel!
+if !VENV_ACTIVATION_ERROR! neq 0 (
     echo [ERROR] Failed to activate virtual environment!
     pause
     exit /b 1
