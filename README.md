@@ -1,7 +1,8 @@
 # 📊 PlanIFlow - Project Planner
 
-![Python Version](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![Python Version](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![Framework](https://img.shields.io/badge/Framework-PyQt6-blue.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 PlanIFlow is a fully offline, standalone desktop application for project planning and management, offering features similar to Microsoft Project.
 
@@ -23,7 +24,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
   - [Importing and Exporting Data](#importing-and-exporting-data)
   - [Project Baselining](#project-baselining)
   - [Monte Carlo Risk Analysis](#-monte-carlo-risk-analysis)
-- [Screnshots](#-screenshots)
+- [Screnshots](#screenshots)
 - [Shortcuts](#️-shortcuts)
 - [Batch Scripts](#-batch-scripts)
 - [Building from Source](#️-building-from-source)
@@ -31,6 +32,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - [Project Structure](#-project-structure)
 - [Troubleshooting](#-troubleshooting)
 - [Security and Distribution](#-security-and-distribution)
+- 	[Reasons for False Positve Detections](#-security-and-distribution)
 - [Acknowledgments](#-acknowledgments)
 
 ## ✨ Features
@@ -371,7 +373,13 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/808e0cd8724d6bd14321c56e0ccf57d2b665323404601e6564145a41cb279561) - May detect as **false positive**, add to Exclusion if necessary.
+- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/8987cc9548e26ebef8a2f45b2bb10367e16fb4082568f07d2cdddf3403c0e04c) - May detect as **false positive**, add to Exclusion if necessary.
+
+### Reasons for False Positve Detections:
+- **PyInstaller Bundling**: Embeds Python runtime, bytecode, and large libraries (e.g., PyQt6, matplotlib) into a single EXE, mimicking packed malware droppers via temporary unpacking.
+- **Dynamic Loading**: Hidden imports and runtime code execution (e.g., via exec()) trigger heuristics for code injection, similar to script-based threats.
+- **Suspicious Behaviors**: File I/O, subprocess calls, and network potential (from libs like requests, which are cleaned as much possible) score as PUPs in sandboxes.
+- **Generic Heuristics**: Large file size, unsigned EXE, and fuzzy hashing group it with known threats; common false positive for PyInstaller apps (85%+ cases).
 
 ## 🙏 Acknowledgments
 
