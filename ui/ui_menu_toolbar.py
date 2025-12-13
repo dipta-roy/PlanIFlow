@@ -283,8 +283,8 @@ def create_menu_bar(window):
     # Help Menu
     help_menu = menubar.addMenu("&Help")
 
-    legend_action = QAction("Status &Legend", window)
-    legend_action.triggered.connect(window._show_status_legend)
+    legend_action = QAction("Quick &Reference Guide", window)
+    legend_action.triggered.connect(window._show_reference_guide)
     help_menu.addAction(legend_action)
 
     mc_help_action = QAction("Monte Carlo &Analysis Help", window)

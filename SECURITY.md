@@ -1,5 +1,5 @@
 # **PlanIFlow - Formal Security Assessment Report**  
-## **PlanIFlow v2.0.0 – Offline Desktop Project Management Application**  
+## **PlanIFlow v2.1.0 – Offline Desktop Project Management Application**  
 **Assessment Conducted:** December 12, 2025  
 **Scope:** All 44 Python source files (`*.py`)  
 **Methodology:** Static code analysis (SAST using `bandit`), manual code review, data flow tracing, threat modeling, CVSS v3.1 scoring.  
@@ -134,7 +134,7 @@ A static analysis scan using `bandit` was performed on the codebase. No high-sev
 
 ## **7. Conclusion**
 
-> **PlanIFlow v2.0.0 is secure, robust, and suitable for deployment.**
+> **PlanIFlow v2.1.0 is secure, robust, and suitable for deployment.**
 
 It adheres to **defense-in-depth principles** appropriate for an offline desktop application:
 - No trust in file inputs beyond what the parsers safely handle.

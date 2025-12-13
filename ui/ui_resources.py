@@ -5,6 +5,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt
 from data_manager.models import Resource
 from ui.ui_resource_dialog import ResourceDialog
+from command_manager.commands import AddResourceCommand, EditResourceCommand
 
 
 class ResourceSheet(QWidget):
@@ -116,36 +117,38 @@ class ResourceSheet(QWidget):
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 resource_data = dialog.get_resource_data()
                 
-                updated_resource = Resource(
-                    name=resource_data['name'],
-                    max_hours_per_day=resource_data['max_hours_per_day'],
-                    exceptions=resource_data['exceptions'],
-                    billing_rate=resource_data['billing_rate']
-                )
+                # Ensure types
+                resource_data['billing_rate'] = float(resource_data.get('billing_rate', 0.0))
                 
-                self.data_manager.update_resource(resource_name, updated_resource)
-                self.parent_window._update_all_views()
-                self.parent_window.status_label.setText("Resource updated")
+                def on_success():
+                    self.parent_window._update_all_views()
+                    # If name changed, status message might use new name
+                    new_name = resource_data['name']
+                    self.parent_window.status_label.setText(f"Resource '{new_name}' updated")
+                
+                command = EditResourceCommand(self.data_manager, resource_name, resource_data, on_success_callback=on_success)
+                
+                if not self.parent_window.command_manager.execute_command(command):
+                    QMessageBox.warning(self, "Error", "Failed to update resource. Name collision?")
 
     def _add_resource_dialog(self):
         """Show add resource dialog"""
         dialog = ResourceDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             resource_data = dialog.get_resource_data()
-
-            resource = Resource(
-                name=resource_data['name'],
-                max_hours_per_day=resource_data['max_hours_per_day'],
-                exceptions=resource_data['exceptions'],
-                billing_rate=float(resource_data.get('billing_rate', 0.0))
-            )
             
-            if self.data_manager.add_resource(resource):
+            # Ensure proper types for command
+            resource_data['billing_rate'] = float(resource_data.get('billing_rate', 0.0))
+
+            def on_success():
                 self.parent_window._update_all_views()
-                self.parent_window.status_label.setText(f"Resource '{resource.name}' added successfully")
-            else:
-                QMessageBox.warning(self, "Duplicate Resource", 
-                                  "A resource with this name already exists.")
+                self.parent_window.status_label.setText(f"Resource '{resource_data['name']}' added successfully")
+
+            command = AddResourceCommand(self.data_manager, resource_data, on_success_callback=on_success)
+            
+            if not self.parent_window.command_manager.execute_command(command):
+                 QMessageBox.warning(self, "Duplicate Resource", 
+                                   "A resource with this name already exists.")
 
     def _delete_resource(self):
         """Delete selected resource"""

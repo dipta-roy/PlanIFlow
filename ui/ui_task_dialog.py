@@ -102,12 +102,17 @@ class TaskDialog(QDialog):
         self.start_date_input = QDateTimeEdit()
         self.start_date_input.setCalendarPopup(True)
         
-        # Default to today at configured start time
+        # Default to today at configured start time or project start date
         now = datetime.now()
         start_hour, start_minute = self.data_manager.calendar_manager.get_working_start_time()
         end_hour, end_minute = self.data_manager.calendar_manager.get_working_end_time()
         
-        default_start = now.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+        if self.data_manager.settings.project_start_date:
+            base_date = self.data_manager.settings.project_start_date
+        else:
+            base_date = now
+
+        default_start = base_date.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
         self.start_date_input.setDateTime(default_start)
         
         if self.is_milestone:
@@ -126,7 +131,7 @@ class TaskDialog(QDialog):
             self.end_date_input.setDateTime(default_start) 
         else:
             # For tasks, default to same day at configured end time
-            default_end = now.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
+            default_end = default_start.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
             self.end_date_input.setDateTime(default_end)
             
         self.end_date_input.dateTimeChanged.connect(self._on_date_changed)

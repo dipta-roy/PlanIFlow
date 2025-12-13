@@ -34,7 +34,7 @@ class Task:
                  task_id: int = None, parent_id: int = None, is_summary: bool = False,
                  is_milestone: bool = False, wbs: str = None,
                  schedule_type: ScheduleType = ScheduleType.AUTO_SCHEDULED,
-                 font_family: str = "Arial", font_size: int = 10, font_color: str = "#000000",
+                 font_family: str = None, font_size: int = None, font_color: str = "#000000",
                  font_bold: bool = None, font_italic: bool = None, font_underline: bool = False,
                  background_color: str = "#FFFFFF"):
         """
@@ -292,8 +292,8 @@ class Task:
             wbs=data.get('wbs'), # Pass wbs from data
             schedule_type=schedule_type,
             # Font styling with defaults for backward compatibility
-            font_family=data.get('font_family', 'Arial'),
-            font_size=data.get('font_size', 10),
+            font_family=data.get('font_family', None),
+            font_size=data.get('font_size', None),
             font_color=data.get('font_color', '#000000'),
             font_bold=data.get('font_bold', None),  # Use None to trigger automatic formatting
             font_italic=data.get('font_italic', None),  # Use None to trigger automatic formatting

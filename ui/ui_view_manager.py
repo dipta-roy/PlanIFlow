@@ -1,6 +1,8 @@
 from constants.app_images import LOGO_BASE64
 from constants.constants import APP_NAME, VERSION, AUTHOR, ABOUT_TEXT
-from PyQt6.QtWidgets import QMessageBox, QDialog, QHBoxLayout, QLabel, QWidget
+from PyQt6.QtWidgets import (QMessageBox, QDialog, QHBoxLayout, QVBoxLayout, QLabel, 
+                             QWidget, QTabWidget, QTableWidget, QTableWidgetItem, 
+                             QHeaderView, QAbstractItemView, QScrollArea, QFrame, QPushButton)
 from PyQt6.QtCore import Qt, QByteArray
 from PyQt6.QtGui import QPixmap, QImage
 from ui.themes import ThemeManager
@@ -14,36 +16,78 @@ class GeneralViewOperationsMixin:
 
     def _update_all_views(self):
         """Update all UI views"""
-        self._update_task_tree()
-        self._update_gantt_chart()
+        # self._apply_stylesheet() # ONLY apply on settings change or init (expensive call)
         
-        # Update the data_manager reference in resource_summary
-        self.resource_summary.data_manager = self.data_manager
+        # Always update task tree if it's visible, or if we want to keep it in sync (it's the main view)
+        # Actually task tree is fast enough usually, but let's optimize.
+        # If we are in Gantt view, we might not need to update Tree immediately?
+        # But Tree holds data for inline editing? No, data_manager holds data.
+        # Tree is just a view.
         
-        self.resource_summary._update_resource_delegates()
-        self._update_resource_summary()
-        self._update_dashboard()
-        self._update_resource_filter()
+        # Update currently visible view immediately
+        current_index = self.tabs.currentIndex()
+        
+        if current_index == 0: # Task List
+            self._update_task_tree()
+        elif current_index == 1: # Gantt
+            self._update_gantt_chart()
+        elif current_index == 2: # Resources
+            self._update_resource_summary()
+        elif current_index == 3: # Dashboard
+             self._update_dashboard()
+        elif current_index == 4: # Baseline
+             if hasattr(self, 'baseline_comparison'):
+                self.baseline_comparison.refresh_baselines()
+        
+        # We should mark others as dirty? 
+        # For simplicity, let's just update the lightweight ones always,
+        # and heavy ones (Tree, Gantt) only if visible.
+        
+        # But wait, if I don't update Tree, and I switch back to Tree, it will be stale unless `_on_tab_changed` updates it.
+        # Yes, `_on_tab_changed` will handle that.
+        
         self._update_window_title()
-        self.project_name_label.setText(self.data_manager.project_name)
-        if hasattr(self, 'dashboard_project_name'):
-            self.dashboard_project_name.setText(f"<h2>{self.data_manager.project_name}</h2>")
-        
-        # Refresh baseline comparison if it exists
-        if hasattr(self, 'baseline_comparison'):
-            self.baseline_comparison.refresh_baselines()
     
+    def _on_tab_changed(self, index):
+        """Handle tab switching to refresh views"""
+        if index == 0:
+            self._update_task_tree()
+        elif index == 1:
+            self._update_gantt_chart()
+        elif index == 2:
+            self._update_resource_summary()
+        elif index == 3:
+            self._update_dashboard()
+        elif index == 4:
+            if hasattr(self, 'baseline_comparison'):
+                self.baseline_comparison.refresh_baselines()
+
     def _update_gantt_chart(self):
         """Update Gantt chart"""
+        # Optimization: Only update if visible
+        # Check if Gantt tab is active. 
+        # Warning: If we export PDF or something relying on this, we might need to force update.
+        # But export usually calls specific methods.
+        
+        if hasattr(self, 'tabs') and self.tabs.currentIndex() != 1:
+             return
+
         tasks = self.data_manager.get_all_tasks()
         self.gantt_chart.update_chart(tasks, self.data_manager)
-    
+
     def _update_resource_summary(self):
         """Update resource summary"""
+        if hasattr(self, 'tabs') and self.tabs.currentIndex() != 2:
+            return
+        # Ensure data manager ref is fresh
+        self.resource_summary.data_manager = self.data_manager
+        self.resource_summary._update_resource_delegates()
         self.resource_summary.update_summary()
 
     def _update_dashboard(self):
         """Update dashboard"""
+        if hasattr(self, 'tabs') and self.tabs.currentIndex() != 3:
+            return
         update_dashboard(self)
     
     def _update_resource_filter(self):
@@ -114,34 +158,143 @@ class GeneralViewOperationsMixin:
 
     def _apply_stylesheet(self):
         """Apply custom stylesheet"""
-        stylesheet = ThemeManager.get_stylesheet(self.dark_mode)
+        font_size = getattr(self.data_manager.settings, 'app_font_size', 9)
+        stylesheet = ThemeManager.get_stylesheet(self.dark_mode, font_size)
         self.setStyleSheet(stylesheet)
 
-    def _show_status_legend(self):
-        """Show status indicator legend"""
-        # Use QDialog instead of QMessageBox for custom sizing
-        legend = QDialog(self)
-        legend.setWindowTitle("Legends")
-        legend.setMinimumWidth(500)
+    def _show_reference_guide(self):
+        """Show quick reference guide with shortcuts and legend"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Quick Reference Guide")
+        dialog.resize(650, 400) # Set a balanced initial size
         
-        layout = QHBoxLayout(legend)
-        label = QLabel()
-        label.setText(
-            "<h3>Task Status Indicators</h3>"
-            "<p><b style='color: red;'>🔴 Overdue:</b> End date passed and not 100% complete</p>"
-            "<p><b style='color: green;'>🟢 In Progress:</b> Started but not yet finished</p>"
-            "<p style='color: grey;'><b>⚫ Upcoming:</b> Not yet started</p>"
-            "<p><b style='color: blue;'>🔵 Completed:</b> 100% complete</p>"
-            "<h3>Dependency Types</h3>"
-            "<p><b>FS (Finish-to-Start):</b> Task B starts after Task A finishes</p>"
-            "<p><b>SS (Start-to-Start):</b> Task B starts when Task A starts</p>"
-            "<p><b>FF (Finish-to-Finish):</b> Task B finishes when Task A finishes</p>"
-            "<p><b>SF (Start-to-Finish):</b> Task B finishes when Task A starts</p>"
+        layout = QVBoxLayout(dialog)
+        tabs = QTabWidget()
+        
+        # --- Legend Tab ---
+        legend_tab = QWidget()
+        legend_layout = QVBoxLayout(legend_tab)
+        legend_layout.setContentsMargins(15, 0, 15, 15) # Consistent padding
+        
+        legend_text = (
+            "<html><body style='margin: 0; padding: 0;'>"
+            "<h3 style='margin-top: 0;'>Task Status Indicators</h3>"
+            "<ul style='list-style-type: none; padding-left: 0;'>"
+            "<li style='margin-bottom: 12px;'><b style='color: red; font-size: 14px;'>🔴 Overdue</b><br/>End date has passed and task is not 100% complete.</li>"
+            "<li style='margin-bottom: 12px;'><b style='color: green; font-size: 14px;'>🟢 In Progress</b><br/>Task has started but is not yet finished.</li>"
+            "<li style='margin-bottom: 12px;'><b style='color: grey; font-size: 14px;'>⚫ Upcoming</b><br/>Start date is in the future.</li>"
+            "<li style='margin-bottom: 12px;'><b style='color: blue; font-size: 14px;'>🔵 Completed</b><br/>Task is 100% complete.</li>"
+            "</ul>"
+            "<h3>Priority Indicators</h3>"
+             "<ul style='list-style-type: none; padding-left: 0;'>"
+             "<li style='margin-bottom: 10px;'>Priorities define the urgency of tasks (High, Medium, Low). They can be set in the task dialog.</li>"
+             "</ul>"
+             "</body></html>"
         )
-        label.setWordWrap(True)
-        layout.addWidget(label)
+        legend_label = QLabel(legend_text)
+        legend_label.setWordWrap(True)
+        # Wrap in scroll area
+        scroll = QScrollArea()
+        scroll.setWidget(legend_label)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        legend_layout.addWidget(scroll)
         
-        legend.exec()
+        tabs.addTab(legend_tab, "📝 Status & Legend")
+
+        # --- Dependencies Tab ---
+        dep_tab = QWidget()
+        dep_layout = QVBoxLayout(dep_tab)
+        dep_layout.setContentsMargins(15, 5, 15, 15)
+        
+        dep_text = (
+            "<html><body style='margin: 0; padding: 0;'>"
+            "<h3 style='margin-top: 0;'>Dependency Types</h3>"
+            "<p>Dependencies define the relationship between the start and end dates of tasks.</p>"
+            "<ul style='list-style-type: none; padding-left: 0;'>"
+            "<li style='margin-bottom: 15px;'><b>FS (Finish-to-Start)</b><br/>task B cannot start until task A finishes. This is the most common dependency type.</li>"
+            "<li style='margin-bottom: 15px;'><b>SS (Start-to-Start)</b><br/>Task B cannot start until Task A starts. They can start simultaneously.</li>"
+            "<li style='margin-bottom: 15px;'><b>FF (Finish-to-Finish)</b><br/>Task B cannot finish until Task A finishes. They can finish simultaneously.</li>"
+            "<li style='margin-bottom: 15px;'><b>SF (Start-to-Finish)</b><br/>Task B cannot finish until Task A starts. This is rarely used.</li>"
+             "</ul>"
+             "<p><i>Note: You can add 'Lag' (delay) or 'Lead' (negative lag) to any dependency.</i></p>"
+             "</body></html>"
+        )
+        dep_label = QLabel(dep_text)
+        dep_label.setWordWrap(True)
+        dep_scroll = QScrollArea()
+        dep_scroll.setWidget(dep_label)
+        dep_scroll.setWidgetResizable(True)
+        dep_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        dep_layout.addWidget(dep_scroll)
+        
+        tabs.addTab(dep_tab, "🔗 Dependencies")
+
+        # --- Shortcuts Tab ---
+        shortcuts_tab = QWidget()
+        shortcuts_layout = QVBoxLayout(shortcuts_tab)
+        
+        shortcuts_table = QTableWidget()
+        shortcuts_table.setColumnCount(2)
+        shortcuts_table.setHorizontalHeaderLabels(["Action", "Shortcut"])
+        shortcuts_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        shortcuts_table.verticalHeader().setVisible(False)
+        shortcuts_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        shortcuts_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        shortcuts_table.setAlternatingRowColors(True)
+
+        shortcuts_data = [
+            ("New Project", "Ctrl+N"),
+            ("Open Project", "Ctrl+O"),
+            ("Save Project", "Ctrl+S"),
+            ("Close Project", "Ctrl+W"),
+            ("Quit", "Ctrl+Q"),
+            ("Add Task", "Ctrl+T"),
+            ("Add Milestone", "Ctrl+M"),
+            ("Add Subtask", "Ctrl+Shift+T"),
+            ("Insert Task Above", "Ctrl+Shift+A"),
+            ("Insert Task Below", "Ctrl+Shift+B"),
+            ("Convert Task/Milestone", "Ctrl+Shift+M"),
+            ("Undo", "Ctrl+Z"),
+            ("Redo", "Ctrl+Y"),
+            ("Indent Task", "Tab"),
+            ("Outdent Task", "Shift+Tab"),
+            ("Expand/Collapse", "Space"),
+            ("Expand Selected", "+"),
+            ("Collapse Selected", "-"),
+            ("Formatting Bold", "Ctrl+B"),
+            ("Formatting Italic", "Ctrl+I"),
+            ("Formatting Underline", "Ctrl+U"),
+            ("Refresh View", "F5"),
+            ("Zoom In", "Ctrl +"),
+            ("Zoom Out", "Ctrl -")
+        ]
+        
+        shortcuts_table.setRowCount(len(shortcuts_data))
+        for row, (action, key) in enumerate(shortcuts_data):
+            shortcuts_table.setItem(row, 0, QTableWidgetItem(action))
+            item_key = QTableWidgetItem(key)
+            item_key.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            # Make key bold
+            font = item_key.font()
+            font.setBold(True)
+            item_key.setFont(font)
+            shortcuts_table.setItem(row, 1, item_key)
+            
+        shortcuts_layout.addWidget(shortcuts_table)
+        tabs.addTab(shortcuts_tab, "⌨️ Shortcuts")
+        
+        layout.addWidget(tabs)
+        
+        # Close button
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+        
+        dialog.exec()
     
     def _show_about(self):
         """Show about dialog"""
@@ -201,6 +354,7 @@ class GeneralViewOperationsMixin:
         dialog.tabs.setCurrentIndex(tab_index)
         
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._apply_stylesheet() # Apply potential font size/theme changes
             self._update_all_views()
             self.status_label.setText("Settings updated")
 

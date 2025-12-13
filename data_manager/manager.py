@@ -374,13 +374,14 @@ class DataManager:
 
                         work_end_hour, work_end_min = self.calendar_manager.get_working_end_time()
                         # If predecessor is not a milestone, or if it ends late, we move to the next day
-                        if not predecessor.is_milestone or (start_from.hour > work_end_hour) or (start_from.hour == work_end_hour and start_from.minute >= work_end_min):
+                        # Only apply this forward shift for non-negative lag. Negative lag means we go backwards from the end date.
+                        if lag_days >= 0 and (not predecessor.is_milestone or (start_from.hour > work_end_hour) or (start_from.hour == work_end_hour and start_from.minute >= work_end_min)):
                             days_to_add += 1
                         
                         constraint_start = self.calendar_manager.add_working_days(start_from, days_to_add)
                         
-                        # If we moved to a new day, snap to working start time
-                        if days_to_add > lag_days:
+                        # If we moved to a new day (implicit in days_to_add > lag for positive, or just any negative lag), snap to start
+                        if days_to_add > lag_days or lag_days < 0:
                            start_h, start_m = self.calendar_manager.get_working_start_time()
                            constraint_start = constraint_start.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
 
@@ -730,6 +731,11 @@ class DataManager:
         self.baselines.clear()
         self.project_name = "Untitled Project"
         Task._next_id = 1
+        
+        # Reset settings and calendar to defaults
+        self.settings.reset_defaults()
+        if self.calendar_manager:
+            self.calendar_manager.reset_defaults()
     
     def bulk_indent_tasks(self, task_ids: List[int]) -> set:
         """Indent multiple tasks at once. Returns set of new parent IDs."""

@@ -23,6 +23,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
   - [Importing and Exporting Data](#importing-and-exporting-data)
   - [Project Baselining](#project-baselining)
   - [Monte Carlo Risk Analysis](#-monte-carlo-risk-analysis)
+- [Screnshots](#-screenshots)
 - [Shortcuts](#️-shortcuts)
 - [Batch Scripts](#-batch-scripts)
 - [Building from Source](#️-building-from-source)
@@ -58,6 +59,8 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - **Excel Import/Export**: Share plans via Excel files
 - **JSON Import/Export**: Save and load projects in JSON format.
 - **PDF Import/Export**: Save and load projects in PDF format.
+- **Undo/Redo**: Full history support for task creation, deletion, editing, movement, and resource management.
+- **Zoom Controls**: Zoom in and out of the Gantt chart for better visualization.
 - **Dark Mode**: Toggle between light and dark themes
 
 ## 🛠️ Technologies Used
@@ -94,7 +97,7 @@ run.bat
 
 or 
 
-Use the `build.bat` script to generate an `PlayIFlow 2.0.0.exe` file which will be saved at `dist/` folder.
+Use the `build.bat` script to generate an `PlayIFlow 2.1.0.exe` file which will be saved at `dist/` folder.
 
 ```bash
 build.bat
@@ -128,7 +131,7 @@ python3 main.py
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download PlanIFlow `PlanIFlow_2.0.0.zip`:
+Download PlanIFlow `PlanIFlow_2.1.0.zip`:
 Download Code Verification Certificate: [Dipta Roy - Code Verification Certificate](https://github.com/dipta-roy/dipta-roy.github.io/blob/main/downloads/Code%20Verifying%20Certificates.zip).
 ```
 - HOW TO TRUST
@@ -150,7 +153,7 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 
 Once verified,
 ```
-Run: PlanIFlow_2.0.0.exe
+Run: PlanIFlow_2.1.0.exe
 ```
 
 ## 💻 Usage
@@ -233,7 +236,7 @@ Baselines allow you to capture snapshots of your project at key milestones and c
 The Monte Carlo analysis feature provides a powerful way to forecast project completion dates under uncertainty. Instead of relying on a single, deterministic schedule, it runs thousands of simulations to model a range of possible outcomes.
 
 - **How to Use**:
-  - Go to the `Monte Carlo` tab.
+  - Go to the `Risk Analysis` tab.
   - Set the number of **Iterations** (e.g., 1000). More iterations lead to more accurate statistical results but take longer to run.
   - Click **"Run Analysis"**.
 
@@ -244,6 +247,28 @@ The Monte Carlo analysis feature provides a powerful way to forecast project com
     - **P90 (High Confidence)**: A very conservative date with a 90% chance of completion.
   - **Top Risk Drivers**: This is a ranked list of tasks that most frequently appear on the critical path during the simulations. These are the tasks that have the biggest impact on your project's schedule. Focus on managing these tasks to reduce schedule risk.
   - **Completion Date Distribution**: An ASCII histogram that visualizes the spread of possible completion dates, giving you a quick overview of the project's risk profile.
+
+## Screenshots
+
+| Task List | Edit Task |
+| --- | --- |
+| ![Task List](./screenshot/Task_List.png) | ![Edit Task](./screenshot/Edit%20Task.png) |
+
+| Gantt Chart | Gantt Chart With Critical Path |
+| --- | --- |
+| ![Gantt Chart](./screenshot/Gantt%20Chart.png) | ![Gantt Chart With Critical Path](./screenshot/Gantt%20Chart%20With%20Critical%20Path.png) |
+
+| Dashboard | Resource |
+| --- | --- |
+| ![Dashboard](./screenshot/Dashboard.png) | ![Resource](./screenshot/Resource.png) |
+
+| Project Baseline | Risk Analysis |
+| --- | --- |
+| ![Project Baseline](./screenshot/Project%20Baseline.png) | ![Risk Analysis](./screenshot/Risk%20Analysis.png) |
+
+| Project Settings | |
+| --- | --- |
+| ![Project Settings](./screenshot/Project%20Settings.png) | |
 
 ## ⌨️ Shortcuts
 
@@ -264,6 +289,10 @@ The Monte Carlo analysis feature provides a powerful way to forecast project com
 | `Ctrl+B`         | Bold Selected       	 |
 | `Ctrl+I`         | Italics Selected        |
 | `Ctrl+U`         | Underline Selected      |
+| `Ctrl+Z`         | Undo                    |
+| `Ctrl+Y`         | Redo                    |
+| `Ctrl++`         | Zoom In (Gantt)         |
+| `Ctrl+-`         | Zoom Out (Gantt)        |
 
 ## 🪟 Batch Scripts
 
@@ -290,6 +319,8 @@ To build a standalone executable from the source code, you can use the `build.ba
 | `prepare_spec.py`                        | Script to prepare the PyInstaller spec file for building the executable.                                |
 | `requirements.txt`                       | A list of Python packages required to run the application.                                              |
 | `calendar_manager/calendar_manager.py`   | Manages project calendars, including working days, holidays, and custom work schedules.                 |
+| `command_manager/command_manager.py`     | Manages the undo/redo stack and executes commands.                                                      |
+| `command_manager/commands.py`            | Defines individual command classes (Add, Edit, Delete, Move) for undoable actions.                      |
 | `constants/app_images.py`                | Contains Base64 encoded application images and icons.                                                   |
 | `constants/constants.py`                 | Defines global constants and configuration values.                                                      |
 | `data_manager/models.py`                 | Defines data models for tasks, resources, and other project entities.                                   |
@@ -340,7 +371,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/1b0b5e148e9b330bec05ff7df7b120854320e5911a53a87e0b6eca9751f5da69) - May detect as **false positive**, add to Exclusion if necessary.
+- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/808e0cd8724d6bd14321c56e0ccf57d2b665323404601e6564145a41cb279561) - May detect as **false positive**, add to Exclusion if necessary.
 
 ## 🙏 Acknowledgments
 

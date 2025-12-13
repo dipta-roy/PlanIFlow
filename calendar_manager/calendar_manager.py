@@ -22,6 +22,14 @@ class CalendarManager:
         # Non-working days (holidays, special dates)
         self.non_working_days: Set[str] = set()  # ISO date strings
     
+    def reset_defaults(self):
+        """Reset calendar to defaults"""
+        self.working_days = {0, 1, 2, 3, 4}  # Mon-Fri
+        self.working_hours_start = "08:00"
+        self.working_hours_end = "16:00"
+        self.hours_per_day = 8.0
+        self.non_working_days = set()
+    
     def is_working_day(self, date: datetime, resource_exceptions: List[str] = None) -> bool:
         """Check if a given date is a working day, considering resource-specific exceptions"""
         # Check if it's a weekend
@@ -179,6 +187,9 @@ class CalendarManager:
     
     def add_working_days(self, start_date: datetime, days: int) -> datetime:
         """Add a number of working days to a date"""
+        if days < 0:
+            return self.subtract_working_days(start_date, abs(days))
+            
         current_date = start_date
         days_added = 0
         

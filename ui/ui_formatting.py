@@ -189,8 +189,8 @@ class FormattingMixin:
                 task_id = item.data(2, Qt.ItemDataRole.UserRole)
                 task = self.data_manager.get_task(task_id)
                 if task:
-                    task.font_family = 'Arial'
-                    task.font_size = 10
+                    task.font_family = None
+                    task.font_size = None
                     task.font_color = '#000000'
                     task.background_color = '#FFFFFF'
                     task.font_bold = False

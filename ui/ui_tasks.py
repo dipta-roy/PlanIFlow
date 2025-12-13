@@ -316,26 +316,41 @@ class TaskNameDelegate(QStyledItemDelegate):
             return
         
         # Get font styling properties
-        font_family = getattr(task, 'font_family', 'Arial')
-        font_size = getattr(task, 'font_size', 10)
+        font_family = getattr(task, 'font_family', None)
+        font_size = getattr(task, 'font_size', None)
         font_color = getattr(task, 'font_color', '#000000')
         bg_color = getattr(task, 'background_color', '#FFFFFF')
         is_bold = getattr(task, 'font_bold', False)
         is_italic = getattr(task, 'font_italic', False)
         is_underline = getattr(task, 'font_underline', False)
         
+        # Determine defaults from option
+        default_font = option.font
+        
+        if not font_family:
+            font_family = default_font.family()
+        
+        if not font_size:
+             font_size = default_font.pointSize()
+        
         # Validate font family and fallback to default if not available
         from PyQt6.QtGui import QFontDatabase
         available_families = QFontDatabase.families()
         if font_family not in available_families:
-            # Try common fallbacks
+            # Try common fallbacks if it's a specific unavailable font
+            # If it came from default_font, it should be available.
             fallback_fonts = ['Arial', 'Helvetica', 'Sans Serif', 'Segoe UI', 'Tahoma']
-            font_family = 'Arial'  # Default fallback
+            # Only switch to Arial if the requested family is actually missing
+            # (which implies it was a specific request, not just a system default)
+            found = False
             for fallback in fallback_fonts:
                 if fallback in available_families:
                     font_family = fallback
+                    found = True
                     break
-        
+            if not found:
+                 font_family = 'Arial'
+
         # Draw background
         painter.save()
         

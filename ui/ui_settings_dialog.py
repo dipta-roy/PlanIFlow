@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, 
                              QWidget, QLabel, QLineEdit, QDateEdit, QGroupBox, 
-                             QCheckBox, QPushButton, QComboBox, QFormLayout, QMessageBox)
+                             QCheckBox, QPushButton, QComboBox, QFormLayout, QMessageBox, QSpinBox)
 from PyQt6.QtCore import QDate, QTime, Qt
 from datetime import datetime
 from settings_manager.settings_manager import DateFormat, DurationUnit
@@ -194,6 +194,13 @@ class SettingsDialog(QDialog):
             self.duration_unit_combo.setCurrentIndex(current_dur_index)
             
         form_layout.addRow("Duration Unit:", self.duration_unit_combo)
+
+        # App Font Size
+        self.font_size_spin = QSpinBox()
+        self.font_size_spin.setRange(8, 24)
+        self.font_size_spin.setValue(getattr(self.settings, 'app_font_size', 10))
+        self.font_size_spin.setSuffix(" pt")
+        form_layout.addRow("Application Font Size:", self.font_size_spin)
         
         layout.addLayout(form_layout)
         layout.addStretch()
@@ -234,5 +241,6 @@ class SettingsDialog(QDialog):
         # 3. Save Interface Settings
         self.settings.default_date_format = self.date_format_combo.currentData()
         self.settings.duration_unit = self.duration_unit_combo.currentData()
+        self.settings.set_app_font_size(self.font_size_spin.value())
         
         self.accept()

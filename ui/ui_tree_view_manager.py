@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt
 from data_manager.models import Task, DependencyType, ScheduleType
 from settings_manager.settings_manager import DurationUnit, DateFormat
 from ui.ui_delegates import SortableTreeWidgetItem
+from command_manager.commands import EditTaskCommand
 
 class TreeViewOperationsMixin:
     """Mixin for task tree view operations in MainWindow"""
@@ -571,20 +572,29 @@ class TreeViewOperationsMixin:
             self._update_formatting_buttons()
     
     def _on_task_item_changed(self, item: QTreeWidgetItem, column: int):
-        """Handle inline editing of task properties"""
+        """Handle inline editing of task properties using Commands"""
         # Block signals to prevent recursive calls during update
         self.task_tree.blockSignals(True)
 
         task_id = item.data(2, Qt.ItemDataRole.UserRole) # Task ID is in column 2
-        task = self.data_manager.get_task(task_id)
+        # Get the current task object (this is the state BEFORE the edit is applied to the model, 
+        # but the UI item already has the NEW text)
+        current_task_model = self.data_manager.get_task(task_id)
 
-        if not task:
+        if not current_task_model:
             self.task_tree.blockSignals(False)
             return
 
-        original_task = Task.from_dict(task.to_dict()) # Create a copy to revert if validation fails
+        # Snapshot old data for Undo
+        old_task_data = current_task_model.to_dict()
+        
+        # Create a clone to apply changes to. We verify validation on this clone.
+        task_clone = Task.from_dict(old_task_data)
 
         try:
+            # Safely capture text for error reporting before any potential object deletion
+            item_text_0 = item.text(0)
+            
             new_value = item.text(column)
             changed = False
 
@@ -592,67 +602,67 @@ class TreeViewOperationsMixin:
                 try:
                     new_schedule_type = ScheduleType(new_value)
                     # Validation: Summary tasks must always be Auto Scheduled
-                    if task.is_summary and new_schedule_type == ScheduleType.MANUALLY_SCHEDULED:
+                    if task_clone.is_summary and new_schedule_type == ScheduleType.MANUALLY_SCHEDULED:
                         QMessageBox.warning(self, "Validation Error",
                                             "Summary tasks must always be 'Auto Scheduled'. Reverting change.")
-                        item.setText(0, task.schedule_type.value) # Revert UI
+                        item.setText(0, task_clone.schedule_type.value) # Revert UI
                         self.task_tree.blockSignals(False)
                         return
                     
-                    if task.schedule_type != new_schedule_type:
-                        task.schedule_type = new_schedule_type
+                    if task_clone.schedule_type != new_schedule_type:
+                        task_clone.schedule_type = new_schedule_type
                         changed = True
                 except ValueError:
                     QMessageBox.critical(self, "Input Error", f"Invalid Schedule Type: {new_value}")
-                    self._revert_task_item_in_ui(item, original_task)
+                    self._revert_task_item_in_ui(item, current_task_model)
                     self.task_tree.blockSignals(False)
                     return
             elif column == 4:  # Task Name
                 # Clean up display markers before saving to actual task name
                 cleaned_name = new_value.lstrip(' ▶◆')
-                if task.name != cleaned_name:
-                    task.name = cleaned_name
+                if task_clone.name != cleaned_name:
+                    task_clone.name = cleaned_name
                     changed = True
             elif column == 5:  # Start Date
                 new_start_date = datetime.strptime(new_value, self._get_strftime_format_string())
-                if task.start_date.date() != new_start_date.date():
-                    task.start_date = new_start_date
+                if task_clone.start_date.date() != new_start_date.date():
+                    task_clone.start_date = new_start_date
                     changed = True
             elif column == 6:  # End Date
-                if not task.is_milestone: # Milestones have fixed end date
+                if not task_clone.is_milestone: # Milestones have fixed end date
                     new_end_date = datetime.strptime(new_value, self._get_strftime_format_string())
-                    if task.end_date.date() != new_end_date.date():
-                        task.end_date = new_end_date
+                    if task_clone.end_date.date() != new_end_date.date():
+                        task_clone.end_date = new_end_date
                         changed = True
             elif column == 7:  # Duration
                 new_duration = float(new_value)
-                if task.is_milestone and new_duration > 0:
-                    task.is_milestone = False
-                    task.font_italic = False  # Remove italic when converting to task
-                    task.set_duration_and_update_end(new_duration, self.data_manager.settings.duration_unit, self.calendar_manager)
+                if task_clone.is_milestone and new_duration > 0:
+                    task_clone.is_milestone = False
+                    task_clone.font_italic = False  # Remove italic when converting to task
+                    task_clone.set_duration_and_update_end(new_duration, self.data_manager.settings.duration_unit, self.calendar_manager)
                     changed = True
-                elif not task.is_milestone and new_duration == 0:
-                    task.is_milestone = True
-                    task.end_date = task.start_date
-                    task.font_italic = True  # Add italic when converting to milestone
+                elif not task_clone.is_milestone and new_duration == 0:
+                    task_clone.is_milestone = True
+                    task_clone.end_date = task_clone.start_date
+                    task_clone.font_italic = True  # Add italic when converting to milestone
                     changed = True
-                elif not task.is_milestone:
+                elif not task_clone.is_milestone:
                     current_duration_unit = self.data_manager.settings.duration_unit
-                    if abs(task.get_duration(current_duration_unit, self.calendar_manager) - new_duration) > 0.01:
-                        task.set_duration_and_update_end(new_duration, current_duration_unit, self.calendar_manager)
+                    if abs(task_clone.get_duration(current_duration_unit, self.calendar_manager) - new_duration) > 0.01:
+                        task_clone.set_duration_and_update_end(new_duration, current_duration_unit, self.calendar_manager)
                         changed = True
             elif column == 8:  # % Complete
                 try:
                     new_percent_complete = int(new_value.strip('%'))
                     if not (0 <= new_percent_complete <= 100):
                         raise ValueError("Percentage must be between 0 and 100.")
-                    if task.percent_complete != new_percent_complete:
-                        task.percent_complete = new_percent_complete
+                    if task_clone.percent_complete != new_percent_complete:
+                        task_clone.percent_complete = new_percent_complete
                         changed = True
-                    item.setText(8, f"{task.percent_complete}%")
+                    item.setText(8, f"{task_clone.percent_complete}%")
                 except ValueError as ve:
                     QMessageBox.critical(self, "Input Error", f"Invalid input for % Complete: {ve}")
-                    self._revert_task_item_in_ui(item, original_task)
+                    self._revert_task_item_in_ui(item, current_task_model)
                     self.task_tree.blockSignals(False)
                     return
             elif column == 9:  # Dependencies
@@ -667,11 +677,6 @@ class TreeViewOperationsMixin:
                         dep_type = DependencyType.FS.name
 
                         # Regex to handle formats like "1", "1 FS", "1FS+2d", "1 (FS-1d)", "1 FS + 2d"
-                        # Group 1: ID
-                        # Group 2: Type (optional)
-                        # Group 3: Sign (+ or -)
-                        # Group 4: Lag value
-                        # Group 5: 'd' (optional)
                         match = re.match(r'(\d+)\s*([A-Z]{2})?\s*(?:([+-])\s*(\d+)\s*(d)?)?', pred_str)
                         if match:
                             pred_id = int(match.group(1))
@@ -686,12 +691,11 @@ class TreeViewOperationsMixin:
                             
                             new_predecessors.append((pred_id, dep_type, lag_days))
 
-                if task.predecessors != new_predecessors:
-                    task.predecessors = new_predecessors
+                if task_clone.predecessors != new_predecessors:
+                    task_clone.predecessors = new_predecessors
                     changed = True
                 
                 # Explicitly update the item's text with the formatted predecessors
-                # This ensures the 'd' is added back for display
                 formatted_predecessors = []
                 for pred_id, dep_type, lag_days in new_predecessors:
                     lag_str = ""
@@ -711,28 +715,48 @@ class TreeViewOperationsMixin:
                         else:
                             # For backward compatibility, if no percentage is specified, assume 100%
                             new_resources.append((r_str.strip(), 100))
-                if task.assigned_resources != new_resources:
-                    task.assigned_resources = new_resources
+                if task_clone.assigned_resources != new_resources:
+                    task_clone.assigned_resources = new_resources
                     changed = True
             elif column == 11:  # Notes
-                if task.notes != new_value:
-                    task.notes = new_value
+                if task_clone.notes != new_value:
+                    task_clone.notes = new_value
                     changed = True
 
             if changed:
-                if self.data_manager.update_task(task_id, task):
+                # Prepare new data
+                new_task_data = task_clone.to_dict()
+                
+                # Create and execute command
+                # Use a callback to update views only on success
+                def on_success():
                     self._update_all_views()
-                    self.status_label.setText(f"✓ Task '{task.name}' updated successfully")
-                else:
+                    self.status_label.setText(f"✓ Task '{task_clone.name}' updated successfully")
+
+                command = EditTaskCommand(
+                    self.data_manager, 
+                    task_id, 
+                    old_task_data, 
+                    new_task_data,
+                    on_success_callback=on_success
+                )
+                
+                if not self.command_manager.execute_command(command):
                     QMessageBox.warning(self, "Validation Error",
                                       "Task update failed (e.g., circular dependency, invalid date).")
                     # Revert changes in UI if update failed
-                    self._revert_task_item_in_ui(item, original_task)
+                    self._revert_task_item_in_ui(item, current_task_model)
 
         except Exception as e:
-            QMessageBox.critical(self, "Input Error", f"Invalid input for {item.text(0)}: {e}")
+            QMessageBox.critical(self, "Input Error", f"Invalid input for {item_text_0}: {e}")
             # Revert changes in UI if input was invalid
-            self._revert_task_item_in_ui(item, original_task)
+            # Note: If item is deleted, this might also fail or do nothing, but the critical box will show.
+            if self.task_tree.itemWidget(item, column): # Just a check, item might be dead
+                 pass 
+            try:
+                self._revert_task_item_in_ui(item, current_task_model)
+            except RuntimeError:
+                pass # Item likely deleted during refresh
 
         self.task_tree.blockSignals(False)
 

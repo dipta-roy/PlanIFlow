@@ -60,10 +60,19 @@ class ThemeManager:
         app.setPalette(dark_palette)
     
     @staticmethod
-    def get_stylesheet(dark_mode: bool) -> str:
+    @staticmethod
+    def get_stylesheet(dark_mode: bool, font_size: int = 9) -> str:
         """Get additional stylesheet for widgets"""
+        
+        # Base style with dynamic font size
+        base_style = f"""
+            QWidget {{
+                font-size: {font_size}pt;
+            }}
+        """
+        
         if dark_mode:
-            return """
+            return base_style + """
                 QTreeWidget {
                     show-decoration-selected: 1;
                     outline: 0;
@@ -172,7 +181,7 @@ class ThemeManager:
                 }
             """
         else:
-            return """
+            return base_style + """
                 QTreeWidget {
                     show-decoration-selected: 1;
                     outline: 0;

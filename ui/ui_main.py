@@ -7,8 +7,10 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QTabWidget, QLabel, QLineEdit, QCheckBox, 
                              QComboBox, QScrollArea, QStatusBar)
 from PyQt6.QtCore import Qt, QTimer, QEvent
+from PyQt6.QtCore import Qt, QTimer, QEvent
 from data_manager.manager import DataManager
 from calendar_manager.calendar_manager import CalendarManager
+from command_manager.command_manager import CommandManager # Import CommandManager
 from ui.gantt_chart import GanttChart
 from ui.themes import ThemeManager
 from ui.ui_helpers import set_application_icon
@@ -41,6 +43,7 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         # Initialize managers
         self.calendar_manager = CalendarManager()
         self.data_manager = DataManager(self.calendar_manager)
+        self.command_manager = CommandManager() # Initialize CommandManager
         self.current_file = None
         self.dark_mode = False
         self.last_save_time = None
@@ -59,6 +62,7 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         create_toolbar(self)
         self._create_central_widget()
         self._create_status_bar()
+        self._setup_shortcuts() # Setup keyboard shortcuts
         
         # Apply initial theme
         ThemeManager.apply_light_mode()
@@ -178,16 +182,19 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         self.tabs.addTab(self.resource_summary, "👥 Resources")
         
         # Dashboard Tab
-        self.dashboard = self._create_dashboard()
-        self.tabs.addTab(self.dashboard, "📈 Dashboard")
-        
+        self.dashboard_tab = create_dashboard(self)
+        self.tabs.addTab(self.dashboard_tab, "📊 Dashboard")
+
         # Baseline Comparison Tab
-        self.baseline_comparison = self._create_baseline_comparison()
+        self.baseline_comparison = BaselineComparisonTab(self.data_manager, self)
         self.tabs.addTab(self.baseline_comparison, "📐 Baseline Comparison")
-        
-        # Monte Carlo Simulation Tab
-        self.monte_carlo_tab = self._create_monte_carlo_tab()
+
+        # Monte Carlo Tab
+        self.monte_carlo_tab = MonteCarloTab(self.data_manager)
         self.tabs.addTab(self.monte_carlo_tab, "🎲 Risk Analysis")
+        
+        # Connect tab change signal
+        self.tabs.currentChanged.connect(self._on_tab_changed)
         
         layout.addWidget(self.tabs)
     
@@ -219,8 +226,69 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         self.status_label = QLabel("Ready")
         self.status_bar.addWidget(self.status_label)
         
+        # Zoom Controls
+        zoom_widget = QWidget()
+        zoom_layout = QHBoxLayout(zoom_widget)
+        zoom_layout.setContentsMargins(0, 0, 0, 0)
+        zoom_layout.setSpacing(5)
+        
+        self.zoom_out_btn = QPushButton("-")
+        self.zoom_out_btn.setFixedWidth(30)
+        self.zoom_out_btn.setToolTip("Zoom Out (Ctrl+-)")
+        # Override padding from global theme because 15px side padding hides text on small buttons
+        self.zoom_out_btn.setStyleSheet("padding: 0px; font-weight: bold;")
+        self.zoom_out_btn.clicked.connect(self._zoom_out)
+        
+        self.zoom_label = QLabel("100%")
+        self.zoom_label.setFixedWidth(40)
+        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.zoom_in_btn = QPushButton("+")
+        self.zoom_in_btn.setFixedWidth(30)
+        self.zoom_in_btn.setToolTip("Zoom In (Ctrl++)")
+        self.zoom_in_btn.setStyleSheet("padding: 0px; font-weight: bold;")
+        self.zoom_in_btn.clicked.connect(self._zoom_in)
+        
+        zoom_layout.addWidget(QLabel("Zoom:"))
+        zoom_layout.addWidget(self.zoom_out_btn)
+        zoom_layout.addWidget(self.zoom_label)
+        zoom_layout.addWidget(self.zoom_in_btn)
+        
+        self.status_bar.addPermanentWidget(zoom_widget)
+        
         self.save_time_label = QLabel("")
+        self.save_time_label.setContentsMargins(20, 0, 0, 0)
         self.status_bar.addPermanentWidget(self.save_time_label)
+
+    def _zoom_in(self):
+        """Zoom in (move to next font size step)"""
+        current_size = getattr(self.data_manager.settings, 'app_font_size', 9)
+        # Scale: 8, 9, 10, 11, 12, 14, 16, 18, 20, 24
+        # Or just increment by 1
+        new_size = min(current_size + 1, 24)
+        if new_size != current_size:
+            self.data_manager.settings.set_app_font_size(new_size)
+            self._apply_stylesheet()
+            self._update_zoom_label()
+            self.status_label.setText(f"Zoom level set to {new_size}pt")
+
+    def _zoom_out(self):
+        """Zoom out (move to previous font size step)"""
+        current_size = getattr(self.data_manager.settings, 'app_font_size', 9)
+        new_size = max(current_size - 1, 8)
+        if new_size != current_size:
+            self.data_manager.settings.set_app_font_size(new_size)
+            self._apply_stylesheet()
+            self._update_zoom_label()
+            self.status_label.setText(f"Zoom level set to {new_size}pt")
+
+    def _update_zoom_label(self):
+        """Update zoom label display"""
+        current_size = getattr(self.data_manager.settings, 'app_font_size', 9)
+        # Base size 9 is 100%? Or 10?
+        # Let's say 10 is 100%. 9 is 90%.
+        percentage = int((current_size / 9.0) * 100) # Using 9 as base since we just changed default to 9
+        self.zoom_label.setText(f"{percentage}%")
 
     def _show_monte_carlo_help(self):
         """Show Monte Carlo help dialog"""
@@ -239,3 +307,39 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
                     self._indent_task()
                     return True  # Event handled
         return super().eventFilter(obj, event)
+
+    def _setup_shortcuts(self):
+        """Setup keyboard shortcuts"""
+        from PyQt6.QtGui import QShortcut, QKeySequence
+        
+        self.undo_shortcut = QShortcut(QKeySequence.StandardKey.Undo, self)
+        self.undo_shortcut.activated.connect(self.undo)
+        
+        self.redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, self)
+        self.redo_shortcut.activated.connect(self.redo)
+        
+        # Zoom shortcuts
+        self.zoom_in_shortcut = QShortcut(QKeySequence("Ctrl+="), self) # Ctrl+= usually works as Ctrl++ on most keyboard layouts
+        self.zoom_in_shortcut.activated.connect(self._zoom_in)
+        
+        self.zoom_in_shortcut_2 = QShortcut(QKeySequence("Ctrl++"), self) # Numpad plus
+        self.zoom_in_shortcut_2.activated.connect(self._zoom_in)
+
+        self.zoom_out_shortcut = QShortcut(QKeySequence("Ctrl+-"), self)
+        self.zoom_out_shortcut.activated.connect(self._zoom_out)
+
+    def undo(self):
+        """Undo last action"""
+        if self.command_manager.undo():
+            self._update_all_views()
+            self.status_label.setText("✓ Undo successful")
+        else:
+            self.status_label.setText("⚠️ Nothing to undo")
+
+    def redo(self):
+        """Redo last action"""
+        if self.command_manager.redo():
+            self._update_all_views()
+            self.status_label.setText("✓ Redo successful")
+        else:
+            self.status_label.setText("⚠️ Nothing to redo")

@@ -98,8 +98,8 @@ class MonteCarloTab(QWidget):
         self.run_btn.clicked.connect(self.run_simulation)
         controls_layout.addWidget(self.run_btn)
         
-        self.help_btn = QPushButton("?")
-        self.help_btn.setFixedWidth(30)
+        self.help_btn = QPushButton("About Monte Carlo")
+        self.help_btn.setFixedWidth(150)
         self.help_btn.setToolTip("About Monte Carlo Analysis")
         self.help_btn.clicked.connect(self.show_help)
         controls_layout.addWidget(self.help_btn)

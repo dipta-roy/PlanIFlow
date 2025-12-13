@@ -6,6 +6,7 @@ import traceback
 from data_manager.models import Task, ScheduleType, Resource
 from ui.ui_task_dialog import TaskDialog
 from ui.ui_resource_dialog import ResourceDialog
+from command_manager.commands import EditTaskCommand, DeleteTaskCommand, AddTaskCommand, MoveTaskCommand
 
 class TaskOperationsMixin:
     """Mixin for task and resource operations in MainWindow"""
@@ -22,8 +23,14 @@ class TaskOperationsMixin:
         start_hour, start_minute = self.data_manager.calendar_manager.get_working_start_time()
         end_hour, end_minute = self.data_manager.calendar_manager.get_working_end_time()
         
-        start_date = now.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
-        end_date = now.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
+        
+        if self.data_manager.settings.project_start_date:
+            base_date = self.data_manager.settings.project_start_date
+        else:
+            base_date = now
+            
+        start_date = base_date.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+        end_date = base_date.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
         
         task = Task(
             name=task_name,
@@ -36,11 +43,16 @@ class TaskOperationsMixin:
             schedule_type=ScheduleType.AUTO_SCHEDULED
         )
         
-        if self.data_manager.add_task(task):
+        command_data = task.to_dict()
+        
+        def on_success():
             self._update_all_views()
             self.status_label.setText(f"Task '{task.name}' added successfully")
             self.quick_add_task_input.clear()
-        else:
+            
+        command = AddTaskCommand(self.data_manager, command_data, mode='append', on_success_callback=on_success)
+        
+        if not self.command_manager.execute_command(command):
             QMessageBox.warning(self, "Validation Error", 
                               "Task could not be added.")
     
@@ -50,6 +62,7 @@ class TaskOperationsMixin:
         if dialog.exec() == QDialog.DialogCode.Accepted:
             task_data = dialog.get_task_data()
             
+            # Create a throwaway task to ensure all defaults and formats are correct before serialization
             task = Task(
                 name=task_data['name'],
                 start_date=task_data['start_date'],
@@ -68,12 +81,18 @@ class TaskOperationsMixin:
                 font_underline=task_data.get('font_underline', False)
             )
             
-            if self.data_manager.add_task(task):
+            # Serialize for command
+            command_data = task.to_dict()
+            
+            def on_success():
                 self._update_all_views()
                 self.status_label.setText(f"Task '{task.name}' added successfully")
-            else:
-                QMessageBox.warning(self, "Validation Error", 
-                                  "Task has circular dependencies or invalid dates.")
+                
+            command = AddTaskCommand(self.data_manager, command_data, mode='append', on_success_callback=on_success)
+            
+            if not self.command_manager.execute_command(command):
+                 QMessageBox.warning(self, "Validation Error", 
+                                   "Task has circular dependencies or invalid dates.")
     
     def _add_subtask_dialog(self):
         """Show add subtask dialog"""
@@ -112,29 +131,40 @@ class TaskOperationsMixin:
                 font_underline=task_data.get('font_underline', False)
             )
             
-            if self.data_manager.add_task(task, parent_id=parent_id):
+            command_data = task.to_dict()
+
+            def on_success():
                 self._update_all_views()
                 self.status_label.setText(f"Subtask '{task.name}' added to '{parent_task.name}'")
-            else:
+
+            command = AddTaskCommand(self.data_manager, command_data, mode='append', parent_id=parent_id, on_success_callback=on_success)
+            
+            if not self.command_manager.execute_command(command):
                 QMessageBox.warning(self, "Validation Error", 
                                   "Task has circular dependencies or invalid dates.")
     
     def _edit_task_dialog(self):
-        """Show edit task dialog"""
+        """Show edit task dialog using Command pattern"""
         selected_items = self.task_tree.selectedItems()
         if not selected_items:
             QMessageBox.information(self, "No Selection", "Please select a task to edit.")
             return
         
         task_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
+        # Getting the live object to snapshot previous state
         task = self.data_manager.get_task(task_id)
         
         if task:
             try:
+                # Capture old state for Undo
+                old_task_data = task.to_dict()
+
                 dialog = TaskDialog(self, self.data_manager, task, is_milestone=task.is_milestone)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     task_data = dialog.task_data
                     
+                    # Create a temporary Task object to generate the new data structure properly
+                    # This ensures all fields/logic in Task constructor are applied
                     updated_task = Task(
                         name=task_data['name'],
                         start_date=task_data['start_date'],
@@ -156,18 +186,31 @@ class TaskOperationsMixin:
                         font_underline=task_data.get('font_underline', False)
                     )
                     
-                    if self.data_manager.update_task(task_id, updated_task):
+                    new_task_data = updated_task.to_dict()
+
+                    # Define callback for success
+                    def on_success():
                         self._update_all_views()
-                        self.status_label.setText(f"Task '{updated_task.name}' updated successfully")
-                    else:
+                        self.status_label.setText(f"✓ Task '{updated_task.name}' updated successfully")
+
+                    command = EditTaskCommand(
+                        self.data_manager, 
+                        task_id, 
+                        old_task_data, 
+                        new_task_data, 
+                        on_success_callback=on_success
+                    )
+
+                    if not self.command_manager.execute_command(command):
                         QMessageBox.warning(self, "Validation Error", 
                                           "Task update failed due to circular dependencies.")
+
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to open task dialog: {e}")
                 traceback.print_exc() # Print full traceback to console
     
     def _delete_task(self):
-        """Delete selected task"""
+        """Delete selected task using Command pattern"""
         selected_items = self.task_tree.selectedItems()
         if not selected_items:
             QMessageBox.information(self, "No Selection", "Please select a task to delete.")
@@ -188,9 +231,19 @@ class TaskOperationsMixin:
                                         QMessageBox.StandardButton.No)
             
             if reply == QMessageBox.StandardButton.Yes:
-                self.data_manager.delete_task(task_id)
-                self._update_all_views()
-                self.status_label.setText("Task deleted")
+                # Callback to refresh UI on success
+                def on_success():
+                    self._update_all_views()
+                    # We might want to remove 'Task deleted' text on undo? 
+                    # Command logic sets status but let's set it here first?
+                    # The command logic doesn't set status on execute, only on undo/redo success usually.
+                    # But here we pass callback.
+                    self.status_label.setText("Task deleted")
+
+                command = DeleteTaskCommand(self.data_manager, task_id, on_success_callback=on_success)
+                
+                if not self.command_manager.execute_command(command):
+                    QMessageBox.warning(self, "Error", "Failed to delete task.")
     
     def _indent_task(self):
         """Indent selected task (make it a subtask of previous sibling in visual order)"""
