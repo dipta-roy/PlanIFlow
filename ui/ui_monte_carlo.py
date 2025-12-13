@@ -154,6 +154,13 @@ class MonteCarloTab(QWidget):
         self.thread.finished.connect(self.on_simulation_finished)
         self.thread.start()
         
+    def clear_view(self):
+        """Clear all inputs and results"""
+        self.iterations_spin.setValue(1000)
+        self.results_text.clear()
+        self.progress_bar.setVisible(False)
+        self.run_btn.setEnabled(True)
+
     def on_simulation_finished(self, results):
         self.run_btn.setEnabled(True)
         self.progress_bar.setVisible(False)

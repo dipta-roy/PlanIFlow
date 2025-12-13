@@ -194,7 +194,6 @@ for %%A in ("dist\PlanIFlow_2.1.0.exe") do (
     echo [INFO] File size: !sizeMB! MB
 )
 echo.
-echo   BUILDING WITH CONSOLE ENABLED FOR DEBUGGING!
 echo   Run the EXE and share the traceback error.
 echo ===============================================
 pause

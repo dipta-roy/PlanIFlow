@@ -20,6 +20,8 @@ class FileOperationsMixin:
             self.data_manager.clear_all()
             self.current_file = None
             self._update_all_views()
+            if hasattr(self, 'monte_carlo_tab'):
+                self.monte_carlo_tab.clear_view()
             self.status_label.setText("New project created")
             self._remove_last_project_path()
 
@@ -34,6 +36,8 @@ class FileOperationsMixin:
             self.data_manager.clear_all()
             self.current_file = None
             self._update_all_views()
+            if hasattr(self, 'monte_carlo_tab'):
+                self.monte_carlo_tab.clear_view()
             self.status_label.setText("Project closed")
             self._remove_last_project_path()
     
@@ -126,6 +130,7 @@ class FileOperationsMixin:
                 if hasattr(self, 'monte_carlo_tab'):
                     self.monte_carlo_tab.data_manager = self.data_manager
                 self._update_all_views()
+                self._expand_all_tasks()
                 self.status_label.setText("Imported from Excel")
             else:
                 QMessageBox.critical(self, "Error", "Failed to import Excel file.")
