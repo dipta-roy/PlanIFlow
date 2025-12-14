@@ -105,7 +105,9 @@ class GeneralViewOperationsMixin:
 
     def _update_window_title(self):
         """Update window title with project name"""
-        self.setWindowTitle(f"PlanIFlow - {self.data_manager.project_name}")
+        self.setWindowTitle(f"{APP_NAME} - {self.data_manager.project_name}")
+        if hasattr(self, 'project_name_label'):
+            self.project_name_label.setText(self.data_manager.project_name)
 
     def _toggle_auto_refresh(self):
         """Toggle auto-refresh on/off"""

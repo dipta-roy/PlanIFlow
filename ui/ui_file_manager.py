@@ -73,6 +73,12 @@ class FileOperationsMixin:
                     self.monte_carlo_tab.data_manager = self.data_manager
                 self._update_all_views()
                 self._expand_all_tasks()
+                
+                # Force update label to be sure
+                if hasattr(self, 'project_name_label'):
+                    print(f"DEBUG: Setting label to {self.data_manager.project_name}")
+                    self.project_name_label.setText(self.data_manager.project_name)
+                
                 self.status_label.setText(f"Opened: {self.data_manager.project_name}")
                 self._save_last_project_path(file_path)
             else:
@@ -103,6 +109,13 @@ class FileOperationsMixin:
             if not file_path.endswith('.json'):
                 file_path += '.json'
             
+            # If project name is default, update it to match filename
+            if self.data_manager.project_name == "Untitled Project":
+                import os
+                new_name = os.path.splitext(os.path.basename(file_path))[0].replace('_', ' ')
+                self.data_manager.project_name = new_name
+                self._update_window_title()
+
             if Exporter.export_to_json(self.data_manager, self.calendar_manager, file_path):
                 self.current_file = file_path
                 self.last_save_time = datetime.now()

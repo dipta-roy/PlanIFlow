@@ -78,9 +78,7 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
     
 
             
-    def _update_window_title(self):
-        """Update window title with project name"""
-        self.setWindowTitle(f"{APP_NAME} - {self.data_manager.project_name}")
+
     
     def _create_central_widget(self):
         """Create central widget with tabs"""

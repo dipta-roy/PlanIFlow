@@ -7,7 +7,6 @@ set force_deps=0
 set encrypt=0
 set onedir=0
 set clean=0
-set no_pause=0
 
 :arg_loop
 if "%~1"=="" goto arg_loop_end
@@ -15,7 +14,6 @@ if "%~1"=="--force-deps" set force_deps=1
 if "%~1"=="--encrypt" set encrypt=1
 if "%~1"=="--onedir" set onedir=1
 if "%~1"=="--clean" set clean=1
-if "%~1"=="--no-pause" set no_pause=1
 shift
 goto arg_loop
 
@@ -190,9 +188,12 @@ echo ===============================================
 echo.
 echo [SUCCESS] Executable created: dist\PlanIFlow_2.1.0.exe
 REM Display file info
-echo [INFO] File size: !sizeMB! MB
+for %%A in ("dist\PlanIFlow_2.1.0.exe") do (
+    set size=%%~zA
+    set /a sizeMB=!size! / 1048576
+    echo [INFO] File size: !sizeMB! MB
 )
 echo.
 echo   Run the EXE and share the traceback error.
 echo ===============================================
-if "!no_pause!"=="0" pause
+pause
