@@ -155,7 +155,7 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 
 Once verified,
 ```
-Run: PlanIFlow_2.1.0.exe
+Run PlanIFlow_2.1.0.exe and install the application.
 ```
 
 ## 💻 Usage
@@ -373,7 +373,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/8987cc9548e26ebef8a2f45b2bb10367e16fb4082568f07d2cdddf3403c0e04c) - May detect as **false positive**, add to Exclusion if necessary.
+- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/af25c1350262d8a8ad85d7dfb7dc94c4147651138df1f424527bf87e697ac8f2) - May detect as **false positive**, add to Exclusion if necessary.
 
 ### Reasons for False Positve Detections:
 - **PyInstaller Bundling**: Embeds Python runtime, bytecode, and large libraries (e.g., PyQt6, matplotlib) into a single EXE, mimicking packed malware droppers via temporary unpacking.
