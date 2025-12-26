@@ -373,7 +373,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/af25c1350262d8a8ad85d7dfb7dc94c4147651138df1f424527bf87e697ac8f2) - May detect as **false positive**, add to Exclusion if necessary.
+- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/658d22127727cd9675d037479010c91bd6f8b2be11df235e1f2f2f9aec831d7f) - May detect as **false positive**, add to Exclusion if necessary.
 
 ### Reasons for False Positve Detections:
 - **PyInstaller Bundling**: Embeds Python runtime, bytecode, and large libraries (e.g., PyQt6, matplotlib) into a single EXE, mimicking packed malware droppers via temporary unpacking.
@@ -383,6 +383,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## 🙏 Acknowledgments
 
-- Built by [Dipta Roy](https://github.com/dipta-roy).
 - Icons: [Flaticon](https://flaticon.com).
 - Thanks to PyQt6 & Matplotlib communities.
+
+Built by [Dipta Roy](https://github.com/dipta-roy) with ❤️
