@@ -9,10 +9,35 @@ import base64
 
 # Import only essential PyQt6 modules first for fast splash screen
 
-from PyQt6.QtWidgets import QApplication, QSplashScreen
+import traceback
+from PyQt6.QtWidgets import QApplication, QSplashScreen, QMessageBox
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import Qt
-from constants.constants import APP_NAME, VERSION
+from constants.constants import (
+    APP_NAME, VERSION, ERROR_TITLE, ERROR_GENERIC_MESSAGE
+)
+from data_manager.temp_manager import TempFileManager
+
+
+def handle_exception(type, value, tb):
+    """Global exception handler to prevent app crash and show popup"""
+    # Print the full traceback to stderr for debugging
+    error_msg = "".join(traceback.format_exception(type, value, tb))
+    print(error_msg, file=sys.stderr)
+
+    # Show a generic error popup to the user
+    if QApplication.instance():
+        try:
+            # We use the generic message from constants
+            QMessageBox.critical(
+                None,
+                ERROR_TITLE,
+                f"{ERROR_GENERIC_MESSAGE}\n\nError: {str(value)}",
+                QMessageBox.StandardButton.Ok
+            )
+        except Exception as e:
+            # Last resort if message box fails
+            print(f"Failed to show error message box: {e}", file=sys.stderr)
 
 
 def get_resource_path(relative_path):
@@ -28,6 +53,9 @@ def get_resource_path(relative_path):
 
 def main():
     """Main application entry point"""
+    # Set global exception hook
+    sys.excepthook = handle_exception
+
     # Enable High DPI scaling
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -45,29 +73,22 @@ def main():
     
     # *** SET APPLICATION ICON (BASE64) ***
     from constants.app_images import SPLASH_BASE64, LOGO_ICO_BASE64
-    import tempfile
-    
     # Create icon from base64 ICO data - save to temp file to preserve all icon sizes
     icon_bytes = base64.b64decode(LOGO_ICO_BASE64)
+    temp_icon_path = TempFileManager.get_temp_path(suffix='.ico', prefix='app_icon_')
     
-    # Create temp file for the icon
-    temp_icon_fd, temp_icon_path = tempfile.mkstemp(suffix='.ico')
     try:
-        os.write(temp_icon_fd, icon_bytes)
-        os.close(temp_icon_fd)
+        with open(temp_icon_path, 'wb') as f:
+            f.write(icon_bytes)
         
         # Load icon from temp file (preserves all sizes in .ico)
         app_icon = QIcon()
         app_icon.addFile(temp_icon_path)
         if not app_icon.isNull():
             app.setWindowIcon(app_icon)
-    finally:
-        # Clean up temp file
-        try:
-            if os.path.exists(temp_icon_path):
-                os.remove(temp_icon_path)
-        except:
-            pass  # Ignore cleanup errors
+    except Exception as e:
+        print(f"Error setting app icon: {e}")
+    # TempFileManager will handle cleanup on application exit
     
     # *** SHOW SPLASH SCREEN IMMEDIATELY (BASE64) ***
     splash_bytes = base64.b64decode(SPLASH_BASE64)

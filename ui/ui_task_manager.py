@@ -7,6 +7,7 @@ from data_manager.models import Task, ScheduleType, Resource
 from ui.ui_task_dialog import TaskDialog
 from ui.ui_resource_dialog import ResourceDialog
 from command_manager.commands import EditTaskCommand, DeleteTaskCommand, AddTaskCommand, MoveTaskCommand
+from constants.constants import ERROR_TITLE, ERROR_GENERIC_MESSAGE
 
 class TaskOperationsMixin:
     """Mixin for task and resource operations in MainWindow"""
@@ -206,8 +207,8 @@ class TaskOperationsMixin:
                                           "Task update failed due to circular dependencies.")
 
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to open task dialog: {e}")
-                traceback.print_exc() # Print full traceback to console
+                QMessageBox.critical(self, ERROR_TITLE, f"{ERROR_GENERIC_MESSAGE}\n\nDetails: {e}")
+                traceback.print_exc()
     
     def _delete_task(self):
         """Delete selected task using Command pattern"""

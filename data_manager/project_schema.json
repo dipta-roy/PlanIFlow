@@ -1,0 +1,316 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "PlaniFlow Project Schema",
+    "type": "object",
+    "required": [
+        "version",
+        "project_data"
+    ],
+    "properties": {
+        "version": {
+            "type": "string"
+        },
+        "project_name": {
+            "type": "string"
+        },
+        "saved_at": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "project_data": {
+            "type": "object",
+            "required": [
+                "tasks",
+                "resources"
+            ],
+            "properties": {
+                "next_task_id": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "name",
+                            "start_date",
+                            "end_date"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "start_date": {
+                                "type": "string"
+                            },
+                            "end_date": {
+                                "type": "string"
+                            },
+                            "percent_complete": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "predecessors": {
+                                "type": "array",
+                                "items": {
+                                    "type": "array",
+                                    "items": [
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "integer"
+                                        }
+                                    ],
+                                    "minItems": 2,
+                                    "maxItems": 3
+                                }
+                            },
+                            "assigned_resources": {
+                                "type": "array",
+                                "items": {
+                                    "type": "array",
+                                    "items": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        }
+                                    ],
+                                    "minItems": 2,
+                                    "maxItems": 2
+                                }
+                            },
+                            "notes": {
+                                "type": "string"
+                            },
+                            "parent_id": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "is_summary": {
+                                "type": "boolean"
+                            },
+                            "is_milestone": {
+                                "type": "boolean"
+                            },
+                            "wbs": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "schedule_type": {
+                                "type": "string",
+                                "enum": [
+                                    "Auto Scheduled",
+                                    "Manually Scheduled"
+                                ]
+                            },
+                            "font_family": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "font_size": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "font_color": {
+                                "type": "string"
+                            },
+                            "font_bold": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "font_italic": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "font_underline": {
+                                "type": "boolean"
+                            },
+                            "background_color": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "resources": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "max_hours_per_day": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 24
+                            },
+                            "exceptions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "billing_rate": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        }
+                    }
+                },
+                "baselines": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "snapshots"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "created_date": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "snapshots": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "required": [
+                                        "task_id",
+                                        "task_name",
+                                        "start_date",
+                                        "end_date"
+                                    ],
+                                    "properties": {
+                                        "task_id": {
+                                            "type": "integer"
+                                        },
+                                        "task_name": {
+                                            "type": "string"
+                                        },
+                                        "start_date": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "end_date": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "duration": {
+                                            "type": "number"
+                                        },
+                                        "percent_complete": {
+                                            "type": "integer"
+                                        },
+                                        "wbs": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "calendar_settings": {
+            "type": "object",
+            "properties": {
+                "working_days": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6
+                    }
+                },
+                "hours_per_day": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 24
+                },
+                "non_working_days": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "working_hours_start": {
+                    "type": "string"
+                },
+                "working_hours_end": {
+                    "type": "string"
+                }
+            }
+        },
+        "project_settings": {
+            "type": "object",
+            "properties": {
+                "duration_unit": {
+                    "type": "string",
+                    "enum": [
+                        "days",
+                        "hours"
+                    ]
+                },
+                "default_date_format": {
+                    "type": "string"
+                },
+                "app_font_size": {
+                    "type": "integer",
+                    "minimum": 6,
+                    "maximum": 72
+                },
+                "project_start_date": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            }
+        },
+        "metadata": {
+            "type": "object"
+        }
+    }
+}

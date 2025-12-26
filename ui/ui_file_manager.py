@@ -5,6 +5,7 @@ import logging
 import json
 from exporter.exporter import Exporter
 from exporter.pdf_exporter import PDFExporter
+from constants.constants import ERROR_TITLE, ERROR_SAVE_FAILED, ERROR_LOAD_FAILED, ERROR_FILE_OPERATION_FAILED
 
 class FileOperationsMixin:
     """Mixin for file operations in MainWindow"""
@@ -59,7 +60,7 @@ class FileOperationsMixin:
         )
         
         if file_path:
-            data_manager, calendar_manager, success = Exporter.import_from_json(file_path)
+            data_manager, calendar_manager, success, error_msg = Exporter.import_from_json(file_path)
             
             if success:
                 self.data_manager = data_manager
@@ -82,7 +83,7 @@ class FileOperationsMixin:
                 self.status_label.setText(f"Opened: {self.data_manager.project_name}")
                 self._save_last_project_path(file_path)
             else:
-                QMessageBox.critical(self, "Error", "Failed to open project file.")
+                QMessageBox.critical(self, ERROR_TITLE, f"{ERROR_LOAD_FAILED}\n\nDetails: {error_msg}")
     
     def _save_project(self):
         """Save current project"""
@@ -92,7 +93,7 @@ class FileOperationsMixin:
                 self.save_time_label.setText(f"Last saved: {self.last_save_time.strftime('%H:%M:%S')}")
                 self.status_label.setText("Project saved")
             else:
-                QMessageBox.critical(self, "Error", "Failed to save project.")
+                QMessageBox.critical(self, ERROR_TITLE, ERROR_SAVE_FAILED)
         else:
             self._save_project_as()
     
@@ -123,7 +124,7 @@ class FileOperationsMixin:
                 self.status_label.setText(f"Saved as: {self.data_manager.project_name}")
                 self._save_last_project_path(file_path)
             else:
-                QMessageBox.critical(self, "Error", "Failed to save project.")
+                QMessageBox.critical(self, ERROR_TITLE, ERROR_SAVE_FAILED)
     
     def _import_excel(self):
         """Import project from Excel"""
@@ -132,7 +133,7 @@ class FileOperationsMixin:
         )
         
         if file_path:
-            data_manager, success = Exporter.import_from_excel(file_path)
+            data_manager, success, error_msg = Exporter.import_from_excel(file_path)
             
             if success:
                 self.data_manager = data_manager
@@ -146,7 +147,7 @@ class FileOperationsMixin:
                 self._expand_all_tasks()
                 self.status_label.setText("Imported from Excel")
             else:
-                QMessageBox.critical(self, "Error", "Failed to import Excel file.")
+                QMessageBox.critical(self, "Import Error", f"Failed to import Excel file:\n{error_msg}")
     
     def _export_excel(self):
         """Export project to Excel"""
@@ -166,7 +167,7 @@ class FileOperationsMixin:
                 QMessageBox.information(self, "Success", 
                                       f"Project exported successfully to:\n{file_path}")
             else:
-                QMessageBox.critical(self, "Error", "Failed to export to Excel.")
+                QMessageBox.critical(self, ERROR_TITLE, f"{ERROR_FILE_OPERATION_FAILED} (Excel)")
 
     def _export_pdf(self):
         """Export project to PDF"""
@@ -187,7 +188,7 @@ class FileOperationsMixin:
                 QMessageBox.information(self, "Success", 
                                       f"Project exported successfully to:\n{file_path}")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to export to PDF: {e}")
+                QMessageBox.critical(self, ERROR_TITLE, f"{ERROR_FILE_OPERATION_FAILED} (PDF): {e}")
     
     # Utility Methods
     def _save_last_project_path(self, path: str):
@@ -214,7 +215,7 @@ class FileOperationsMixin:
                     path = f.read().strip()
                 
                 if os.path.exists(path):
-                    data_manager, calendar_manager, success = Exporter.import_from_json(path)
+                    data_manager, calendar_manager, success, error_msg = Exporter.import_from_json(path)
                     if success:
                         self.data_manager = data_manager
                         self.data_manager.calendar_manager = calendar_manager

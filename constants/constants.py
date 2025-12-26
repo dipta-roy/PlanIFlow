@@ -8,7 +8,7 @@ from reportlab.lib import colors
 
 # --- General Application Constants ---
 APP_NAME = "PlanIFlow"
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 AUTHOR = "Dipta Roy"
 ABOUT_TEXT = "PlanIFlow is a project planning and management tool designed to help you organize tasks, resources, and schedules effectively."
 
@@ -116,3 +116,10 @@ PDF_TABLE_PADDING_BOTTOM = 4
 PDF_TABLE_HEADER_PADDING_TOP = 6
 PDF_TABLE_HEADER_PADDING_BOTTOM = 6
 PDF_ALIGN_LEFT = 0 # Constant for alignment (TA_LEFT)
+
+# --- Error Handling Constants ---
+ERROR_TITLE = "Application Error"
+ERROR_GENERIC_MESSAGE = "An unexpected error occurred. The application will continue to run, but some functionality may be affected."
+ERROR_FILE_OPERATION_FAILED = "File operation failed. Please check the file path and permissions."
+ERROR_SAVE_FAILED = "Failed to save the project. Please try again."
+ERROR_LOAD_FAILED = "Failed to load the project. The file might be corrupted or in an incompatible format."

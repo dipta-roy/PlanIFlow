@@ -18,7 +18,7 @@ echo.
 echo ===============================================================================
 echo   [PAUSE FOR SIGNING]
 echo.
-echo   matrix Core application built at: dist\PlanIFlow_2.1.0.exe\
+echo   matrix Core application built at: dist\PlanIFlow_2.2.0.exe\
 echo.
 echo   If you wish to digitally sign the inner executables (e.g. PlanIFlow.exe),
 echo   please do so NOW using your own certificate and tools.
@@ -47,7 +47,7 @@ echo ===============================================
 echo   Installer Build Complete!
 echo ===============================================
 echo.
-echo  Output: dist\PlanIFlow_Setup_2.1.0.exe
+echo  Output: dist\PlanIFlow_Setup_2.2.0.exe
 echo.
 echo  [FINAL ACTION]
 echo  You may now digitally sign this final installer executable.

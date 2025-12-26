@@ -1,7 +1,7 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
 
-set spec_file=PlanIFlow_2.1.0.exe.spec
+set spec_file=PlanIFlow_2.2.0.exe.spec
 
 set force_deps=0
 set encrypt=0
@@ -106,7 +106,7 @@ echo.
 
 
 echo [INFO] Generating spec file for final Windowed release...
-set makespec_command=pyi-makespec --windowed --name="PlanIFlow_2.1.0.exe" ^
+set makespec_command=pyi-makespec --windowed --name="PlanIFlow_2.2.0.exe" ^
 %ICON_OPTION% ^
 --version-file=version_info.txt ^
 --add-data="images;images" ^
@@ -188,7 +188,7 @@ echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
 echo.
-echo [SUCCESS] Executable created: dist\PlanIFlow_2.1.0.exe
+echo [SUCCESS] Executable created: dist\PlanIFlow_2.2.0.exe
 REM Display file info
 echo [INFO] File size: !sizeMB! MB
 )

@@ -22,8 +22,8 @@ def package_installer():
     installer_dir = os.path.join(base_dir, "installer")
     
     # 1. Identify the Source Directory
-    # We expect dist/PlanIFlow_2.1.0.exe (as a folder)
-    source_dir_name = "PlanIFlow_2.1.0.exe"
+    # We expect dist/PlanIFlow_2.2.0.exe (as a folder)
+    source_dir_name = "PlanIFlow_2.2.0.exe"
     source_path = os.path.join(dist_dir, source_dir_name)
     
     if not os.path.exists(source_path):
@@ -82,7 +82,7 @@ def package_installer():
         "--noconfirm",
         "--onefile",
         "--noconsole",
-        "--name", "PlanIFlow_Setup_2.1.0",
+        "--name", "PlanIFlow_Setup_2.2.0",
         *(["--icon", icon_path] if icon_path else []),
         "--add-data", f"{payload_path};.",
         *(["--add-data", f"{icon_path};."] if icon_path else []),
@@ -101,7 +101,7 @@ def package_installer():
     if icon_path and os.path.exists(icon_path):
         os.remove(icon_path)
         
-    print(f"[SUCCESS] Installer created at: {os.path.join(dist_dir, 'PlanIFlow_Setup_2.1.0.exe')}")
+    print(f"[SUCCESS] Installer created at: {os.path.join(dist_dir, 'PlanIFlow_Setup_2.2.0.exe')}")
 
 if __name__ == "__main__":
     package_installer()

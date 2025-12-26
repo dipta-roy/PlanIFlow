@@ -10,6 +10,7 @@ from data_manager.manager import DataManager
 from data_manager.models import Task, Resource, DependencyType, ScheduleType
 from settings_manager.settings_manager import DateFormat, DurationUnit
 from calendar_manager.calendar_manager import CalendarManager
+from data_manager.validator import ProjectValidator
 
 class Exporter:
     """Handles data import/export operations with enhanced features"""
@@ -50,7 +51,7 @@ class Exporter:
                 resources_text = ', '.join([f"{name} ({alloc}%)" for name, alloc in task.assigned_resources])
                 
                 # Task name without indentation
-                display_name = task.name
+                display_name = ProjectValidator.sanitize_string(task.name)
                 
                 duration = task.get_duration(
                     data_manager.settings.duration_unit,
@@ -74,8 +75,8 @@ class Exporter:
                     'Status': status,
                     'Status Color': status_color,
                     'Predecessors': pred_text,
-                    'Assigned Resources': ', '.join([f"{name} ({alloc}%)" for name, alloc in task.assigned_resources]),
-                    'Notes': task.notes,
+                    'Assigned Resources': ', '.join([f"{ProjectValidator.sanitize_string(name)} ({alloc}%)" for name, alloc in task.assigned_resources]),
+                    'Notes': ProjectValidator.sanitize_string(task.notes),
                     # Font styling properties
                     'Font Family': getattr(task, 'font_family', 'Arial'),
                     'Font Size': getattr(task, 'font_size', 10),
@@ -102,7 +103,7 @@ class Exporter:
             for resource in data_manager.get_all_resources():
                 res_alloc = allocation.get(resource.name, {})
                 resources_data.append({
-                    'Resource Name': resource.name,
+                    'Resource Name': ProjectValidator.sanitize_string(resource.name),
                     'Max Hours/Day': resource.max_hours_per_day,
                     'Total Hours Allocated': res_alloc.get('total_hours', 0),
                     'Tasks Assigned': res_alloc.get('tasks_assigned', 0),
@@ -128,7 +129,7 @@ class Exporter:
                     'Date Format'
                 ],
                 'Value': [
-                    data_manager.project_name,
+                    ProjectValidator.sanitize_string(data_manager.project_name),
                     data_manager.get_project_start_date().strftime(date_format_str) 
                         if data_manager.get_project_start_date() else 'N/A',
                     data_manager.get_project_end_date().strftime(date_format_str)
@@ -334,14 +335,23 @@ class Exporter:
             return False
     
     @staticmethod
-    def import_from_excel(filepath: str) -> Tuple[DataManager, bool]:
+    def import_from_excel(filepath: str) -> Tuple[DataManager, bool, str]:
         """Import project from Excel file with backward compatibility"""
         data_manager = DataManager()
         calendar_manager = CalendarManager()
+        error_msg = ""
         data_manager.calendar_manager = calendar_manager
         date_format_enum = DateFormat.YYYY_MM_DD # Default
         
         try:
+            # Validate Excel file first
+            success, errors = ProjectValidator.validate_excel(filepath)
+            if not success:
+                import logging
+                error_msg = "; ".join(errors)
+                logging.error(f"Excel validation failed for {filepath}: {error_msg}")
+                return data_manager, False, error_msg
+
             # Try to read summary for project name, project start date and date format
             try:
                 df_summary = pd.read_excel(filepath, sheet_name='Summary')
@@ -455,10 +465,10 @@ class Exporter:
                         r_item = r_item.strip()
                         match = re.match(r'(.+?)\s*\((\d+)\s*%\)', r_item)
                         if match:
-                            assigned_resources.append((match.group(1).strip(), int(match.group(2))))
+                            assigned_resources.append((ProjectValidator.sanitize_string(match.group(1)), int(match.group(2))))
                         else:
                             # Backward compatibility: assume 100% if not specified
-                            assigned_resources.append((r_item, 100))
+                            assigned_resources.append((ProjectValidator.sanitize_string(r_item), 100))
                 
                 # Get parent ID
                 parent_id = None
@@ -478,6 +488,7 @@ class Exporter:
                 # Only remove the summary marker if it's at the very beginning
                 if task_name.startswith('▶'):
                     task_name = task_name.lstrip('▶').strip()
+                task_name = ProjectValidator.sanitize_string(task_name)
                 
                 # Get is_milestone flag
                 is_milestone = False
@@ -498,7 +509,7 @@ class Exporter:
                     percent_complete=int(row.get('% Complete', 0)),
                     predecessors=predecessors,
                     assigned_resources=assigned_resources,
-                    notes=str(row.get('Notes', '')) if pd.notna(row.get('Notes', '')) else '',
+                    notes=ProjectValidator.sanitize_string(str(row.get('Notes', ''))) if pd.notna(row.get('Notes', '')) else '',
                     task_id=int(row['Task ID']),
                     parent_id=parent_id,
                     is_summary=is_summary,
@@ -548,7 +559,7 @@ class Exporter:
                         exceptions = [x.strip() for x in str(row['Exceptions']).split(',')]
                     
                     resource = Resource(
-                        name=str(row['Resource Name']),
+                        name=ProjectValidator.sanitize_string(str(row['Resource Name'])),
                         max_hours_per_day=float(row.get('Max Hours/Day', 8.0)),
                         exceptions=exceptions
                     )
@@ -566,7 +577,7 @@ class Exporter:
                 df_baseline_meta = pd.read_excel(filepath, sheet_name='Baselines')
                 
                 for _, meta_row in df_baseline_meta.iterrows():
-                    baseline_name = str(meta_row['Baseline Name'])
+                    baseline_name = ProjectValidator.sanitize_string(str(meta_row['Baseline Name']))
                     created_date_str = str(meta_row['Created Date'])
                     
                     # Parse created date
@@ -604,13 +615,12 @@ class Exporter:
                 # Baselines sheet doesn't exist - backward compatibility
                 print(f"No baselines found in Excel file (backward compatibility): {e}")
             
-            return data_manager, True
+            return data_manager, True, ""
             
         except Exception as e:
-            print(f"Error importing from Excel: {e}")
-            import traceback
-            traceback.print_exc()
-            return data_manager, False
+            error_msg = str(e)
+            print(f"Error importing from Excel: {error_msg}")
+            return data_manager, False, error_msg
     
     @staticmethod
     def export_to_json(data_manager: DataManager, calendar_manager: CalendarManager, 
@@ -646,14 +656,24 @@ class Exporter:
             return False
     
     @staticmethod
-    def import_from_json(filepath: str) -> Tuple[DataManager, CalendarManager, bool]:
+    def import_from_json(filepath: str) -> Tuple[DataManager, CalendarManager, bool, str]:
         """Load project from JSON file with backward compatibility"""
         data_manager = DataManager()
         calendar_manager = CalendarManager()
+        error_msg = ""
         
         try:
             with open(filepath, 'r') as f:
                 data = json.load(f)
+            
+            # Validate JSON data against schema
+            success, errors = ProjectValidator.validate_json(data)
+            if not success:
+                # Log and print errors
+                import logging
+                error_msg = "; ".join(errors)
+                logging.error(f"JSON validation failed for {filepath}: {error_msg}")
+                return data_manager, calendar_manager, False, error_msg
             
             # Check version for backward compatibility
             version = data.get('version', '1.0')
@@ -689,13 +709,12 @@ class Exporter:
             # Set calendar manager reference
             data_manager.calendar_manager = calendar_manager
             
-            return data_manager, calendar_manager, True
+            return data_manager, calendar_manager, True, ""
             
         except Exception as e:
-            print(f"Error loading from JSON: {e}")
-            import traceback
-            traceback.print_exc()
-            return data_manager, calendar_manager, False
+            error_msg = str(e)
+            print(f"Error loading from JSON: {error_msg}")
+            return data_manager, calendar_manager, False, error_msg
     
     @staticmethod
     def export_to_csv(data_manager: DataManager, filepath: str) -> bool:
@@ -792,11 +811,11 @@ class Exporter:
                     if not task.is_summary and task.get_status_text() == 'Overdue':
                         critical_tasks.append({
                             'ID': task.id,
-                            'Task': task.name,
+                            'Task': ProjectValidator.sanitize_string(task.name),
                             'End Date': task.end_date.strftime('%Y-%m-%d'),
                             'Days Overdue': (datetime.now() - task.end_date).days,
                             'Complete': f"{task.percent_complete}%",
-                            'Resources': ', '.join(task.assigned_resources)
+                            'Resources': ', '.join([ProjectValidator.sanitize_string(r) for r in task.assigned_resources])
                         })
                 
                 if critical_tasks:
@@ -808,7 +827,7 @@ class Exporter:
                 for resource in data_manager.resources:
                     alloc = allocation.get(resource.name, {})
                     resource_data.append({
-                        'Resource': resource.name,
+                        'Resource': ProjectValidator.sanitize_string(resource.name),
                         'Max Hours/Day': resource.max_hours_per_day,
                         'Total Hours': f"{alloc.get('total_hours', 0):.1f}",
                         'Tasks': alloc.get('tasks_assigned', 0),

@@ -18,6 +18,7 @@ import io
 import constants.constants as constants
 from constants.app_images import LOGO_BASE64
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from data_manager.temp_manager import TempFileManager
 
 class PDFExporter:
     def __init__(self, project_data, file_path, calendar_manager):
@@ -97,10 +98,13 @@ class PDFExporter:
         
         doc.build(self.story, onFirstPage=lambda c, d: None, onLaterPages=self._header)
         
-        # Clean up temporary image files after PDF is built
+        # Proactive cleanup (redundant but good practice)
         for path in self.temp_image_paths:
-            if os.path.exists(path):
-                os.remove(path)
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except:
+                pass
 
     def _render_gantt_chart_to_image(self, show_critical_path: bool, filename: str) -> str:
         """Renders the Gantt chart to a temporary image file."""
@@ -126,8 +130,8 @@ class PDFExporter:
         pixmap = gantt_widget.grab()
         
         # Save to temporary file
-        temp_image_path = os.path.join(os.path.dirname(self.file_path), filename)
-        self.temp_image_paths.append(temp_image_path) # Store path for later cleanup
+        temp_image_path = TempFileManager.get_temp_path(suffix=".png", prefix="gantt_")
+        self.temp_image_paths.append(temp_image_path)
         pixmap.save(temp_image_path, "PNG")
         
         return temp_image_path
@@ -267,10 +271,10 @@ class PDFExporter:
 
         # Decode base64 logo and save to a temporary file
         logo_data = base64.b64decode(LOGO_BASE64)
-        temp_logo_path = os.path.join(os.path.dirname(self.file_path), "temp_logo.ico")
+        temp_logo_path = TempFileManager.get_temp_path(suffix=".png", prefix="logo_")
         with open(temp_logo_path, "wb") as f:
             f.write(logo_data)
-        self.temp_image_paths.append(temp_logo_path) # Add to cleanup list
+        self.temp_image_paths.append(temp_logo_path)
 
         # Adjust width and height for better presentation
         img = Image(temp_logo_path, width=2.5*inch, height=2.5*inch)

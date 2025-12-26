@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import logging
 from data_manager.models import Task, Resource, DependencyType, TaskStatus, ScheduleType, Baseline, TaskSnapshot
 from settings_manager.settings_manager import ProjectSettings, DurationUnit
+from data_manager.validator import ProjectValidator
 
 class DataManager:
     def __init__(self, calendar_manager=None):
@@ -800,12 +801,25 @@ class DataManager:
     def save_to_dict(self) -> Dict[str, Any]:
         """Export all data to dictionary"""
         data = {
-            'project_name': self.project_name,
+            'project_name': ProjectValidator.sanitize_string(self.project_name),
             'settings': self.settings.to_dict(), # Include settings
-            'tasks': [task.to_dict(date_format=self.settings.default_date_format) for task in self.tasks],
-            'resources': [resource.to_dict() for resource in self.resources], # Include resources
+            'tasks': [],
+            'resources': [],
             'baselines': [baseline.to_dict(date_format=self.settings.default_date_format) for baseline in self.baselines], # Include baselines
         }
+        
+        # Sanitize tasks
+        for task in self.tasks:
+            t_dict = task.to_dict(date_format=self.settings.default_date_format)
+            t_dict['name'] = ProjectValidator.sanitize_string(t_dict.get('name', ''))
+            t_dict['notes'] = ProjectValidator.sanitize_string(t_dict.get('notes', ''))
+            data['tasks'].append(t_dict)
+            
+        # Sanitize resources
+        for resource in self.resources:
+            r_dict = resource.to_dict()
+            r_dict['name'] = ProjectValidator.sanitize_string(r_dict.get('name', ''))
+            data['resources'].append(r_dict)
         
         # Save calendar settings if manager exists
         if self.calendar_manager:
@@ -818,7 +832,7 @@ class DataManager:
         version = data.get('version', '1.0')
         
         Task._next_id = data.get('next_task_id', 1)
-        self.project_name = data.get('project_name', 'Untitled Project')
+        self.project_name = ProjectValidator.sanitize_string(data.get('project_name', 'Untitled Project'))
         
         # Load settings (with backward compatibility)
         if 'settings' in data:
@@ -845,7 +859,10 @@ class DataManager:
         # Load resources, preserving existing ones if none are provided in the data
         loaded_resources_data = data.get('resources')
         if loaded_resources_data is not None: # Only overwrite if 'resources' key is explicitly present
-            self.resources = [Resource.from_dict(r) for r in loaded_resources_data]
+            self.resources = []
+            for r in loaded_resources_data:
+                r['name'] = ProjectValidator.sanitize_string(r.get('name', ''))
+                self.resources.append(Resource.from_dict(r))
         
         # Ensure there's always at least a default resource if none were loaded
         if not self.resources:
@@ -1274,7 +1291,7 @@ class DataManager:
             return False
         
         # Create new baseline
-        baseline = Baseline(name=name, created_date=datetime.now())
+        baseline = Baseline(name=ProjectValidator.sanitize_string(name), created_date=datetime.now())
         
         # Capture snapshots of all tasks
         for task in self.tasks:
