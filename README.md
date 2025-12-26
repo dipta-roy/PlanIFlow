@@ -99,7 +99,7 @@ run.bat
 
 or 
 
-Use the `build.bat` script to generate an `PlayIFlow 2.1.0.exe` file which will be saved at `dist/` folder.
+Use the `build.bat` script to generate an `PlayIFlow 2.2.0.exe` file which will be saved at `dist/` folder.
 
 ```bash
 build.bat
@@ -133,7 +133,7 @@ python3 main.py
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download PlanIFlow `PlanIFlow_2.1.0.zip`:
+Download PlanIFlow `PlanIFlow_2.2.0.zip`:
 Download Code Verification Certificate: [Dipta Roy - Code Verification Certificate](https://github.com/dipta-roy/dipta-roy.github.io/blob/main/downloads/Code%20Verifying%20Certificates.zip).
 ```
 - HOW TO TRUST
@@ -155,7 +155,7 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 
 Once verified,
 ```
-Run PlanIFlow_2.1.0.exe and install the application.
+Run PlanIFlow_2.2.0.exe and install the application.
 ```
 
 ## 💻 Usage
