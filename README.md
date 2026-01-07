@@ -75,6 +75,9 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - Reportlab
 - Numpy
 - Pillow
+- cx_Freeze
+- Jsonschema
+- Python-dateutil
 
 ## Architecture Overview
 
@@ -99,10 +102,10 @@ run.bat
 
 or 
 
-Use the `build.bat` script to generate an `PlayIFlow 2.2.0.exe` file which will be saved at `dist/` folder.
+Use the `build_msi.bat` script to generate an `PlayIFlow 2.2.0.msi` file which will be saved at `dist/` folder.
 
 ```bash
-build.bat
+build_msi.bat
 ```
 
 #### Linux/Mac
@@ -133,7 +136,7 @@ python3 main.py
 ### Using Standalone Executables
 
 #### Windows (.exe)
-Download PlanIFlow `PlanIFlow_2.2.0.zip`:
+
 Download Code Verification Certificate: [Dipta Roy - Code Verification Certificate](https://github.com/dipta-roy/dipta-roy.github.io/blob/main/downloads/Code%20Verifying%20Certificates.zip).
 ```
 - HOW TO TRUST
@@ -155,7 +158,7 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 
 Once verified,
 ```
-Run PlanIFlow_2.2.0.exe and install the application.
+Run PlanIFlow_2.2.0.msi and install the application.
 ```
 
 ## 💻 Usage
@@ -304,13 +307,25 @@ This project includes a set of batch scripts to automate common tasks on Windows
 | ------------------- | ------------------------------------------------------------------------------ |
 | `run.bat`           | Runs the application, creating a virtual environment and installing dependencies if needed. |
 | `build.bat`         | Builds a standalone `.exe` file of the application.                            |
+| `build_msi.bat`     | Builds a professional `.msi` installer using cx_Freeze (less likely to trigger antivirus). |
 | `clean.bat`         | Cleans up the project directory by removing build artifacts and cache files.   |
 
 ## 🛠️ Building from Source
 
-To build a standalone executable from the source code, you can use the `build.bat` scripts.
+To build a standalone executable or a professional installer from the source code, you can use the provided batch scripts.
 
--   **`build.bat`**: Creates a single `.exe` file in the `dist` folder. This is the easiest way to create a distributable version of the application.
+-   **`build.bat`**: Creates a single `.exe` file in the `dist` folder. This is the quickest way to create a portable version, but it may sometimes be flagged by aggressive antivirus software.
+-   **`build_msi.bat`**: RECOMMENDED. Creates a professional Windows Installer (`.msi`) using `cx_Freeze`. This method is generally more compatible with antivirus software and provides a standard installation experience.
+
+### Building the MSI Installer
+
+1. Run `build_msi.bat` from the project root.
+2. The script will automatically:
+   - Create a virtual environment if it doesn't exist.
+   - Install all required dependencies.
+   - Compile the application.
+   - Package everything into a `.msi` file located in the `dist/` folder.
+3. You can then distribute and install the generated `PlanIFlow_Setup_2.2.0.msi`.
 
 ## 📂 Project Structure
 
@@ -373,7 +388,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
 - **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/658d22127727cd9675d037479010c91bd6f8b2be11df235e1f2f2f9aec831d7f) - May detect as **false positive**, add to Exclusion if necessary.
+- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/4eb2c37fd65be9df098b077cc6d0ece2178a6f19b968e559e8344af7466a1d0f) - May detect as **false positive**, add to Exclusion if necessary.
 
 ### Reasons for False Positve Detections:
 - **PyInstaller Bundling**: Embeds Python runtime, bytecode, and large libraries (e.g., PyQt6, matplotlib) into a single EXE, mimicking packed malware droppers via temporary unpacking.

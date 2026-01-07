@@ -1,12 +1,23 @@
 import json
 import os
+import sys
 import logging
 from typing import Dict, Any, List, Tuple
 
 class ProjectValidator:
     """Validator for project data in JSON and Excel formats"""
     
-    SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'project_schema.json')
+    if getattr(sys, 'frozen', False):
+        # Running in a frozen bundle (cx_Freeze / PyInstaller)
+        # We expect data_manager/project_schema.json relative to the executable dir
+        # or the lib dir depending on how it was packed.
+        # With our current setup, it is in {INSTALL_DIR}/data_manager/project_schema.json
+        base_dir = os.path.dirname(sys.executable)
+        SCHEMA_PATH = os.path.join(base_dir, 'data_manager', 'project_schema.json')
+    else:
+        # Running in normal Python environment
+        SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'project_schema.json')
+
     MAX_TASKS = 10000  # Security limit to prevent DoS
     MAX_STR_LEN = 250  # Limit for names and notes
     

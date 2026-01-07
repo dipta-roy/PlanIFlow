@@ -53,6 +53,23 @@ def get_resource_path(relative_path):
 
 def main():
     """Main application entry point"""
+    try:
+        _main_impl()
+    except Exception:
+        # Emergency logging for startup crashes
+        error_msg = traceback.format_exc()
+        try:
+            log_path = os.path.join(os.path.expanduser("~"), "PlanIFlow_Startup_Error.log")
+            with open(log_path, "w") as f:
+                f.write(error_msg)
+            # Try to show message box if Qt is alive
+            if QApplication.instance():
+                QMessageBox.critical(None, "Startup Error", f"An error occurred during startup.\nSee {log_path}\n\n{error_msg}")
+        except:
+            pass
+        sys.exit(1)
+
+def _main_impl():
     # Set global exception hook
     sys.excepthook = handle_exception
 
