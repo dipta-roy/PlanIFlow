@@ -624,17 +624,48 @@ class TreeViewOperationsMixin:
                     task_clone.name = cleaned_name
                     changed = True
             elif column == 5:  # Start Date
+                # Validate restrictions
+                if task_clone.is_summary:
+                    QMessageBox.warning(self, "Edit Restricted", "Summary task dates are calculated automatically.")
+                    self._revert_task_item_in_ui(item, current_task_model)
+                    self.task_tree.blockSignals(False)
+                    return
+                if task_clone.schedule_type == ScheduleType.AUTO_SCHEDULED:
+                    QMessageBox.warning(self, "Edit Restricted", "Auto Scheduled task dates are calculated automatically.")
+                    self._revert_task_item_in_ui(item, current_task_model)
+                    self.task_tree.blockSignals(False)
+                    return
+
                 new_start_date = datetime.strptime(new_value, self._get_strftime_format_string())
                 if task_clone.start_date.date() != new_start_date.date():
                     task_clone.start_date = new_start_date
                     changed = True
             elif column == 6:  # End Date
+                # Validate restrictions
+                if task_clone.is_summary:
+                    QMessageBox.warning(self, "Edit Restricted", "Summary task dates are calculated automatically.")
+                    self._revert_task_item_in_ui(item, current_task_model)
+                    self.task_tree.blockSignals(False)
+                    return
+                if task_clone.schedule_type == ScheduleType.AUTO_SCHEDULED:
+                    QMessageBox.warning(self, "Edit Restricted", "Auto Scheduled task dates are calculated automatically.")
+                    self._revert_task_item_in_ui(item, current_task_model)
+                    self.task_tree.blockSignals(False)
+                    return
+
                 if not task_clone.is_milestone: # Milestones have fixed end date
                     new_end_date = datetime.strptime(new_value, self._get_strftime_format_string())
                     if task_clone.end_date.date() != new_end_date.date():
                         task_clone.end_date = new_end_date
                         changed = True
             elif column == 7:  # Duration
+                # Validate restrictions
+                if task_clone.is_summary:
+                    QMessageBox.warning(self, "Edit Restricted", "Summary task duration is calculated automatically.")
+                    self._revert_task_item_in_ui(item, current_task_model)
+                    self.task_tree.blockSignals(False)
+                    return
+
                 new_duration = float(new_value)
                 if task_clone.is_milestone and new_duration > 0:
                     task_clone.is_milestone = False

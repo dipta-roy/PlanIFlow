@@ -300,8 +300,9 @@ class DataManager:
     
     def _validate_predecessors(self, task: Task, exclude_id: int = None) -> bool:
         for pred_id, dep_type, lag_days in task.predecessors:
-            if pred_id == exclude_id or pred_id == task.id:
-                continue
+            # Check for self-dependency
+            if pred_id == task.id or (exclude_id is not None and pred_id == exclude_id):
+                return False
             
             predecessor = self.get_task(pred_id)
             if not predecessor:

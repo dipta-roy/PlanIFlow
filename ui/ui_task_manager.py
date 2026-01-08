@@ -41,7 +41,11 @@ class TaskOperationsMixin:
             predecessors=[],
             assigned_resources=[],
             notes="",
-            schedule_type=ScheduleType.AUTO_SCHEDULED
+            schedule_type=ScheduleType.AUTO_SCHEDULED,
+            font_family='Arial',
+            font_size=10,
+            font_color='#000000',
+            background_color='#FFFFFF'
         )
         
         command_data = task.to_dict()

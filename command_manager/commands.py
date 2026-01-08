@@ -27,9 +27,12 @@ class EditTaskCommand(Command):
     def execute(self):
         task = self.data_manager.get_task(self.task_id)
         if task:
-            # Apply new data
-            self._apply_data(task, self.new_task_data)
-            if self.data_manager.update_task(self.task_id, task):
+            # Apply new data to a COPY of the task to avoid modifying the live object
+            # if validation fails.
+            updated_task = deepcopy(task)
+            self._apply_data(updated_task, self.new_task_data)
+            
+            if self.data_manager.update_task(self.task_id, updated_task):
                 if self.on_success_callback:
                     self.on_success_callback()
                 return True
@@ -38,9 +41,11 @@ class EditTaskCommand(Command):
     def undo(self):
         task = self.data_manager.get_task(self.task_id)
         if task:
-            # Revert to old data
-            self._apply_data(task, self.old_task_data)
-            if self.data_manager.update_task(self.task_id, task):
+            # Revert to old data on a COPY
+            reverted_task = deepcopy(task)
+            self._apply_data(reverted_task, self.old_task_data)
+            
+            if self.data_manager.update_task(self.task_id, reverted_task):
                 if self.on_success_callback:
                     self.on_success_callback()
                 return True
