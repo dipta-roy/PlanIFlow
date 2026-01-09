@@ -81,7 +81,7 @@ echo.
 echo [STEP 3/3] Packaging MSI Installer...
 echo Note: This step uses the binaries from the build folder.
 
-python installer\setup_msi.py bdist_msi
+python installer\setup_msi.py bdist_msi --skip-build
 
 if errorlevel 1 (
     echo [ERROR] MSI packaging failed.

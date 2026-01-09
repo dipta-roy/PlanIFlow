@@ -64,6 +64,7 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - **Undo/Redo**: Full history support for task creation, deletion, editing, movement, and resource management.
 - **Zoom Controls**: Zoom in and out of the Gantt chart for better visualization.
 - **Dark Mode**: Toggle between light and dark themes
+- **Auto-Update System**: Automatically checks for updates, verifies integrity, and installs new versions securely.
 
 ## 🛠️ Technologies Used
 
@@ -395,6 +396,22 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - **Dynamic Loading**: Hidden imports and runtime code execution (e.g., via exec()) trigger heuristics for code injection, similar to script-based threats.
 - **Suspicious Behaviors**: File I/O, subprocess calls, and network potential (from libs like requests, which are cleaned as much possible) score as PUPs in sandboxes.
 - **Generic Heuristics**: Large file size, unsigned EXE, and fuzzy hashing group it with known threats; common false positive for PyInstaller apps (85%+ cases).
+
+## 🔄 Auto-Update System
+
+PlanIFlow includes a secure, built-in auto-update mechanism to keep your application up-to-date with the latest features and bug fixes.
+
+### How it works:
+1.  **Check**: The application periodically checks the [GitHub Releases](https://github.com/dipta-roy/PlanIFlow/releases) page for new versions.
+2.  **Download**: If a newer version is found, it downloads the official MSI installer.
+3.  **Verify**: 
+    -   **Hash Verification**: After downloading, the system automatically calculates the SHA256 hash of the installer.
+    -   It compares this hash against the official `.sha256.txt` record provided in the release assets.
+    -   **Security**: If the hashes do not match (indicating corruption or potential tampering), the update is **immediately aborted** and the file is deleted.
+4.  **Install**: Once verified, the application silently installs the update and restarts.
+
+### Manual Check:
+You can manually check for updates at any time by going to **Help > Check for Updates**.
 
 ## 🙏 Acknowledgments
 

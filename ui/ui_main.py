@@ -191,6 +191,8 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         self.monte_carlo_tab = MonteCarloTab(self.data_manager)
         self.tabs.addTab(self.monte_carlo_tab, "🎲 Risk Analysis")
         
+
+        
         # Connect tab change signal
         self.tabs.currentChanged.connect(self._on_tab_changed)
         
@@ -292,6 +294,12 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         """Show Monte Carlo help dialog"""
         if hasattr(self, 'monte_carlo_tab'):
             self.monte_carlo_tab.show_help()
+
+    def _check_for_updates(self):
+        """Show check for updates dialog"""
+        from ui.ui_update_dialog import UpdateDialog
+        msg = UpdateDialog(self)
+        msg.exec()
     
     # Tree View Methods
     def eventFilter(self, obj, event):

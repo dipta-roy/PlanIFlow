@@ -295,6 +295,12 @@ def create_menu_bar(window):
     about_action.triggered.connect(window._show_about)
     help_menu.addAction(about_action)
 
+    help_menu.addSeparator()
+
+    check_update_action = QAction("Check for &Updates...", window)
+    check_update_action.triggered.connect(window._check_for_updates)
+    help_menu.addAction(check_update_action)
+
 
 def create_toolbar(window):
     """Create toolbar"""

@@ -12,6 +12,11 @@ VERSION = "2.3.0"
 AUTHOR = "Dipta Roy"
 ABOUT_TEXT = "PlanIFlow is a project planning and management tool designed to help you organize tasks, resources, and schedules effectively."
 
+# --- Auto-Update Constants ---
+REPO_OWNER = "dipta-roy"
+REPO_NAME = "PlanIFlow"
+GITHUB_API_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest"
+
 
 # --- UI General Constants ---
 ICON_SIZE = 14 # Default icon size for certain UI elements
