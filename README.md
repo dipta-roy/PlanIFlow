@@ -4,67 +4,66 @@
 ![Framework](https://img.shields.io/badge/Framework-PyQt6-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-PlanIFlow is a fully offline, standalone desktop application for project planning and management, offering features similar to Microsoft Project.
+PlanIFlow is an **Offline-First**, standalone desktop application for project planning and management, offering features similar to professional project management tools. It operates primarily offline, with optional network connectivity solely for secure updates.
 
 ## 📝 Table of Contents
 
-- [Features](#-features)
-- [Technologies Used](#️-technologies-used)
-- [Architecture Overview](#-architecture-overview)
-- [Getting Started](#-getting-started)
+- [Features](#features)
+- [Technologies Used](#technologies-used)
+- [Architecture Overview](#architecture-overview)
+- [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
   - [Running the Application](#running-the-application)
-- [Usage](#-usage)
+  - [Using Standalone Executables](#using-standalone-executables)
+- [Usage](#usage)
   - [Creating a New Project](#creating-a-new-project)
   - [Adding Tasks and Resources](#adding-tasks-and-resources)
   - [Managing Tasks](#managing-tasks)
+  - [Resource Exception Days](#resource-exception-days)
   - [Gantt Chart](#gantt-chart)
   - [Dashboard](#dashboard)
   - [Importing and Exporting Data](#importing-and-exporting-data)
   - [Project Baselining](#project-baselining)
-  - [Monte Carlo Risk Analysis](#-monte-carlo-risk-analysis)
-- [Screnshots](#screenshots)
-- [Shortcuts](#️-shortcuts)
-- [Batch Scripts](#-batch-scripts)
-- [Building from Source](#️-building-from-source)
-- [License](#-license)
-- [Project Structure](#-project-structure)
-- [Troubleshooting](#-troubleshooting)
-- [Security and Distribution](#-security-and-distribution)
-- 	[Reasons for False Positve Detections](#-security-and-distribution)
-- [Acknowledgments](#-acknowledgments)
+- [Monte Carlo Risk Analysis](#monte-carlo-risk-analysis)
+- [Screenshots](#screenshots)
+- [Shortcuts](#shortcuts)
+- [Batch Scripts](#batch-scripts)
+- [Building from Source](#building-from-source)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Security and Distribution](#security-and-distribution)
+- [Secure Auto-Update System](#secure-auto-update-system)
+- [Acknowledgments](#acknowledgments)
 
 ## ✨ Features
 
+- **Offline-First Architecture**: Your data stays on your machine. Network is used only for updates.
 - **Modular UI Architecture**: A well-organized and extensible user interface, making it easier to navigate and manage project elements.
 - **Project Settings Management**: Dedicated interface for configuring project-specific settings and preferences.
-- **Task Management**: Create, edit, delete tasks with dependencies
+- **Task Management**: Create, edit, delete tasks with dependencies (FS, SS, FF, SF + Lag).
 - **Hierarchical Tasks**: Create summary tasks and sub-tasks.
 - **Inline Editing**: Directly edit task properties within the table for quick modifications.
 - **Context Menus**: Right-click on tasks for quick access to actions like edit, delete, indent, and outdent.
-- **Task Filtering**: Search and filter by resource, status, or name
-- **Calendar Management**: Custom work hours
+- **Task Filtering**: Search and filter by resource, status, or name.
+- **Calendar Management**: Custom work hours and holidays.
 - **Resource Management**: Allocate resources, track utilization, and manage billing rates.
-- **Resource Allocation Tracking**: Detect over-allocation
-- **Resource Exception**: Resources can now have exception days (holidays/leaves) that exclude them from work on specific dates. This affects their billing and effort calculations.
-- **Total Project Cost in Dashboard**: The dashboard now displays the total estimated cost of the project, calculated from all assigned resources and their billing rates.
-- **Project Baselining**: Create up to 3 project baselines to capture snapshots of your project at specific points in time. Compare current progress against baselines to track variances in start dates, end dates, duration, and completion percentages. Baselines are fully integrated with Excel and JSON import/export.
-- **Monte Carlo Risk Analysis**: A risk assessment tool that simulates the project schedule hundreds or thousands of times to generate a probability distribution of possible project completion dates.
-- **Rich Text Task Formatting**: Customize the appearance of tasks with rich text formatting options. Make important tasks stand out or organize your project visually.
-    - **Font Styling**: Apply **bold**, *italic*, and underline to task names.
-    - **Coloring**: Change the font color and background color of tasks.
-    - **Font Selection**: Choose from a variety of font families and sizes.
-- **Duration Unit Selection**: Switch between 'Days' and 'Hours' for task duration calculations, allowing for more granular project planning.
-- **Dynamic Gantt Charts**: Real-time visualization with dependencies
-- **Project Dashboard**: Overview of project metrics, including total project cost.
-- **Excel Import/Export**: Share plans via Excel files
+- **Resource Allocation Tracking**: Detect over-allocation.
+- **Resource Exception**: Resources can now have exception days (holidays/leaves) that exclude them from work on specific dates.
+- **Total Project Cost in Dashboard**: The dashboard displays the total estimated cost of the project.
+- **Project Baselining**: Create up to 3 project baselines. Compare current progress against baselines to track variances.
+- **Monte Carlo Risk Analysis**: A risk assessment tool that simulates the project schedule hundreds of times to generate a probability distribution of completion dates.
+- **Rich Text Task Formatting**: Customize task appearance with bold, italic, color, and font selection.
+- **Duration Unit Selection**: Switch between 'Days' and 'Hours' for task duration.
+- **Dynamic Gantt Charts**: Real-time visualization with dependencies.
+- **Project Dashboard**: Overview of project metrics, costs, and status.
+- **Excel Import/Export**: Share plans via Excel files.
 - **JSON Import/Export**: Save and load projects in JSON format.
-- **PDF Import/Export**: Save and load projects in PDF format.
-- **Undo/Redo**: Full history support for task creation, deletion, editing, movement, and resource management.
-- **Zoom Controls**: Zoom in and out of the Gantt chart for better visualization.
-- **Dark Mode**: Toggle between light and dark themes
-- **Auto-Update System**: Automatically checks for updates, verifies integrity, and installs new versions securely.
+- **PDF Import/Export**: Export project reports and Gantt charts to PDF.
+- **Undo/Redo**: Full history support for all actions.
+- **Zoom Controls**: Zoom in and out of the Gantt chart.
+- **Dark Mode**: Toggle between light and dark themes.
+- **Secure Auto-Update System**: Automatically checks for updates, downloads, and verifies SHA256 integrity before installing.
 
 ## 🛠️ Technologies Used
 
@@ -79,10 +78,15 @@ PlanIFlow is a fully offline, standalone desktop application for project plannin
 - cx_Freeze
 - Jsonschema
 - Python-dateutil
+- Requests (Updater only)
 
 ## Architecture Overview
 
-The application follows a modular architecture, separating data management, UI, and business logic into distinct components. This design makes the application easier to maintain and extend.
+The application follows a modular architecture, separating data management, UI, and business logic into distinct components.
+- **Core**: Python + PyQt6
+- **Data**: In-memory Pandas DataFrames, persisted to JSON/Excel.
+- **Security**: Strict input validation, no database server, no telemetry.
+- **Network**: Restricted to `updater.py` for GitHub Releases checks.
 
 ## 🚀 Getting Started
 
@@ -95,7 +99,7 @@ The application follows a modular architecture, separating data management, UI, 
 
 #### Windows:
 
-Once the installation is complete, you can run the application by executing the `run.bat` script. This script will activate the virtual environment and start the application.
+Once the installation is complete, you can run the application by executing the `run.bat` script.
 
 ```bash
 run.bat
@@ -103,7 +107,7 @@ run.bat
 
 or 
 
-Use the `build_msi.bat` script to generate an `PlayIFlow 2.3.0.msi` file which will be saved at `dist/` folder.
+Use the `build_msi.bat` script to generate an `PlanIFlow_Setup_2.3.0.msi` file.
 
 ```bash
 build_msi.bat
@@ -111,25 +115,22 @@ build_msi.bat
 
 #### Linux/Mac
 
-To run this application on Linux or macOS, follow these steps:
-1. Open your terminal.
-
-2. Create a virtual environment: 
+1. Create a virtual environment: 
 ```bash
 python3 -m venv venv
 ```
 
-3. Activate the virtual environment: 
+2. Activate the virtual environment: 
 ```bash
 source venv/bin/activate
 ```
 
-4. Install dependencies: 
+3. Install dependencies: 
 ```bash
 pip install -r requirements.txt
 ```
 
-5. Run the application: 
+4. Run the application: 
 ```bash
 python3 main.py 
 ```
@@ -154,7 +155,7 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 1. To confirm the application is genuine, open its Properties.
 2. Go to the Digital Signatures tab.
 3. Select "Signed_By_Dipta" from the Embedded Signatures list, then choose Details.
-4. In the General tab, you should see the message "This digital signature is OK." which confirms the app was signed by Dipta using the listed certificates.
+4. In the General tab, you should see the message "This digital signature is OK."
 ```
 
 Once verified,
@@ -171,88 +172,59 @@ Run PlanIFlow_2.3.0.msi and install the application.
 
 ### Adding Tasks and Resources
 
-- **Add Resources**: Click the `👤 Add Resource` button in the toolbar to add resources like team members or equipment. You can now also specify a billing rate for each resource.
-- **Add Tasks**: Click the `➕ Add Task` button to create a new task. You can set the start and end dates, assign resources, and add notes.
+- **Add Resources**: Click the `👤 Add Resource` button in the toolbar.
+- **Add Tasks**: Click the `➕ Add Task` button to create a new task.
 - **Sub-tasks**: Select a task and click `➕ Add Subtask` to create a child task.
 
 ### Managing Tasks
 
-- **Inline Editing**: Double-click on a task field (e.g., Task Name, Start Date, End Date, Duration, % Complete, Dependencies, Resources, Notes) to directly edit its value. Press `Enter` to save changes or `Esc` to cancel.
-  - **Date Fields**: Use the calendar dropdown for Start Date and End Date.
-  - **Resources Field**: Select from a dropdown of existing resources or type new ones.
-  - **Status and ID**: These fields are automatically populated and cannot be edited directly.
-- **Context Menu**: Right-click on any task row to bring up a context menu with options such as editing the task, deleting it, indenting, or outdenting.
-- **Indent/Outdent**: Use the `Tab` and `Shift+Tab` keys to indent and outdent tasks, creating a task hierarchy.
+- **Inline Editing**: Double-click on a task field to edit.
+- **Context Menu**: Right-click on any task row for more options.
+- **Indent/Outdent**: Use `Tab` and `Shift+Tab` to create hierarchy.
 
 ### Resource Exception Days
 
-- **Single Day**: A specific date when the resource is unavailable
-- **Date Range**: A continuous period when the resource is unavailable (e.g., vacation)
+- **Single Day**: A specific date when the resource is unavailable.
+- **Date Range**: A continuous period (e.g., vacation).
 
 ### Gantt Chart
 
-The **Gantt Chart** tab provides a visual representation of your project timeline. Dependency lines are drawn between tasks, and the chart is updated in real-time.
-- **Show Critical Path**: Check the checkbox → red highlights for zero-slack tasks.
+The **Gantt Chart** tab provides a visual representation of your project timeline.
+- **Show Critical Path**: Check the checkbox for red highlights on zero-slack tasks.
 
 ### Dashboard
 
 The **Dashboard** tab gives you a high-level overview of your project, including:
-
--   Project start and end dates
--   Total number of tasks
--   Overall project completion percentage
--   Task status breakdown
--   **Total Project Cost**: A summary of the estimated cost across all resources.
-- 	Scroll for Budget and cost tables.
+-   Project dates, task counts, completion %.
+-   **Total Project Cost**.
+- 	Budget and cost tables.
 
 ### Importing and Exporting Data
 
-- **JSON**: Save and load your projects using the `.json` format. This is the recommended format for saving your work.
-- **Excel**: Import and export your projects to and from Excel files. This is useful for sharing your project with others who may not have the application.
-- **PDF**: Export your projects to and from PDF report.
+- **JSON**: Recommended format.
+- **Excel**: For sharing with non-users.
+- **PDF**: For reporting.
 
 ### Project Baselining
 
-Baselines allow you to capture snapshots of your project at key milestones and compare current progress against them.
-
-- **Creating a Baseline**:
-  - Go to `Settings > Baselines > Set Baseline...`
-  - Click "Create New Baseline" and enter a name (e.g., "Initial Plan", "Q1 Baseline")
-  - The baseline captures all task start dates, end dates, durations, and completion percentages
-  - You can create up to 3 baselines per project
-
-- **Viewing Baseline Comparison**:
-  - Go to `Settings > Baselines > View Baseline Comparison` or click the "📊 Baseline Comparison" tab
-  - Select a baseline from the dropdown to compare against current project state
-  - View detailed variance analysis including:
-    - Start/End date variances (in days)
-    - Duration variances
-    - Completion percentage variances
-    - Color-coded status indicators (late=red, early=green, on-track=blue)
-  - Summary statistics show overall project health
-
-- **Managing Baselines**:
-  - Rename baselines to reflect project phases
-  - Delete outdated baselines
-  - Baselines are automatically saved with your project in JSON and Excel formats
-  - When importing projects, baselines are restored with full backward compatibility
+Baselines allow you to capture snapshots of your project.
+- **Create**: `Settings > Baselines > Set Baseline...`
+- **Compare**: `Settings > Baselines > View Baseline Comparison`.
+- **Visualize**: Variance in start/end dates, duration, and completion.
 
 ## 🎲 Monte Carlo Risk Analysis
 
-The Monte Carlo analysis feature provides a powerful way to forecast project completion dates under uncertainty. Instead of relying on a single, deterministic schedule, it runs thousands of simulations to model a range of possible outcomes.
+The Monte Carlo analysis feature forecasts project completion dates under uncertainty.
 
 - **How to Use**:
   - Go to the `Risk Analysis` tab.
-  - Set the number of **Iterations** (e.g., 1000). More iterations lead to more accurate statistical results but take longer to run.
+  - Set **Iterations** (e.g., 1000).
   - Click **"Run Analysis"**.
 
-- **Interpreting the Results**:
-  - **Confidence Table**: This table shows the predicted completion dates for different confidence levels:
-    - **P50 (Median)**: The date by which there is a 50% chance of completion. This is the most likely outcome.
-    - **P80 (Low Risk)**: The date you can be 80% confident the project will be finished. A good target for stakeholder communication.
-    - **P90 (High Confidence)**: A very conservative date with a 90% chance of completion.
-  - **Top Risk Drivers**: This is a ranked list of tasks that most frequently appear on the critical path during the simulations. These are the tasks that have the biggest impact on your project's schedule. Focus on managing these tasks to reduce schedule risk.
-  - **Completion Date Distribution**: An ASCII histogram that visualizes the spread of possible completion dates, giving you a quick overview of the project's risk profile.
+- **Results**:
+  - **Confidence Table**: P50 (Median), P80 (Low Risk), P90 (High Confidence).
+  - **Top Risk Drivers**: Tasks most frequently on the critical path.
+  - **Completion Date Distribution**: Histogram of possible completion dates.
 
 ## Screenshots
 
@@ -302,84 +274,44 @@ The Monte Carlo analysis feature provides a powerful way to forecast project com
 
 ## 🪟 Batch Scripts
 
-This project includes a set of batch scripts to automate common tasks on Windows:
-
 | Script              | Purpose                                                                        |
 | ------------------- | ------------------------------------------------------------------------------ |
-| `run.bat`           | Runs the application, creating a virtual environment and installing dependencies if needed. |
-| `build.bat`         | Builds a standalone `.exe` file of the application.                            |
-| `build_msi.bat`     | Builds a professional `.msi` installer using cx_Freeze (less likely to trigger antivirus). |
-| `clean.bat`         | Cleans up the project directory by removing build artifacts and cache files.   |
+| `run.bat`           | Runs the application, installing dependencies if needed. |
+| `build.bat`         | Builds a standalone `.exe` (PyInstaller).                            |
+| `build_msi.bat`     | Builds a professional `.msi` installer using `cx_Freeze` + `PyInstaller` wrapper. |
+| `clean.bat`         | Cleans up build artifacts.   |
 
 ## 🛠️ Building from Source
 
 To build a standalone executable or a professional installer from the source code, you can use the provided batch scripts.
 
--   **`build.bat`**: Creates a single `.exe` file in the `dist` folder. This is the quickest way to create a portable version, but it may sometimes be flagged by aggressive antivirus software.
--   **`build_msi.bat`**: RECOMMENDED. Creates a professional Windows Installer (`.msi`) using `cx_Freeze`. This method is generally more compatible with antivirus software and provides a standard installation experience.
+-   **`build.bat`**: Creates a single `.exe` file in the `dist` folder.
+-   **`build_msi.bat`**: RECOMMENDED. Creates a professional Windows Installer (`.msi`). This method is more compatible with antivirus software.
 
 ### Building the MSI Installer
 
 1. Run `build_msi.bat` from the project root.
 2. The script will automatically:
-   - Create a virtual environment if it doesn't exist.
-   - Install all required dependencies.
+   - Create/Update virtual environment.
+   - Install dependencies.
    - Compile the application.
    - Package everything into a `.msi` file located in the `dist/` folder.
-3. You can then distribute and install the generated `PlanIFlow_Setup_2.3.0.msi`.
 
 ## 📂 Project Structure
 
 | Path                                     | Description                                                                                             |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `main.py`                                | Main entry point of the application.                                                                    |
-| `build.bat`, `clean.bat`, `run.bat`      | Batch scripts for building, cleaning, and running the application on Windows.                           |
-| `prepare_spec.py`                        | Script to prepare the PyInstaller spec file for building the executable.                                |
-| `requirements.txt`                       | A list of Python packages required to run the application.                                              |
-| `calendar_manager/calendar_manager.py`   | Manages project calendars, including working days, holidays, and custom work schedules.                 |
-| `command_manager/command_manager.py`     | Manages the undo/redo stack and executes commands.                                                      |
-| `command_manager/commands.py`            | Defines individual command classes (Add, Edit, Delete, Move) for undoable actions.                      |
-| `constants/app_images.py`                | Contains Base64 encoded application images and icons.                                                   |
-| `constants/constants.py`                 | Defines global constants and configuration values.                                                      |
-| `data_manager/models.py`                 | Defines data models for tasks, resources, and other project entities.                                   |
-| `data_manager/manager.py`                | The core data manager, handling tasks, resources, critical path, and cost management.                   |
-| `data_manager/baseline.py`               | Defines baseline data models for capturing project snapshots.                                           |
-| `data_manager/monte_carlo.py`            | Handles Monte Carlo simulation for risk analysis.                                                       |
-| `exporter/exporter.py`                   | Handles the import and export of project data in formats like JSON and Excel.                           |
-| `exporter/pdf_exporter.py`               | Responsible for exporting project reports and Gantt charts to PDF format.                               |
-| `settings_manager/settings_manager.py`   | Manages application settings, such as duration units and theme preferences.                             |
-| `ui/ui_main.py`                          | The main window of the application, containing tabs, menus, and the primary tree view.                  |
-| `ui/ui_tasks.py`                         | Implements the task tree view, handling task hierarchy and dependencies.                                |
-| `ui/ui_resources.py`                     | Implements the resource table, displaying resource allocation and warnings.                             |
-| `ui/gantt_chart.py`                      | Implements the dynamic Gantt chart visualization.                                                       |
-| `ui/ui_dashboard.py`                     | Creates the project dashboard interface.                                                                |
-| `ui/ui_delegates.py`                     | Contains custom delegates for UI editors, such as date pickers and resource selectors.                  |
-| `ui/ui_baseline_comparison.py`           | Implements the baseline comparison tab for variance analysis.                                           |
-| `ui/ui_baseline_manager.py`              | Manages baseline-related operations and interactions.                                                   |
-| `ui/ui_baseline_dialog.py`               | Defines the dialog for managing project baselines.                                                      |
-| `ui/ui_calendar_settings_dialog.py`      | Defines the dialog for configuring project calendar settings.                                           |
-| `ui/ui_duration_unit_dialog.py`          | Defines the dialog for setting duration units (e.g., days, hours).                                      |
-| `ui/ui_file_manager.py`                  | Manages file-related operations within the UI.                                                          |
-| `ui/ui_formatting.py`                    | Implements the font and color formatting features.                                                      |
-| `ui/ui_helpers.py`                       | Provides utility functions and helper methods for UI-related tasks.                                     |
-| `ui/ui_menu_toolbar.py`                  | Handles actions and shortcuts for the application's menu and toolbar.                                   |
-| `ui/ui_monte_carlo.py`                   | Implements the Monte Carlo simulation tab.                                                              |
-| `ui/ui_project_settings.py`              | Defines the dialog for configuring general project settings.                                            |
-| `ui/ui_resource_dialog.py`               | Defines the dialog for managing and editing resources.                                                  |
-| `ui/ui_resource_exceptions_widget.py`    | Widget for managing resource exceptions (holidays/leaves).                                              |
-| `ui/ui_task_dialog.py`                   | Defines the dialog for managing and editing individual tasks.                                           |
-| `ui/ui_task_manager.py`                  | Manages task-related operations and interactions within the UI.                                         |
-| `ui/ui_tree_view_manager.py`             | Manages the overall behavior and interactions of the tree view widgets.                                 |
-| `ui/ui_view_manager.py`                  | Manages the different views and their transitions within the application.                               |
-| `ui/themes.py`                           | Manages the application's visual themes (e.g., light and dark mode).                                    |
-
-**Note:** The `build` and `dist` directories are generated during the build process and contain the compiled application and its dependencies. 
+| `updater.py`                             | Handles secure updates (check, download, hash verification).                                            |
+| `data_manager/`                          | Core logic for tasks, resources, validation, and Monte Carlo.                                           |
+| `ui/`                                    | PyQt6 widgets, dialogs, and main window logic.                                                          |
+| `installer/`                             | Scripts for building the MSI installer.                                                                 |
 
 ## 🐛 Troubleshooting
 
--   **Resource Files Not Found (PyInstaller builds)**: If you encounter issues with the application not finding images or other data files when running a built executable, it might be related to how PyInstaller bundles resources. The application uses `sys._MEIPASS` to locate files in standalone executables. Ensure all necessary data directories (e.g., `images`, `constants`) are correctly included in the PyInstaller build process via `--add-data` flags in `build.bat`.
--   **Application does not start**: Ensure you have Python 3.11 or higher installed and that it is in your system's PATH.
--   **`ModuleNotFoundError`**: If you get an error about a missing module, run `pip install -r requirements.txt` in the activated virtual environment.
+-   **Resource Files Not Found**: Check `sys._MEIPASS` handling if building custom specs.
+-   **App does not start**: Ensure Python 3.11+ is in PATH.
+-   **`ModuleNotFoundError`**: Run `pip install -r requirements.txt`.
 
 ## 📄 License
 
@@ -387,35 +319,36 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## 📈 Security and Distribution
 
-- **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (offline, safe I/O).
-- **Distribution**: Use signed builds; include .cer for trust.
-- **VirusTotal Report**: [VirusTotal Report](https://www.virustotal.com/gui/file/b1be35b6e0e10d8d9399be1bf69dc58b9274b2097d16b3c4b12d09e1584d3aa8) - May detect as **false positive**, add to Exclusion if necessary.
+- **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (Secure Design).
+- **Offline-First**: No data leaves your machine.
+- **Secure Updates**: HTTPS + SHA256 Hash Verification.
+- **Input Validation**: Strict limits on task counts (10k) and string lengths (250) to prevent DoS.
 
-### Reasons for False Positve Detections:
-- **PyInstaller Bundling**: Embeds Python runtime, bytecode, and large libraries (e.g., PyQt6, matplotlib) into a single EXE, mimicking packed malware droppers via temporary unpacking.
-- **Dynamic Loading**: Hidden imports and runtime code execution (e.g., via exec()) trigger heuristics for code injection, similar to script-based threats.
-- **Suspicious Behaviors**: File I/O, subprocess calls, and network potential (from libs like requests, which are cleaned as much possible) score as PUPs in sandboxes.
-- **Generic Heuristics**: Large file size, unsigned EXE, and fuzzy hashing group it with known threats; common false positive for PyInstaller apps (85%+ cases).
+### Reasons for False Positive Detections:
+- **PyInstaller Bundling**: Embeds Python runtime and libraries into a single EXE, which heuristic scanners may flag.
+- **Dynamic Loading**: Runtime imports can trigger behavior monitoring.
+- **Suspicious Behaviors**: Updater network activity (clean `requests` usage) can be flagged as "network potential".
+- **Mitigation**: We digitally sign our builds. Please verify the signature as described in "Getting Started".
 
-## 🔄 Auto-Update System
+## 🔄 Secure Auto-Update System
 
-PlanIFlow includes a secure, built-in auto-update mechanism to keep your application up-to-date with the latest features and bug fixes.
+PlanIFlow includes a secure, built-in auto-update mechanism.
 
 ### How it works:
-1.  **Check**: The application periodically checks the [GitHub Releases](https://github.com/dipta-roy/PlanIFlow/releases) page for new versions.
-2.  **Download**: If a newer version is found, it downloads the official MSI installer.
+1.  **Check**: Periodically checks [GitHub Releases](https://github.com/dipta-roy/PlanIFlow/releases) securely via HTTPS.
+2.  **Download**: Downloads the official MSI installer.
 3.  **Verify**: 
-    -   **Hash Verification**: After downloading, the system automatically calculates the SHA256 hash of the installer.
-    -   It compares this hash against the official `.sha256.txt` record provided in the release assets.
-    -   **Security**: If the hashes do not match (indicating corruption or potential tampering), the update is **immediately aborted** and the file is deleted.
-4.  **Install**: Once verified, the application silently installs the update and restarts.
+    -   **Hash Verification**: Calculates SHA256 hash of the download.
+    -   **Compare**: Matches against the official `.sha256.txt` record.
+    -   **Abort**: If hashes mismatch, the file is deleted immediately.
+4.  **Install**: Installs the update silently and restarts.
 
 ### Manual Check:
-You can manually check for updates at any time by going to **Help > Check for Updates**.
+Go to **Help > Check for Updates**.
 
 ## 🙏 Acknowledgments
 
 - Icons: [Flaticon](https://flaticon.com).
 - Thanks to PyQt6 & Matplotlib communities.
 
-Built by [Dipta Roy](https://github.com/dipta-roy) with ❤️
+Built by [Dipta Roy](https://github.com/dipta-roy) with ❤️.
