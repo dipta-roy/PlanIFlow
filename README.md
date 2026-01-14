@@ -290,15 +290,15 @@ Track your project's cost and schedule performance with professional precision.
 
 | Kanban Board | Edit Kanban Tile |
 | --- | --- |
-| ![Kanban Board](./screenshot/Kanban%20Board.png) ![Edit Kanban Tile](./screenshot/Kanban%20Tile%20Edit.png) |
+| ![Kanban Board](./screenshot/Kanban%20Board.png) | ![Edit Kanban Tile](./screenshot/Kanban%20Tile%20Edit.png) |
 
 | Project Settings | Calendar Settings |
 | --- | --- |
-| ![Project Settings](./screenshot/Project%20Settings.png) ![Calendar Settings](./screenshot/Calendar%20Settings.png) |
+| ![Project Settings](./screenshot/Project%20Settings.png) |![Calendar Settings](./screenshot/Calendar%20Settings.png) |
 
 | Holidays Settings | Interface Settings |
 | --- | --- |
-| ![Project Settings](./screenshot/Holidays%20Settings.png) ![Risk Analysis](./screenshot/Interface%20Settings.png) |
+| ![Project Settings](./screenshot/Holidays%20Settings.png) | ![Risk Analysis](./screenshot/Interface%20Settings.png) |
 
 
 ## ⌨️ Shortcuts
