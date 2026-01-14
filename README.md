@@ -144,11 +144,11 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 - HOW TO TRUST
 
 1. Download certficate from above link.
-1. Right-click `Signed_By_Dipta_CodeSigningPublicKey.cer` → **Install Certificate**
-2. Select **Local Machine** (requires admin)
-3. Choose **Place all certificates in the following store**
-4. Click **Browse** → Select **Trusted Root Certification Authorities**
-5. Click **Next** → **Finish**
+2. Right-click `Signed_By_Dipta_CodeSigningPublicKey.cer` → "Install Certificate"
+3. Select "Local Machine" (requires admin)
+4. Choose "Place all certificates in the following store"
+5. Click "Browse" → Select "Trusted Root Certification Authorities"
+6. Click "Next" → "Finish"
 
 - VERIFY APPLICATION AUTHENTICITY
 
