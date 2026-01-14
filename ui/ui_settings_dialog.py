@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, 
                              QWidget, QLabel, QLineEdit, QDateEdit, QGroupBox, 
-                             QCheckBox, QPushButton, QComboBox, QFormLayout, QMessageBox, QSpinBox)
+                             QCheckBox, QPushButton, QComboBox, QFormLayout, QMessageBox, QSpinBox,
+                             QTableWidget, QTableWidgetItem, QHeaderView)
 from PyQt6.QtCore import QDate, QTime, Qt
 from datetime import datetime
-from settings_manager.settings_manager import DateFormat, DurationUnit
+from settings_manager.settings_manager import DateFormat, DurationUnit, Currency
 from calendar_manager.calendar_manager import CalendarManager
 from ui.ui_time_picker import TimePickerWidget
 
@@ -30,11 +31,13 @@ class SettingsDialog(QDialog):
         # Initialize tabs
         self.general_tab = self._create_general_tab()
         self.calendar_tab = self._create_calendar_tab()
+        self.holidays_tab = self._create_holidays_tab()
         self.interface_tab = self._create_interface_tab()
         
-        self.tabs.addTab(self.general_tab, "General")
-        self.tabs.addTab(self.calendar_tab, "Calendar")
-        self.tabs.addTab(self.interface_tab, "Interface")
+        self.tabs.addTab(self.general_tab, "⚙️ General")
+        self.tabs.addTab(self.calendar_tab, "📅 Calendar")
+        self.tabs.addTab(self.holidays_tab, "🏖️ Holidays")
+        self.tabs.addTab(self.interface_tab, "🖥️ Interface")
         
         layout.addWidget(self.tabs)
         
@@ -43,6 +46,7 @@ class SettingsDialog(QDialog):
         button_layout.addStretch()
         
         ok_button = QPushButton("OK")
+        ok_button.setAutoDefault(False) # Prevent Accidental Enter submission
         ok_button.clicked.connect(self._save_settings)
         button_layout.addWidget(ok_button)
         
@@ -51,7 +55,7 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(cancel_button)
         
         layout.addLayout(button_layout)
-
+        
     def _create_general_tab(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -75,6 +79,17 @@ class SettingsDialog(QDialog):
                                  self.settings.project_start_date.day)
         self.project_start_date_input.setDate(initial_date)
         form_layout.addRow("Project Start Date:", self.project_start_date_input)
+        
+        # Currency
+        self.currency_combo = QComboBox()
+        for c in Currency:
+            self.currency_combo.addItem(f"{c.code} ({c.symbol})", c)
+        
+        current_currency_index = self.currency_combo.findData(self.settings.currency)
+        if current_currency_index != -1:
+            self.currency_combo.setCurrentIndex(current_currency_index)
+            
+        form_layout.addRow("Currency:", self.currency_combo)
         
         layout.addLayout(form_layout)
         
@@ -168,6 +183,114 @@ class SettingsDialog(QDialog):
         
         return widget
 
+    def _create_holidays_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        info_label = QLabel("Specify project-level holidays or non-working periods. These will affect all scheduling.")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; font-style: italic; margin-bottom: 5px;")
+        layout.addWidget(info_label)
+        
+        # Holidays Table
+        self.holidays_table = QTableWidget()
+        self.holidays_table.setColumnCount(5)
+        self.holidays_table.setHorizontalHeaderLabels(["Holiday Name", "Start Date", "End Date", "Recurring", "Comment"])
+        self.holidays_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.holidays_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.holidays_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        
+        # Populate table from calendar_manager
+        holidays = self.calendar_manager.custom_holidays
+        self.holidays_table.setRowCount(len(holidays))
+        for row, holiday in enumerate(holidays):
+            self.holidays_table.setItem(row, 0, QTableWidgetItem(holiday.get("name", "")))
+            
+            # Start Date Picker
+            start_date_edit = QDateEdit()
+            start_date_edit.setCalendarPopup(True)
+            start_date_edit.setDisplayFormat("yyyy-MM-dd")
+            s_date = QDate.fromString(holiday.get("start_date", ""), "yyyy-MM-dd")
+            if s_date.isValid():
+                start_date_edit.setDate(s_date)
+            self.holidays_table.setCellWidget(row, 1, start_date_edit)
+            
+            # End Date Picker
+            end_date_edit = QDateEdit()
+            end_date_edit.setCalendarPopup(True)
+            end_date_edit.setDisplayFormat("yyyy-MM-dd")
+            e_date = QDate.fromString(holiday.get("end_date", ""), "yyyy-MM-dd")
+            if e_date.isValid():
+                end_date_edit.setDate(e_date)
+            self.holidays_table.setCellWidget(row, 2, end_date_edit)
+            
+            # Recurring Checkbox
+            recurring_cb = QCheckBox()
+            recurring_cb.setChecked(holiday.get("is_recurring", False))
+            cb_container = QWidget()
+            cb_layout = QHBoxLayout(cb_container)
+            cb_layout.addWidget(recurring_cb)
+            cb_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cb_layout.setContentsMargins(0, 0, 0, 0)
+            self.holidays_table.setCellWidget(row, 3, cb_container)
+            
+            self.holidays_table.setItem(row, 4, QTableWidgetItem(holiday.get("comment", "")))
+            
+        layout.addWidget(self.holidays_table)
+        
+        # Holiday buttons
+        h_btn_layout = QHBoxLayout()
+        add_btn = QPushButton("+ Add Holiday")
+        add_btn.clicked.connect(self._add_holiday_row)
+        h_btn_layout.addWidget(add_btn)
+        
+        remove_btn = QPushButton("- Remove Selected")
+        remove_btn.clicked.connect(self._remove_holiday_row)
+        h_btn_layout.addWidget(remove_btn)
+        
+        h_btn_layout.addStretch()
+        layout.addLayout(h_btn_layout)
+        
+        return widget
+
+    def _add_holiday_row(self):
+        row = self.holidays_table.rowCount()
+        self.holidays_table.insertRow(row)
+        
+        self.holidays_table.setItem(row, 0, QTableWidgetItem("New Holiday"))
+        
+        # Start Date Picker
+        start_date_edit = QDateEdit()
+        start_date_edit.setCalendarPopup(True)
+        start_date_edit.setDisplayFormat("yyyy-MM-dd")
+        start_date_edit.setDate(QDate.currentDate())
+        self.holidays_table.setCellWidget(row, 1, start_date_edit)
+        
+        # End Date Picker
+        end_date_edit = QDateEdit()
+        end_date_edit.setCalendarPopup(True)
+        end_date_edit.setDisplayFormat("yyyy-MM-dd")
+        end_date_edit.setDate(QDate.currentDate())
+        self.holidays_table.setCellWidget(row, 2, end_date_edit)
+        
+        # Recurring Checkbox
+        recurring_cb = QCheckBox()
+        cb_container = QWidget()
+        cb_layout = QHBoxLayout(cb_container)
+        cb_layout.addWidget(recurring_cb)
+        cb_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cb_layout.setContentsMargins(0, 0, 0, 0)
+        self.holidays_table.setCellWidget(row, 3, cb_container)
+        
+        self.holidays_table.setItem(row, 4, QTableWidgetItem(""))
+
+    def _remove_holiday_row(self):
+        current_row = self.holidays_table.currentRow()
+        if current_row >= 0:
+            self.holidays_table.removeRow(current_row)
+        else:
+            QMessageBox.information(self, "Selection Required", "Please select a holiday row to remove.")
+
     def _create_interface_tab(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -198,7 +321,18 @@ class SettingsDialog(QDialog):
         # App Font Size
         self.font_size_spin = QSpinBox()
         self.font_size_spin.setRange(8, 24)
-        self.font_size_spin.setValue(getattr(self.settings, 'app_font_size', 10))
+        # Handle None value for app_font_size
+        current_font_size = getattr(self.settings, 'app_font_size', 9)
+        if current_font_size is None or current_font_size == "":
+            current_font_size = 9
+        
+        # Ensure it's an int
+        try:
+             current_font_size = int(current_font_size)
+        except:
+             current_font_size = 10
+             
+        self.font_size_spin.setValue(current_font_size)
         self.font_size_spin.setSuffix(" pt")
         form_layout.addRow("Application Font Size:", self.font_size_spin)
         
@@ -227,6 +361,8 @@ class SettingsDialog(QDialog):
         new_start_date = datetime(qdate.year(), qdate.month(), qdate.day())
         self.settings.project_start_date = new_start_date
         
+        self.settings.currency = self.currency_combo.currentData()
+        
         # 2. Save Calendar Settings
         start_time = self.start_time_picker.get_time()
         end_time = self.end_time_picker.get_time()
@@ -238,9 +374,53 @@ class SettingsDialog(QDialog):
         working_days = [day for day, checkbox in self.day_checkboxes.items() if checkbox.isChecked()]
         self.calendar_manager.set_working_days(working_days)
         
-        # 3. Save Interface Settings
+        # 3. Save Holiday Settings
+        new_custom_holidays = []
+        for row in range(self.holidays_table.rowCount()):
+            name_item = self.holidays_table.item(row, 0)
+            name = name_item.text() if name_item else ""
+            
+            start_widget = self.holidays_table.cellWidget(row, 1)
+            start = start_widget.date().toString("yyyy-MM-dd") if start_widget else ""
+            
+            end_widget = self.holidays_table.cellWidget(row, 2)
+            end = end_widget.date().toString("yyyy-MM-dd") if end_widget else ""
+            
+            recurring_container = self.holidays_table.cellWidget(row, 3)
+            is_recurring = False
+            if recurring_container:
+                cb = recurring_container.findChild(QCheckBox)
+                if cb:
+                    is_recurring = cb.isChecked()
+            
+            comment_item = self.holidays_table.item(row, 4)
+            comment = comment_item.text() if comment_item else ""
+            
+            if start: # Basic validation
+                new_custom_holidays.append({
+                    "name": name,
+                    "start_date": start,
+                    "end_date": end or start,
+                    "comment": comment,
+                    "is_recurring": is_recurring
+                })
+        
+        self.calendar_manager.custom_holidays = new_custom_holidays
+        self.calendar_manager._sync_holidays()
+
+        # 4. Save Interface Settings
         self.settings.default_date_format = self.date_format_combo.currentData()
         self.settings.duration_unit = self.duration_unit_combo.currentData()
-        self.settings.set_app_font_size(self.font_size_spin.value())
+        
+        # Update App Font Size only if changed to avoid accidental resets
+        new_font_size = self.font_size_spin.value()
+        current_font_size = getattr(self.settings, 'app_font_size', 9)
+        try:
+            current_font_size = int(current_font_size)
+        except (ValueError, TypeError):
+            current_font_size = 9
+            
+        if new_font_size != current_font_size:
+             self.settings.set_app_font_size(new_font_size)
         
         self.accept()

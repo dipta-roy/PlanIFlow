@@ -1,0 +1,43 @@
+### **PlanIFlow: Requirements Suitable for Automated Testing with Python**
+
+Automated testing with **pure Python** (no external tools like Selenium for UI) is best suited for **non-UI logic** — i.e., functions in modules like `data_manager/manager.py`, `evm_calculator.py` (future), `baseline.py`, `calendar_manager.py`, etc. These can be unit/integration tested using frameworks like **pytest** + **unittest.mock** for dependencies.
+
+Below is a filtered list of requirements from the full documentation that are **realistically automatable** with Python-only tests. I've marked **High**, **Medium**, or **Low** feasibility based on isolation, determinism, and existing modular code.
+
+| ID      | Requirement (Summary)                                      | Version   | Feasibility | Why Automatable?                                                                 | Suggested Test Approach |
+|---------|------------------------------------------------------------|-----------|-------------|----------------------------------------------------------------------------------|--------------------------|
+| FRS-01  | Project Creation and Management                            | 2.3.0     | Medium      | Core data model creation (name, dates, units) can be tested via manager init.    | Test `ProjectManager.new_project()` outputs correct defaults. |
+| FRS-02  | Hierarchical Task Management (WBS)                         | 2.3.0     | High        | Pure logic: parent/child links, WBS code generation, level calculation.          | Test add_task with parent_id → correct WBS ("1.1.2"), level, summary roll-up. |
+| FRS-03  | Task Dependencies with Lead/Lag                            | 2.3.0     | High        | Date calculations, cycle detection, auto-adjustment are backend functions.      | Test FS+2d lag shifts successor start correctly; negative lag for lead; cycle error. |
+| FRS-04  | Dynamic Gantt Chart (logic part only)                      | 2.3.0     | Medium      | Critical path and early/late date calcs are pure functions.                     | Test `calculate_critical_path()` returns correct zero-slack tasks. |
+| FRS-05  | Resource Management                                        | 2.3.0     | High        | Allocation %, cost calculation, exceptions storage.                             | Test resource add/edit, cost = hours × rate. |
+| FRS-06  | Over-Allocation Detection                                  | 2.3.0     | High        | Daily hours aggregation and warning generation.                                 | Mock tasks/resources → assert warnings on >max hours dates. |
+| FRS-08  | Baselining (up to 10) with Variance Analysis               | 2.3.0/2.4.0| High        | Snapshot creation, variance computation (date/duration/% diff).                 | Test baseline capture; variance calc returns correct +/− values. |
+| FRS-09  | Earned Value Management (EVM)                              | 2.4.0     | High        | Pure math: PV/EV/AC, CV/SV/CPI/SPI/EAC/VAC formulas.                             | Test `EVMCalculator` methods with known project data → exact index matches. |
+| FRS-10  | Monte Carlo Risk Analysis                                  | 2.3.0     | High        | Simulation loop, statistical aggregation (P50/P80/P90).                         | Seed random → assert confidence levels within tolerance; risk drivers ranked. |
+| FRS-11  | Project-Level Custom Holidays                              | 2.4.0     | High        | `is_working_day()` logic with holiday ranges/comments.                          | Test date in holiday range → returns False; shifts task dates correctly. |
+| FRS-12  | Global Currency Support                                    | 2.4.0     | High        | Symbol lookup, cost formatting, export serialization.                           | Test currency change → correct symbol in cost fields and JSON/Excel output. |
+| FRS-13  | Import/Export (JSON, Excel) – data integrity               | 2.3.0/2.4.0| High        | Round-trip validation (load → save → load equals original).                     | Export project → re-import → assert data equality (tasks, baselines, holidays). |
+| FRS-14  | Secure Auto-Update (hash verification logic)               | 2.3.0/2.4.0| Medium      | SHA256 comparison can be unit-tested (mock download).                           | Test hash match/mismatch → correct accept/reject. |
+| SEC-02  | Input Validation and Sanitization                          | 2.3.0     | High        | Schema checks, string sanitization, limits, cycle detection.                    | Test invalid JSON/Excel → raises expected errors; sanitized strings. |
+| SEC-07  | Data Integrity on Import/Export (backward compat)          | 2.3.0/2.4.0| High        | Load old files with <10 baselines → pad correctly.                              | Load v2.3.0 JSON → assert 3 baselines + room for 7 more. |
+
+### **Requirements NOT Easily Automatable with Pure Python**
+These involve **UI interactions** (PyQt6 widgets, rendering, user gestures) — would require GUI testing tools like **pytest-qt** (still Python, but heavier) or manual testing.
+
+- FRS-15 (UI Polish: shortcuts, tooltips, full-screen, button positions)
+- FRS-16 (Sorting menu visibility)
+- FRS-17 (Quick Reference Guide content)
+- FRS-18 (Export dialog "Open File" button)
+- Most visual aspects of Gantt/Dashboard/EVM tab charts
+
+### **Recommended Testing Strategy**
+- Use **pytest** as framework.
+- Place tests in `/tests/` folder.
+- Mock heavy parts (e.g., UI signals) with `unittest.mock`.
+- Add fixtures for sample projects (small/medium/complex).
+- Aim for **80%+ coverage** on `data_manager/*`, `evm_calculator.py`, `baseline.py`, `calendar_manager.py`.
+
+**High-priority for automation first**: FRS-02, FRS-03, FRS-06, FRS-08, FRS-09 (EVM), FRS-11, SEC-02 — these are the core calculation engines and most valuable to regression-test.
+
+If you want, I can draft a sample `pytest` suite structure or specific test cases for any of the high-feasibility ones (e.g., EVM or baseline variance). Just say the word! 🚀

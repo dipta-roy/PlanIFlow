@@ -2,7 +2,6 @@ from PyQt6.QtWidgets import QMessageBox, QDialog
 from PyQt6.QtCore import Qt, QDate
 from datetime import datetime, timedelta
 import traceback
-
 from data_manager.models import Task, ScheduleType, Resource
 from ui.ui_task_dialog import TaskDialog
 from ui.ui_resource_dialog import ResourceDialog
@@ -76,6 +75,7 @@ class TaskOperationsMixin:
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
+                is_milestone=task_data.get('is_milestone', False),
                 schedule_type=task_data['schedule_type'],
                 font_family=task_data.get('font_family', 'Arial'),
                 font_size=task_data.get('font_size', 10),
@@ -168,8 +168,6 @@ class TaskOperationsMixin:
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     task_data = dialog.task_data
                     
-                    # Create a temporary Task object to generate the new data structure properly
-                    # This ensures all fields/logic in Task constructor are applied
                     updated_task = Task(
                         name=task_data['name'],
                         start_date=task_data['start_date'],
@@ -179,8 +177,8 @@ class TaskOperationsMixin:
                         assigned_resources=task_data['assigned_resources'],
                         notes=task_data['notes'],
                         task_id=task.id,
-                        is_milestone=task.is_milestone,  # Preserve milestone status
-                        is_summary=task.is_summary,  # Preserve summary status
+                        is_milestone=task_data.get('is_milestone', task.is_milestone),
+                        is_summary=task.is_summary, # Summary status is usually structural
                         schedule_type=task_data['schedule_type'],
                         font_family=task_data.get('font_family', 'Arial'),
                         font_size=task_data.get('font_size', 10),
@@ -239,10 +237,6 @@ class TaskOperationsMixin:
                 # Callback to refresh UI on success
                 def on_success():
                     self._update_all_views()
-                    # We might want to remove 'Task deleted' text on undo? 
-                    # Command logic sets status but let's set it here first?
-                    # The command logic doesn't set status on execute, only on undo/redo success usually.
-                    # But here we pass callback.
                     self.status_label.setText("Task deleted")
 
                 command = DeleteTaskCommand(self.data_manager, task_id, on_success_callback=on_success)
@@ -314,7 +308,7 @@ class TaskOperationsMixin:
         
         # Perform the indent (make current task a child of previous task)
         if self.data_manager.move_task(task_id, previous_task_id):
-            self.expanded_tasks.add(previous_task_id)  # Auto-expand the new parent
+            self.expanded_tasks.add(previous_task_id)
             self._update_all_views()
             self.status_label.setText(f"✓ '{task.name}' indented under '{previous_task.name}'")
         else:
@@ -369,7 +363,7 @@ class TaskOperationsMixin:
     
     def _add_resource_dialog(self):
         """Show add resource dialog"""
-        dialog = ResourceDialog(self)
+        dialog = ResourceDialog(self, self.data_manager)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             resource_data = dialog.get_resource_data()
             
@@ -389,7 +383,6 @@ class TaskOperationsMixin:
                                   "A resource with this name already exists.")
     
 
-
     def _add_milestone_dialog(self):
         """Show add milestone dialog"""
         dialog = TaskDialog(self, self.data_manager, is_milestone=True)
@@ -399,18 +392,18 @@ class TaskOperationsMixin:
             task = Task(
                 name=task_data['name'],
                 start_date=task_data['start_date'],
-                end_date=task_data['start_date'],  # Milestone: end = start
+                end_date=task_data['start_date'],
                 percent_complete=task_data['percent_complete'],
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
-                is_milestone=True,  # *** MARK AS MILESTONE ***
+                is_milestone=task_data.get('is_milestone', True),
                 font_family=task_data.get('font_family', 'Arial'),
                 font_size=task_data.get('font_size', 10),
                 font_color=task_data.get('font_color', '#000000'),
                 background_color=task_data.get('background_color', '#FFFFFF'),
                 font_bold=task_data.get('font_bold', None),
-                font_italic=None,  # Let automatic logic apply italic for milestones
+                font_italic=None,
                 font_underline=task_data.get('font_underline', False)
             )
             
@@ -453,7 +446,6 @@ class TaskOperationsMixin:
         # Open dialog for new task
         dialog = TaskDialog(self, self.data_manager)
         
-        # Pre-fill with dates just before the selected task
         if selected_task.start_date:
             default_end = selected_task.start_date - timedelta(days=1)
             default_start = default_end - timedelta(days=6)
@@ -472,7 +464,8 @@ class TaskOperationsMixin:
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
-                task_id=None,  # Will be set by insert method
+                task_id=None,
+                is_milestone=task_data.get('is_milestone', False),
                 font_family=task_data.get('font_family', 'Arial'),
                 font_size=task_data.get('font_size', 10),
                 font_color=task_data.get('font_color', '#000000'),
@@ -553,7 +546,8 @@ class TaskOperationsMixin:
                 predecessors=task_data['predecessors'],
                 assigned_resources=task_data['assigned_resources'],
                 notes=task_data['notes'],
-                task_id=None,  # Will be set by insert method
+                task_id=None,
+                is_milestone=task_data.get('is_milestone', False),
                 font_family=task_data.get('font_family', 'Arial'),
                 font_size=task_data.get('font_size', 10),
                 font_color=task_data.get('font_color', '#000000'),
@@ -668,8 +662,6 @@ class TaskOperationsMixin:
         if not task_ids:
             return
         
-        # Perform bulk indent
-        # Perform bulk indent
         affected_parents = self.data_manager.bulk_indent_tasks(task_ids)
         if affected_parents:
             # Add all new parents to expanded tasks set so they stay open

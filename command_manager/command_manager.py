@@ -28,9 +28,6 @@ class CommandManager:
             self._redo_stack.append(command)
             return True
         else:
-            # If undo fails, push it back? Or discard?
-            # Ideally undo shouldn't fail if execute succeeded.
-            # But if it does, let's keep state consistent.
             self._redo_stack.append(command) 
             return False
 

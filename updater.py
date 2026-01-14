@@ -151,8 +151,7 @@ class Updater:
             # We use 'start "" ' to ensure it detaches completely.
             # subprocess.Popen with shell=True handles the command execution via cmd.exe.
             # Double quotes around paths are sufficient. 
-            # Added /norestart to msiexec to prevent unexpected reboots.
-            
+            # Added /norestart to msiexec to prevent unexpected reboots.    
             cmd = f'msiexec /i "{msi_path}" /qn /norestart && timeout /t 5 && start "" "{current_exe}"'
             
             # Using Popen to detach.

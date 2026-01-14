@@ -5,6 +5,7 @@ import logging
 import json
 from exporter.exporter import Exporter
 from exporter.pdf_exporter import PDFExporter
+from ui.ui_dashboard import clear_dashboard
 from constants.constants import ERROR_TITLE, ERROR_SAVE_FAILED, ERROR_LOAD_FAILED, ERROR_FILE_OPERATION_FAILED
 
 class FileOperationsMixin:
@@ -23,6 +24,9 @@ class FileOperationsMixin:
             self._update_all_views()
             if hasattr(self, 'monte_carlo_tab'):
                 self.monte_carlo_tab.clear_view()
+            if hasattr(self, 'evm_tab'):
+                self.evm_tab.clear_view()
+            clear_dashboard(self)
             self.status_label.setText("New project created")
             self._remove_last_project_path()
 
@@ -39,6 +43,9 @@ class FileOperationsMixin:
             self._update_all_views()
             if hasattr(self, 'monte_carlo_tab'):
                 self.monte_carlo_tab.clear_view()
+            if hasattr(self, 'evm_tab'):
+                self.evm_tab.clear_view()
+            clear_dashboard(self)
             self.status_label.setText("Project closed")
             self._remove_last_project_path()
     
@@ -72,12 +79,16 @@ class FileOperationsMixin:
                     self.baseline_comparison.data_manager = self.data_manager
                 if hasattr(self, 'monte_carlo_tab'):
                     self.monte_carlo_tab.data_manager = self.data_manager
+                if hasattr(self, 'evm_tab'):
+                    self.evm_tab.update_data_manager(self.data_manager)
+                if hasattr(self, 'kanban_board'):
+                    self.kanban_board.update_data_manager(self.data_manager)
                 self._update_all_views()
                 self._expand_all_tasks()
                 
                 # Force update label to be sure
                 if hasattr(self, 'project_name_label'):
-                    print(f"DEBUG: Setting label to {self.data_manager.project_name}")
+                    #print(f"DEBUG: Setting label to {self.data_manager.project_name}")
                     self.project_name_label.setText(self.data_manager.project_name)
                 
                 self.status_label.setText(f"Opened: {self.data_manager.project_name}")
@@ -143,6 +154,10 @@ class FileOperationsMixin:
                     self.baseline_comparison.data_manager = self.data_manager
                 if hasattr(self, 'monte_carlo_tab'):
                     self.monte_carlo_tab.data_manager = self.data_manager
+                if hasattr(self, 'evm_tab'):
+                    self.evm_tab.update_data_manager(self.data_manager)
+                if hasattr(self, 'kanban_board'):
+                    self.kanban_board.update_data_manager(self.data_manager)
                 self._update_all_views()
                 self._expand_all_tasks()
                 self.status_label.setText("Imported from Excel")
@@ -164,8 +179,20 @@ class FileOperationsMixin:
             
             if Exporter.export_to_excel(self.data_manager, file_path):
                 self.status_label.setText("Exported to Excel")
-                QMessageBox.information(self, "Success", 
-                                      f"Project exported successfully to:\n{file_path}")
+                
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle("Success")
+                msg_box.setText(f"Project exported successfully to:\n{file_path}")
+                msg_box.setIcon(QMessageBox.Icon.Information)
+                
+                open_button = msg_box.addButton("Open File", QMessageBox.ButtonRole.ActionRole)
+                msg_box.addButton(QMessageBox.StandardButton.Ok)
+                
+                msg_box.exec()
+                
+                if msg_box.clickedButton() == open_button:
+                    import os
+                    os.startfile(file_path)
             else:
                 QMessageBox.critical(self, ERROR_TITLE, f"{ERROR_FILE_OPERATION_FAILED} (Excel)")
 
@@ -185,8 +212,20 @@ class FileOperationsMixin:
                 exporter = PDFExporter(self.data_manager, file_path, self.calendar_manager)
                 exporter.export()
                 self.status_label.setText("Exported to PDF")
-                QMessageBox.information(self, "Success", 
-                                      f"Project exported successfully to:\n{file_path}")
+                
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle("Success")
+                msg_box.setText(f"Project exported successfully to:\n{file_path}")
+                msg_box.setIcon(QMessageBox.Icon.Information)
+                
+                open_button = msg_box.addButton("Open File", QMessageBox.ButtonRole.ActionRole)
+                msg_box.addButton(QMessageBox.StandardButton.Ok)
+                
+                msg_box.exec()
+                
+                if msg_box.clickedButton() == open_button:
+                    import os
+                    os.startfile(file_path)
             except Exception as e:
                 QMessageBox.critical(self, ERROR_TITLE, f"{ERROR_FILE_OPERATION_FAILED} (PDF): {e}")
     
@@ -226,6 +265,10 @@ class FileOperationsMixin:
                             self.baseline_comparison.data_manager = self.data_manager
                         if hasattr(self, 'monte_carlo_tab'):
                             self.monte_carlo_tab.data_manager = self.data_manager
+                        if hasattr(self, 'evm_tab'):
+                            self.evm_tab.update_data_manager(self.data_manager)
+                        if hasattr(self, 'kanban_board'):
+                            self.kanban_board.update_data_manager(self.data_manager)
                         self._update_all_views()
                         self._expand_all_tasks()
                         self.status_label.setText(f"Loaded: {self.data_manager.project_name}")

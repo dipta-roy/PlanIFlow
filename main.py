@@ -18,10 +18,8 @@ from constants.constants import (
 )
 from data_manager.temp_manager import TempFileManager
 
-
 def handle_exception(type, value, tb):
     """Global exception handler to prevent app crash and show popup"""
-    # Print the full traceback to stderr for debugging
     error_msg = "".join(traceback.format_exception(type, value, tb))
     print(error_msg, file=sys.stderr)
 
@@ -105,18 +103,14 @@ def _main_impl():
             app.setWindowIcon(app_icon)
     except Exception as e:
         print(f"Error setting app icon: {e}")
-    # TempFileManager will handle cleanup on application exit
     
     # *** SHOW SPLASH SCREEN IMMEDIATELY (BASE64) ***
     splash_bytes = base64.b64decode(SPLASH_BASE64)
     splash_pix = QPixmap()
     splash_pix.loadFromData(splash_bytes)
     splash = None
-    
-    # Use the custom splash screen with loading message below
     if not splash_pix.isNull():
         splash = QSplashScreen(splash_pix, Qt.WindowType.WindowStaysOnTopHint)
-        # Add "Loading..." message below the splash image
         splash.showMessage(f"{APP_NAME} {VERSION} Loading...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.darkGray)
         splash.show()
         app.processEvents()  # Ensure splash is drawn immediately
@@ -124,9 +118,9 @@ def _main_impl():
     # NOW import heavy modules while splash is visible
     from ui.ui_main import MainWindow
     
-    # Create and show main window
+    # Create and show main window maximized
     window = MainWindow()
-    window.show()
+    window.showMaximized()
     
     # Close splash screen
     if splash:

@@ -103,5 +103,3 @@ class DateFormatDialog(QDialog):
         selected_format = self.date_format_combo.currentData()
         self.settings.default_date_format = selected_format
         self.accept()
-
-

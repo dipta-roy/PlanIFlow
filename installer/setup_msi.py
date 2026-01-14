@@ -1,20 +1,9 @@
 import sys
 import os
 from cx_Freeze import setup, Executable
-
-# Increase recursion limit to handle deep dependency trees (common with pandas/numpy)
 sys.setrecursionlimit(5000)
-
-# Add the current directory to sys.path so that cx_Freeze can find the local packages
-# We assume this script is run from the project root
 sys.path.append(os.getcwd())
-
-# Define the base for the executable
-# "Win32GUI" means no console window.
 base = "Win32GUI" if sys.platform == "win32" else None
-
-# Paths
-# Adjust these if your icon is located elsewhere
 icon_path = os.path.abspath("images/logo.ico")
 
 # GUID for the application
@@ -68,7 +57,7 @@ bdist_msi_options = {
     "upgrade_code": UPGRADE_CODE,
     "initial_target_dir": r"[ProgramFilesFolder]\PlaniFlow",
     "install_icon": icon_path,
-    "target_name": "PlanIFlow_Setup_2.3.0.msi",
+    "target_name": "PlanIFlow_Setup_2.4.0.msi",
 }
 
 # Executable Configuration
@@ -83,7 +72,7 @@ target = Executable(
 
 setup(
     name="PlanIFlow",
-    version="2.3.0",
+    version="2.4.0",
     description="PlanIFlow Project Planner",
     author="Dipta Roy",
     options={

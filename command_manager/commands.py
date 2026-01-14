@@ -64,12 +64,15 @@ class EditTaskCommand(Command):
         # but we pull the converted value from temp_task
         for key in data.keys():
             if hasattr(task, key) and hasattr(temp_task, key):
-                # special case: don't overwrite ID if it's not present or None in data,
-                # though usually it matches.
-                if key == 'id':
+                # skip read-only properties or structural fields
+                if key in ['id', 'duration', 'wbs', 'is_summary', 'parent_id']:
                     continue
                     
-                setattr(task, key, getattr(temp_task, key))
+                try:
+                    setattr(task, key, getattr(temp_task, key))
+                except AttributeError:
+                    # Fallback for other read-only properties if any
+                    continue
 
 class DeleteTaskCommand(Command):
     """Command to delete a task"""

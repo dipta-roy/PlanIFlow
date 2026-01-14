@@ -16,15 +16,7 @@ class GeneralViewOperationsMixin:
 
     def _update_all_views(self):
         """Update all UI views"""
-        # self._apply_stylesheet() # ONLY apply on settings change or init (expensive call)
-        
-        # Always update task tree if it's visible, or if we want to keep it in sync (it's the main view)
-        # Actually task tree is fast enough usually, but let's optimize.
-        # If we are in Gantt view, we might not need to update Tree immediately?
-        # But Tree holds data for inline editing? No, data_manager holds data.
-        # Tree is just a view.
-        
-        # Update currently visible view immediately
+        self._apply_stylesheet() # Ensure theme/font size is consistent
         current_index = self.tabs.currentIndex()
         
         if current_index == 0: # Task List
@@ -33,18 +25,17 @@ class GeneralViewOperationsMixin:
             self._update_gantt_chart()
         elif current_index == 2: # Resources
             self._update_resource_summary()
-        elif current_index == 3: # Dashboard
-             self._update_dashboard()
-        elif current_index == 4: # Baseline
+        elif current_index == 3: # Baseline
              if hasattr(self, 'baseline_comparison'):
                 self.baseline_comparison.refresh_baselines()
-        
-        # We should mark others as dirty? 
-        # For simplicity, let's just update the lightweight ones always,
-        # and heavy ones (Tree, Gantt) only if visible.
-        
-        # But wait, if I don't update Tree, and I switch back to Tree, it will be stale unless `_on_tab_changed` updates it.
-        # Yes, `_on_tab_changed` will handle that.
+        elif current_index == 5: # EVM Analysis
+             if hasattr(self, 'evm_tab'):
+                self.evm_tab.refresh_data(silent=True)
+        elif current_index == 6: # Kanban Board
+             if hasattr(self, 'kanban_board'):
+                self.kanban_board.refresh_board()
+        elif current_index == 7: # Dashboard
+             self._update_dashboard()
         
         self._update_window_title()
     
@@ -57,18 +48,19 @@ class GeneralViewOperationsMixin:
         elif index == 2:
             self._update_resource_summary()
         elif index == 3:
-            self._update_dashboard()
-        elif index == 4:
             if hasattr(self, 'baseline_comparison'):
                 self.baseline_comparison.refresh_baselines()
+        elif index == 5:
+            if hasattr(self, 'evm_tab'):
+                self.evm_tab.refresh_data(silent=True)
+        elif index == 6:
+            if hasattr(self, 'kanban_board'):
+                self.kanban_board.refresh_board()
+        elif index == 7:
+            self._update_dashboard()
 
     def _update_gantt_chart(self):
-        """Update Gantt chart"""
-        # Optimization: Only update if visible
-        # Check if Gantt tab is active. 
-        # Warning: If we export PDF or something relying on this, we might need to force update.
-        # But export usually calls specific methods.
-        
+        """Update Gantt chart"""    
         if hasattr(self, 'tabs') and self.tabs.currentIndex() != 1:
              return
 
@@ -86,7 +78,7 @@ class GeneralViewOperationsMixin:
 
     def _update_dashboard(self):
         """Update dashboard"""
-        if hasattr(self, 'tabs') and self.tabs.currentIndex() != 3:
+        if hasattr(self, 'tabs') and self.tabs.currentIndex() != 7:
             return
         update_dashboard(self)
     
@@ -122,8 +114,6 @@ class GeneralViewOperationsMixin:
         """Auto-refresh with smarter logic to preserve tree state"""
         # Only refresh if user is not actively interacting
         if not self.task_tree.hasFocus():
-            # Only update charts and dashboard, skip tree to preserve expansion
-            # self._update_gantt_chart() # Temporarily disable auto-refresh for Gantt chart to prevent resize
             self._update_dashboard()
             self._update_resource_summary()
 
@@ -187,10 +177,6 @@ class GeneralViewOperationsMixin:
             "<li style='margin-bottom: 12px;'><b style='color: grey; font-size: 14px;'>⚫ Upcoming</b><br/>Start date is in the future.</li>"
             "<li style='margin-bottom: 12px;'><b style='color: blue; font-size: 14px;'>🔵 Completed</b><br/>Task is 100% complete.</li>"
             "</ul>"
-            "<h3>Priority Indicators</h3>"
-             "<ul style='list-style-type: none; padding-left: 0;'>"
-             "<li style='margin-bottom: 10px;'>Priorities define the urgency of tasks (High, Medium, Low). They can be set in the task dialog.</li>"
-             "</ul>"
              "</body></html>"
         )
         legend_label = QLabel(legend_text)
@@ -202,7 +188,7 @@ class GeneralViewOperationsMixin:
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         legend_layout.addWidget(scroll)
         
-        tabs.addTab(legend_tab, "📝 Status & Legend")
+        tabs.addTab(legend_tab, "📝 Status")
 
         # --- Dependencies Tab ---
         dep_tab = QWidget()
@@ -218,8 +204,14 @@ class GeneralViewOperationsMixin:
             "<li style='margin-bottom: 15px;'><b>SS (Start-to-Start)</b><br/>Task B cannot start until Task A starts. They can start simultaneously.</li>"
             "<li style='margin-bottom: 15px;'><b>FF (Finish-to-Finish)</b><br/>Task B cannot finish until Task A finishes. They can finish simultaneously.</li>"
             "<li style='margin-bottom: 15px;'><b>SF (Start-to-Finish)</b><br/>Task B cannot finish until Task A starts. This is rarely used.</li>"
+            "</ul>"
+            "<p><i>Note: You can add 'Lag' (delay) or 'Lead' (negative lag) to any dependency. Example:</i></p>"
+            "<ul style='list-style-type: none; padding-left: 0;'>"
+            "<li style='margin-bottom: 15px;'><b>1FS+5d</b> - Task B with ID : 2 uses Finish to Start (FS) dependency on task A with ID : 1 and will start 5 days after completing task A.</li>"
+            "<li style='margin-bottom: 15px;'><b>1FS-3d</b> - Task B with ID : 2 uses Finish to Start (FS) dependency on task A with ID : 1 and will start 3 days before completing task A.</li>"
+            "<li style='margin-bottom: 15px;'><b>1SS+5d</b> - Task B with ID : 2 uses Start to Start (FS) dependency on task A with ID : 1 and will start 5 days after starting task A.</li>"
+            "<li style='margin-bottom: 15px;'><b>1SS-3d</b> - Task B with ID : 2 uses Start to Start (FS) dependency on task A with ID : 1 and will start 3 days before starting task A.</li>"
              "</ul>"
-             "<p><i>Note: You can add 'Lag' (delay) or 'Lead' (negative lag) to any dependency.</i></p>"
              "</body></html>"
         )
         dep_label = QLabel(dep_text)
@@ -267,6 +259,7 @@ class GeneralViewOperationsMixin:
             ("Formatting Bold", "Ctrl+B"),
             ("Formatting Italic", "Ctrl+I"),
             ("Formatting Underline", "Ctrl+U"),
+            ("Clear Formatting", "Ctrl+Shift+X"),
             ("Refresh View", "F5"),
             ("Zoom In", "Ctrl +"),
             ("Zoom Out", "Ctrl -")
@@ -327,27 +320,14 @@ class GeneralViewOperationsMixin:
         header_layout.addWidget(app_name_label)
         header_layout.addStretch(1) # Add a stretch to push content to left
         header_layout.setContentsMargins(0, 0, 0, 0)
-        
-        about_box.setMinimumWidth(600) # Set a minimum width
-        
-        # Set the custom widget as the message box's layout
-        # This requires a bit of a workaround since QMessageBox doesn't directly support custom widgets in its layout
-        # We can set the icon and then manipulate the text to align it.
-        # Alternatively, for more complex layouts, a custom QDialog would be better.
-        # For this task, setting the icon and adjusting text is sufficient.
-        
+        about_box.setMinimumWidth(600) # Set a minimum width      
         about_box.setIconPixmap(pixmap)
-        
-        # Reconstruct the text to include the app name next to the icon
-        # The previous app_name_label is not directly used in the QMessageBox text,
-        # but the pixmap is set as the icon.
         about_box.setText(
             f"<h2>{APP_NAME}</h2>"
             f"<p>App Version: {VERSION}</p>"
             f"<p>Developed by: <b>{AUTHOR}</b></p>" 
             f"<p>{ABOUT_TEXT}</p>"
         )
-        
         about_box.exec()
 
     def _show_settings_dialog(self, tab_index=0):
@@ -356,6 +336,7 @@ class GeneralViewOperationsMixin:
         dialog.tabs.setCurrentIndex(tab_index)
         
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.data_manager.recalculate_all_tasks() # Trigger full schedule recalculation
             self._apply_stylesheet() # Apply potential font size/theme changes
             self._update_all_views()
             self.status_label.setText("Settings updated")
@@ -386,8 +367,11 @@ class GeneralViewOperationsMixin:
         ]
         self.task_tree.setHeaderLabels(header_labels)
         
-        # Ensure WBS column visibility is respected after header update
-        self.task_tree.setColumnHidden(3, not self.toggle_wbs_action.isChecked())
+        # Ensure WBS column visibility and sort action visibility are respected after header update
+        is_wbs_visible = self.toggle_wbs_action.isChecked()
+        self.task_tree.setColumnHidden(3, not is_wbs_visible)
+        if hasattr(self, 'sort_wbs_action'):
+            self.sort_wbs_action.setVisible(is_wbs_visible)
         
         # Convert tasks
         self.data_manager.convert_all_tasks_to_unit(new_unit)

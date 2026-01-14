@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from PyQt6.QtWidgets import QTreeWidgetItem, QMessageBox, QMenu
 from PyQt6.QtGui import QAction, QColor, QBrush
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from data_manager.models import Task, DependencyType, ScheduleType
 from settings_manager.settings_manager import DurationUnit, DateFormat
 from ui.ui_delegates import SortableTreeWidgetItem
@@ -25,6 +25,10 @@ class TreeViewOperationsMixin:
         self.task_tree.setSortingEnabled(False)
         self.task_tree.blockSignals(True)
         self.task_tree.clear()
+
+        # Update resource delegate's list of resources so dropdown is up-to-date
+        if hasattr(self, 'resource_delegate'):
+             self.resource_delegate.update_resource_list([r.name for r in self.data_manager.get_all_resources()])
         
         # Ensure backward compatibility
         for task in self.data_manager.get_all_tasks():
@@ -38,11 +42,9 @@ class TreeViewOperationsMixin:
         resource_filter = self.resource_filter.currentText()
         status_filter = self.status_filter.currentText()
         
-        # --- NEW FILTERING LOGIC ---
         tasks_to_display = set()
         all_tasks = self.data_manager.get_all_tasks()
         
-        # Pass 1: Identify tasks that directly match the filter criteria
         for task in all_tasks:
             match_name = True
             if search_text:
@@ -64,10 +66,8 @@ class TreeViewOperationsMixin:
             
             if match_name and match_resource and match_status:
                 tasks_to_display.add(task.id)
-        
-        # Pass 2: Include all ancestors of tasks that are to be displayed
-        # This ensures that if a child matches, its parent is also shown
-        for task_id in list(tasks_to_display): # Iterate over a copy as set changes during iteration
+
+        for task_id in list(tasks_to_display):
             current_task = self.data_manager.get_task(task_id)
             while current_task and current_task.parent_id is not None:
                 parent_task = self.data_manager.get_task(current_task.parent_id)
@@ -76,10 +76,8 @@ class TreeViewOperationsMixin:
                     current_task = parent_task
                 else:
                     break # Parent not found, stop
-        
-        # Helper function to add tasks to tree, only if they are in tasks_to_display
-        # and their parent is also in tasks_to_display (or is None for top-level)
-        added_items = {} # To store QTreeWidgetItem references by task ID
+
+        added_items = {}
 
         def add_task_to_tree_filtered(task: Task, parent_item: QTreeWidgetItem = None, level: int = 0):
             if task.id not in tasks_to_display:
@@ -87,13 +85,6 @@ class TreeViewOperationsMixin:
 
             # Create tree item
             item = SortableTreeWidgetItem(main_window=self)
-            
-            # Set flags for editability for each column
-            # Column 0: Schedule Type (editable)
-            # Column 1: Status (not editable)
-            # Column 2: ID (not editable)
-            # Column 3: WBS (not editable)
-            # Other columns are generally editable
             for col_idx in range(self.task_tree.columnCount()):
                 if col_idx in [1, 2, 3]:  # Status, ID, WBS columns
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -101,7 +92,10 @@ class TreeViewOperationsMixin:
                     item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
             # COLUMN 0: Schedule Type
-            item.setText(0, task.schedule_type.value)
+            st_val = task.schedule_type.value
+            item.setText(0, st_val)
+            full_form = "Auto Scheduled" if st_val == "Auto" else "Manually Scheduled"
+            item.setToolTip(0, full_form)
             
             # COLUMN 1: Status
             status_color = task.get_status_color()
@@ -121,8 +115,7 @@ class TreeViewOperationsMixin:
             is_milestone = getattr(task, 'is_milestone', False)
             is_summary = getattr(task, 'is_summary', False)
             
-            # Add spacing based on level (use em space for better appearance)
-            indent = "    " * level  # 4 spaces per level
+            indent = "    " * level
             
             if is_milestone:
                 display_name = f"{indent}◆ {task.name}"
@@ -133,12 +126,12 @@ class TreeViewOperationsMixin:
             
             item.setText(4, display_name)
             
-            # Apply font styling from task properties
-            font = item.font(4)
-            # Use actual font properties from the task
-            font.setBold(getattr(task, 'font_bold', False))
-            font.setItalic(getattr(task, 'font_italic', False))
-            item.setFont(4, font)
+            # Apply font styling from task properties to ALL columns
+            for col in range(self.task_tree.columnCount()):
+                font = item.font(col)
+                font.setBold(getattr(task, 'font_bold', False))
+                font.setItalic(getattr(task, 'font_italic', False))
+                item.setFont(col, font)
             
             # COLUMN 5: Start Date
             item.setText(5, task.start_date.strftime(self._get_strftime_format_string()))
@@ -377,8 +370,6 @@ class TreeViewOperationsMixin:
         if not selected_items:
             return
         
-        # Note: This method currently operates on the first selected item.
-        # If multiple items are selected, only the first one's state will be toggled.
         item = selected_items[0]
         if item.isExpanded():
             self._collapse_selected()
@@ -389,6 +380,11 @@ class TreeViewOperationsMixin:
         """Toggle visibility of the WBS column"""
         is_visible = self.toggle_wbs_action.isChecked()
         self.task_tree.setColumnHidden(3, not is_visible)
+        
+        # Toggle Sort by WBS action visibility
+        if hasattr(self, 'sort_wbs_action'):
+            self.sort_wbs_action.setVisible(is_visible)
+            
         self.status_label.setText(f"✓ WBS column visibility toggled: {is_visible}")
 
     def _sort_by_column(self, column: int):
@@ -416,6 +412,41 @@ class TreeViewOperationsMixin:
                 else:
                     self.expanded_tasks.discard(task_id)
     
+    def _move_task_up(self):
+        """Move selected task up"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            return
+        
+        item = selected_items[0]
+        task_id = item.data(2, Qt.ItemDataRole.UserRole)
+        
+        if self.data_manager.move_task_vertically(task_id, 'up'):
+            self._update_all_views()
+            # Restore selection - ID might be swapped but object is same in memory?
+            # Wait, IDs are swapped. The task physically moved up.
+            # We want to select the NEW ID at the NEW position (which is the old ID at the old position... wait).
+            # If I move Task A (ID 2) up to where Task B (ID 1) was.
+            # Task A becomes ID 1. Task B becomes ID 2.
+            # I want to select ID 1 (Move target).
+            
+            # Simple approach: Find the item with ID 1 (if we knew it became 1).
+            # But swapping IDs is complex to track here without re-finding.
+            # Just refreshing view is enough for now. User can re-select if needed or I can try to re-select based on index.
+            pass
+
+    def _move_task_down(self):
+        """Move selected task down"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            return
+        
+        item = selected_items[0]
+        task_id = item.data(2, Qt.ItemDataRole.UserRole)
+        
+        if self.data_manager.move_task_vertically(task_id, 'down'):
+            self._update_all_views()
+
     def _show_task_context_menu(self, position):
         """Show context menu on task right-click"""
         item = self.task_tree.itemAt(position)
@@ -428,6 +459,17 @@ class TreeViewOperationsMixin:
         
         menu = QMenu(self)
         
+        # *** ADD MOVE OPTIONS ***
+        move_up_action = QAction("⬆ Move Up", self)
+        move_up_action.triggered.connect(self._move_task_up)
+        menu.addAction(move_up_action)
+        
+        move_down_action = QAction("⬇ Move Down", self)
+        move_down_action.triggered.connect(self._move_task_down)
+        menu.addAction(move_down_action)
+        
+        menu.addSeparator()
+
         # *** ADD INSERT OPTIONS ***
         insert_above_action = QAction("➕ Insert Task Above", self)
         insert_above_action.triggered.connect(self._insert_task_above)
@@ -567,40 +609,31 @@ class TreeViewOperationsMixin:
                 else:
                     self.expanded_tasks.discard(task_id)
         
-        # Update formatting buttons to reflect selected task's formatting
         if hasattr(self, '_update_formatting_buttons'):
             self._update_formatting_buttons()
     
     def _on_task_item_changed(self, item: QTreeWidgetItem, column: int):
         """Handle inline editing of task properties using Commands"""
-        # Block signals to prevent recursive calls during update
         self.task_tree.blockSignals(True)
 
-        task_id = item.data(2, Qt.ItemDataRole.UserRole) # Task ID is in column 2
-        # Get the current task object (this is the state BEFORE the edit is applied to the model, 
-        # but the UI item already has the NEW text)
+        task_id = item.data(2, Qt.ItemDataRole.UserRole)
         current_task_model = self.data_manager.get_task(task_id)
 
         if not current_task_model:
             self.task_tree.blockSignals(False)
             return
 
-        # Snapshot old data for Undo
         old_task_data = current_task_model.to_dict()
-        
-        # Create a clone to apply changes to. We verify validation on this clone.
         task_clone = Task.from_dict(old_task_data)
 
         try:
-            # Safely capture text for error reporting before any potential object deletion
-            item_text_0 = item.text(0)
-            
+            item_text_0 = item.text(0)          
             new_value = item.text(column)
             changed = False
 
             if column == 0: # Schedule Type
                 try:
-                    new_schedule_type = ScheduleType(new_value)
+                    new_schedule_type = ScheduleType.from_string(new_value)
                     # Validation: Summary tasks must always be Auto Scheduled
                     if task_clone.is_summary and new_schedule_type == ScheduleType.MANUALLY_SCHEDULED:
                         QMessageBox.warning(self, "Validation Error",
@@ -666,7 +699,14 @@ class TreeViewOperationsMixin:
                     self.task_tree.blockSignals(False)
                     return
 
-                new_duration = float(new_value)
+                try:
+                    new_duration = float(new_value)
+                except ValueError:
+                    QMessageBox.critical(self, "Input Error", "Duration should be in numbers only")
+                    self._revert_task_item_in_ui(item, current_task_model)
+                    self.task_tree.blockSignals(False)
+                    return
+
                 if task_clone.is_milestone and new_duration > 0:
                     task_clone.is_milestone = False
                     task_clone.font_italic = False  # Remove italic when converting to task
@@ -685,17 +725,22 @@ class TreeViewOperationsMixin:
             elif column == 8:  # % Complete
                 try:
                     new_percent_complete = int(new_value.strip('%'))
-                    if not (0 <= new_percent_complete <= 100):
-                        raise ValueError("Percentage must be between 0 and 100.")
-                    if task_clone.percent_complete != new_percent_complete:
-                        task_clone.percent_complete = new_percent_complete
-                        changed = True
-                    item.setText(8, f"{task_clone.percent_complete}%")
-                except ValueError as ve:
-                    QMessageBox.critical(self, "Input Error", f"Invalid input for % Complete: {ve}")
+                except ValueError:
+                    QMessageBox.critical(self, "Input Error", "% complete should be numbers only")
                     self._revert_task_item_in_ui(item, current_task_model)
                     self.task_tree.blockSignals(False)
                     return
+
+                if not (0 <= new_percent_complete <= 100):
+                    QMessageBox.critical(self, "Input Error", "% complete must be within the range of 0 to 100")
+                    self._revert_task_item_in_ui(item, current_task_model)
+                    self.task_tree.blockSignals(False)
+                    return
+
+                if task_clone.percent_complete != new_percent_complete:
+                    task_clone.percent_complete = new_percent_complete
+                    changed = True
+                item.setText(8, f"{task_clone.percent_complete}%")
             elif column == 9:  # Dependencies
                 new_predecessors = []
                 if new_value.strip():
@@ -761,8 +806,11 @@ class TreeViewOperationsMixin:
                 # Create and execute command
                 # Use a callback to update views only on success
                 def on_success():
-                    self._update_all_views()
-                    self.status_label.setText(f"✓ Task '{task_clone.name}' updated successfully")
+                    # Defer the update to avoid destroying the item while signal is being processed
+                    def deferred_update():
+                        self._update_all_views()
+                        self.status_label.setText(f"✓ Task '{task_clone.name}' updated successfully")
+                    QTimer.singleShot(0, deferred_update)
 
                 command = EditTaskCommand(
                     self.data_manager, 
@@ -780,14 +828,12 @@ class TreeViewOperationsMixin:
 
         except Exception as e:
             QMessageBox.critical(self, "Input Error", f"Invalid input for {item_text_0}: {e}")
-            # Revert changes in UI if input was invalid
-            # Note: If item is deleted, this might also fail or do nothing, but the critical box will show.
             if self.task_tree.itemWidget(item, column): # Just a check, item might be dead
                  pass 
             try:
                 self._revert_task_item_in_ui(item, current_task_model)
             except RuntimeError:
-                pass # Item likely deleted during refresh
+                pass
 
         self.task_tree.blockSignals(False)
 

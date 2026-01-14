@@ -8,7 +8,7 @@ from reportlab.lib import colors
 
 # --- General Application Constants ---
 APP_NAME = "PlanIFlow"
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 AUTHOR = "Dipta Roy"
 ABOUT_TEXT = "PlanIFlow is a project planning and management tool designed to help you organize tasks, resources, and schedules effectively."
 
@@ -114,8 +114,8 @@ PDF_TABLE_GRID_COLOR = colors.HexColor('#90CAF9') # Light Blue Grid
 PDF_TABLE_GRID_LINE_WIDTH = 0.5
 PDF_TABLE_FONT_NAME = 'Helvetica'
 PDF_TABLE_FONT_NAME_BOLD = 'Helvetica-Bold'
-PDF_TABLE_FONT_SIZE = 8
-PDF_TABLE_HEADER_FONT_SIZE = 9
+PDF_TABLE_FONT_SIZE = 9
+PDF_TABLE_HEADER_FONT_SIZE = 10
 PDF_TABLE_PADDING_TOP = 4
 PDF_TABLE_PADDING_BOTTOM = 4
 PDF_TABLE_HEADER_PADDING_TOP = 6

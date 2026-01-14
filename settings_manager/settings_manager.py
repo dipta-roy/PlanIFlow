@@ -18,6 +18,33 @@ class DateFormat(Enum):
     DD_MMM_YYYY = "dd-MMM-yyyy"
     YYYY_MM_DD = "yyyy-mm-dd"
 
+class Currency(Enum):
+    """Currency options with symbols"""
+    USD = ("USD", "$")
+    EUR = ("EUR", "€")
+    GBP = ("GBP", "£")
+    INR = ("INR", "₹")
+    JPY = ("JPY", "¥")
+    CNY = ("CNY", "¥")
+    AUD = ("AUD", "A$")
+    CAD = ("CAD", "C$")
+    BRL = ("BRL", "R$")
+    RUB = ("RUB", "₽")
+    KRW = ("KRW", "₩")
+    ZAR = ("ZAR", "R")
+    TRY = ("TRY", "₺")
+    AED = ("AED", "د.إ")
+    SAR = ("SAR", "﷼")
+    SGD = ("SGD", "S$")
+    
+    @property
+    def symbol(self):
+        return self.value[1]
+    
+    @property
+    def code(self):
+        return self.value[0]
+
 class ProjectSettings:
     """Project-wide settings"""
     
@@ -25,6 +52,7 @@ class ProjectSettings:
         self.duration_unit = DurationUnit.DAYS
         self.project_start_date = None
         self.default_date_format = DateFormat.YYYY_MM_DD
+        self.currency = Currency.USD
         self.app_font_size = 9 # Default application font size
         self._listeners = []  # Callbacks for setting changes
     
@@ -33,6 +61,7 @@ class ProjectSettings:
         self.duration_unit = DurationUnit.DAYS
         self.project_start_date = datetime.now()
         self.default_date_format = DateFormat.YYYY_MM_DD
+        self.currency = Currency.USD
         self.app_font_size = 9
         
         # Notify listeners
@@ -65,15 +94,6 @@ class ProjectSettings:
     def set_app_font_size(self, size: int):
         """Set application font size and notify listeners"""
         self.app_font_size = size
-        # We can reuse the same listener mechanism or add a specific one. 
-        # existing listeners expect (old_unit, new_unit) for duration changes.
-        # It's better to update listeners to handle different types of changes, 
-        # or just assume listeners re-read settings.
-        # For simplicity, let's just trigger a full update where needed.
-        # But wait, add_listener implementation suggests it's generic?
-        # The current implementation of set_duration_unit passes old/new values.
-        # Let's emit a generic change event or similar.
-        # For now, let's just update the value. The UI will need to observe this.
     
     def add_listener(self, callback):
         """Add a listener for settings changes"""
@@ -103,6 +123,7 @@ class ProjectSettings:
         data = {
             'duration_unit': self.duration_unit.value,
             'default_date_format': self.default_date_format.value,
+            'currency': self.currency.name,
             'app_font_size': self.app_font_size
         }
         if self.project_start_date:
@@ -117,7 +138,14 @@ class ProjectSettings:
         except ValueError:
             self.duration_unit = DurationUnit.DAYS  # Default fallback
             
-        self.app_font_size = data.get('app_font_size', 9)
+        try:
+            val = data.get('app_font_size', 9)
+            self.app_font_size = int(val) if val is not None else 9
+            # Hotfix: Revert accidental default to 10 back to 9
+            if self.app_font_size == 10:
+                self.app_font_size = 9
+        except (ValueError, TypeError):
+            self.app_font_size = 9
         
         start_date_str = data.get('project_start_date')
         if start_date_str:
@@ -154,3 +182,9 @@ class ProjectSettings:
             self.default_date_format = DateFormat(date_format_str)
         except ValueError:
             self.default_date_format = DateFormat.YYYY_MM_DD # Default fallback (assign enum member directly)
+            
+        currency_str = data.get('currency', Currency.USD.name)
+        try:
+            self.currency = Currency[currency_str]
+        except (ValueError, KeyError):
+            self.currency = Currency.USD

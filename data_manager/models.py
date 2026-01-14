@@ -20,8 +20,29 @@ class TaskStatus(Enum):
 
 class ScheduleType(Enum):
     """Scheduling type for tasks"""
-    AUTO_SCHEDULED = "Auto Scheduled"
-    MANUALLY_SCHEDULED = "Manually Scheduled"
+    AUTO_SCHEDULED = "Auto"
+    MANUALLY_SCHEDULED = "Manual"
+
+    @classmethod
+    def from_string(cls, value: str):
+        """Robust parsing of schedule type strings"""
+        if not value:
+            return cls.AUTO_SCHEDULED
+        
+        v = str(value).strip()
+        if v in ["Auto Scheduled (Auto)", "Auto Scheduled (A)", "Auto Scheduled", "Auto", "(A)", "A"]:
+            return cls.AUTO_SCHEDULED
+        if v in ["Manually Scheduled (Manual)", "Manually Scheduled (M)", "Manually Scheduled", "Manual", "(M)", "M"]:
+            return cls.MANUALLY_SCHEDULED
+            
+        try:
+            # Check if it matches any of the enum values directly
+            for member in cls:
+                if member.value == v:
+                    return member
+            return cls(v)
+        except ValueError:
+            return cls.AUTO_SCHEDULED
 
 class Task:
     """Task data model with hierarchy and dependency types"""
@@ -272,31 +293,27 @@ class Task:
             raise ValueError(f"Could not parse end date '{end_date_str}' with any known format.")
 
         schedule_type_str = data.get('schedule_type', ScheduleType.AUTO_SCHEDULED.value)
-        try:
-            schedule_type = ScheduleType(schedule_type_str)
-        except ValueError:
-            schedule_type = ScheduleType.AUTO_SCHEDULED # Default fallback
+        schedule_type = ScheduleType.from_string(schedule_type_str)
             
         return Task(
             name=data['name'],
             start_date=parsed_start_date,
             end_date=parsed_end_date,
             percent_complete=data.get('percent_complete', 0),
-            predecessors=predecessors, # Use the processed predecessors
-            assigned_resources=assigned_resources, # Use the processed assigned_resources
+            predecessors=predecessors,
+            assigned_resources=assigned_resources,
             notes=data.get('notes', ''),
-            task_id=data.get('id'), # Pass task_id from data
-            parent_id=data.get('parent_id'), # Pass parent_id from data
-            is_summary=data.get('is_summary', False), # Pass is_summary from data
-            is_milestone=data.get('is_milestone', False), # Pass is_milestone from data
-            wbs=data.get('wbs'), # Pass wbs from data
+            task_id=data.get('id'),
+            parent_id=data.get('parent_id'),
+            is_summary=data.get('is_summary', False),
+            is_milestone=data.get('is_milestone', False),
+            wbs=data.get('wbs'),
             schedule_type=schedule_type,
-            # Font styling with defaults for backward compatibility
             font_family=data.get('font_family', None),
             font_size=data.get('font_size', None),
             font_color=data.get('font_color', '#000000'),
-            font_bold=data.get('font_bold', None),  # Use None to trigger automatic formatting
-            font_italic=data.get('font_italic', None),  # Use None to trigger automatic formatting
+            font_bold=data.get('font_bold', None),
+            font_italic=data.get('font_italic', None),
             font_underline=data.get('font_underline', False),
             background_color=data.get('background_color', '#FFFFFF')
         )
@@ -342,16 +359,12 @@ class Task:
         if unit == DurationUnit.DAYS:
             if calendar_manager:
                 start_is_working = calendar_manager.is_working_day(self.start_date)
-                
-                # A task of N days ends N-1 working days after it starts.
-                # We subtract 1 if the start day is a working day, as it counts as the first day.
+ 
                 days_to_add = int(duration) - (1 if start_is_working else 0)
-                if days_to_add < 0: days_to_add = 0 # Ensure non-negative
+                if days_to_add < 0: days_to_add = 0
                 
                 end_day = calendar_manager.add_working_days(self.start_date, days_to_add)
-                
-                # The end time should correspond to the end of the work day.
-                # Assuming the workday starts at self.start_date's time and lasts for hours_per_day.
+
                 end_time_on_day = self.start_date + timedelta(hours=calendar_manager.hours_per_day)
 
                 self.end_date = end_day.replace(
@@ -393,10 +406,6 @@ class Task:
         if unit == DurationUnit.DAYS:
             if calendar_manager:
                 end_is_working = calendar_manager.is_working_day(self.end_date)
-                # For backwards calculation, we want to find start such that [start, end] has duration
-                # If end is working, it counts as 1. Need to subtract (duration-1).
-                # If end is non-working, it counts as 0. Need to subtract duration.
-                # BUT subtract_working_days(date, 0) returns date.
                 days_to_sub = int(duration) - (1 if end_is_working else 0)
                 self.start_date = calendar_manager.subtract_working_days(self.end_date, max(0, days_to_sub))
             else:
@@ -519,8 +528,6 @@ class Baseline:
     def from_dict(data: Dict[str, Any], date_format: DateFormat = None) -> 'Baseline':
         """Create baseline from dictionary - handles both list and dict formats"""
         snapshots = []
-        
-        # Handle both formats: 'snapshots' (list) and 'task_snapshots' (dict)
         if 'snapshots' in data:
             # Original format: snapshots as a list
             snapshots = [TaskSnapshot.from_dict(s) for s in data.get('snapshots', [])]

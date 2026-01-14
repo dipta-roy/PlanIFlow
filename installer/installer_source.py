@@ -135,22 +135,11 @@ class InstallerApp:
                 
                 # Find the main exe
                 exe_path = None
-                # Look for the main exe. It should be PlanIFlow_2.3.0.exe (as folder) -> PlanIFlow.exe? 
-                # Or PlanIFlow_2.3.0.exe.exe? 
-                # We will search for the largest .exe file in the root, or specific name if known.
-                # Based on build.bat: --name="PlanIFlow_2.3.0.exe" in directory mode usually implies the exe is inside a folder of that name.
-                # But here we are extracting the *contents* of that folder directly to `dest_path`? 
-                # Wait, if we zip the FOLDER, then extraction will create the folder. 
-                # If we zip the CONTENTS, extraction puts files in root.
-                # I will ensure the packager zips the CONTENTS.
-                
+               
                 candidates = [f for f in os.listdir(dest_path) if f.endswith(".exe")]
-                # Filter out uninstaller if we make one (not yet).
-                # Pick the one that looks like the main app.
-                # If 'PlanIFlow_2.3.0.exe.exe' exists, use it.
-                main_exe = "PlanIFlow_2.3.0.exe.exe" # PyInstaller often appends .exe if name has extension?
+                main_exe = "PlanIFlow_2.3.0.exe.exe"
                 if main_exe not in candidates:
-                     main_exe = "PlanIFlow_2.3.0.exe" # if no extra .exe added
+                     main_exe = "PlanIFlow_2.3.0.exe"
                 
                 # Fallback: largest exe
                 if main_exe not in candidates:

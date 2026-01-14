@@ -20,6 +20,7 @@ PlanIFlow is an **Offline-First**, standalone desktop application for project pl
   - [Adding Tasks and Resources](#adding-tasks-and-resources)
   - [Managing Tasks](#managing-tasks)
   - [Resource Exception Days](#resource-exception-days)
+  - [Kanban Board](#kanban-board)
   - [Gantt Chart](#gantt-chart)
   - [Dashboard](#dashboard)
   - [Importing and Exporting Data](#importing-and-exporting-data)
@@ -46,24 +47,23 @@ PlanIFlow is an **Offline-First**, standalone desktop application for project pl
 - **Inline Editing**: Directly edit task properties within the table for quick modifications.
 - **Context Menus**: Right-click on tasks for quick access to actions like edit, delete, indent, and outdent.
 - **Task Filtering**: Search and filter by resource, status, or name.
-- **Calendar Management**: Custom work hours and holidays.
+- **Calendar Management**: Custom work hours and recurring holidays (automatically applied within the project timeline).
 - **Resource Management**: Allocate resources, track utilization, and manage billing rates.
 - **Resource Allocation Tracking**: Detect over-allocation.
 - **Resource Exception**: Resources can now have exception days (holidays/leaves) that exclude them from work on specific dates.
-- **Total Project Cost in Dashboard**: The dashboard displays the total estimated cost of the project.
-- **Project Baselining**: Create up to 3 project baselines. Compare current progress against baselines to track variances.
-- **Monte Carlo Risk Analysis**: A risk assessment tool that simulates the project schedule hundreds of times to generate a probability distribution of completion dates.
-- **Rich Text Task Formatting**: Customize task appearance with bold, italic, color, and font selection.
-- **Duration Unit Selection**: Switch between 'Days' and 'Hours' for task duration.
-- **Dynamic Gantt Charts**: Real-time visualization with dependencies.
-- **Project Dashboard**: Overview of project metrics, costs, and status.
-- **Excel Import/Export**: Share plans via Excel files.
-- **JSON Import/Export**: Save and load projects in JSON format.
-- **PDF Import/Export**: Export project reports and Gantt charts to PDF.
-- **Undo/Redo**: Full history support for all actions.
-- **Zoom Controls**: Zoom in and out of the Gantt chart.
-- **Dark Mode**: Toggle between light and dark themes.
-- **Secure Auto-Update System**: Automatically checks for updates, downloads, and verifies SHA256 integrity before installing.
+- **Multi-Currency Support**: Global setting for project-wide currency (USD, EUR, GBP, etc.) reflected in dashboard, resource management, and all exports.
+- **Project Baselining**: Create up to 11 project snapshots. Compare current progress against baselines to track schedule and cost variances.
+- **Monte Carlo Risk Analysis**: Accurately forecast completion dates and identify high-risk tasks through statistical simulations.
+- **Duration Unit Selection**: Switch between 'Days' and 'Hours' for granular task planning.
+- **Standard Dependency Notation**: Support for FS, SS, FF, SF relationships with custom lag/lead times.
+- **Dynamic Gantt Charts**: Real-time visualization of your project timeline with zoom and interactive tooltips.
+- **Rich Export Capabilities**: Professional reports in Excel, PDF, and JSON formats.
+- **Undo/Redo Support**: Full history for all project modifications.
+- **Interactive Kanban Board**: Visual task management with drag-and-drop cards organized by status (To Do, In Progress, Delayed, Blocked, Completed). Includes task-level and resource-level filtering.
+- **Secure Auto-Update**: Hassle-free updates with SHA-256 integrity verification.
+- **Earned Value Management (EVM)**: Track project performance using industry-standard metrics (CPI, SPI, EV, PV, AC). Includes health summaries and Excel export.
+- **Smart Project Diagnosis**: One-click analysis combining Risk, Schedule, and Cost health checks into a unified status report.
+- **Dark Mode**: Fully supported dark theme for reduced eye strain.
 
 ## 🛠️ Technologies Used
 
@@ -107,7 +107,7 @@ run.bat
 
 or 
 
-Use the `build_msi.bat` script to generate an `PlanIFlow_Setup_2.3.0.msi` file.
+Use the `build_msi.bat` script to generate an `PlanIFlow_Setup_2.2.0.msi` file.
 
 ```bash
 build_msi.bat
@@ -143,12 +143,12 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 ```
 - HOW TO TRUST
 
-1. Unzip the distribution package.
-2. Double-click: Signed_By_Dipta_CodeSigningPublicKey.cer
-3. Click: "Open" -> "Install Certificate..."
-4. Select: "Current User"
-5. Choose: "Place all certificates in the following store"
-6. Browse -> "Trusted People" -> OK -> Next -> Finish
+1. Download certficate from above link.
+1. Right-click `Signed_By_Dipta_CodeSigningPublicKey.cer` → **Install Certificate**
+2. Select **Local Machine** (requires admin)
+3. Choose **Place all certificates in the following store**
+4. Click **Browse** → Select **Trusted Root Certification Authorities**
+5. Click **Next** → **Finish**
 
 - VERIFY APPLICATION AUTHENTICITY
 
@@ -160,7 +160,7 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 
 Once verified,
 ```
-Run PlanIFlow_2.3.0.msi and install the application.
+Run PlanIFlow_2.2.0.msi and install the application.
 ```
 
 ## 💻 Usage
@@ -187,6 +187,31 @@ Run PlanIFlow_2.3.0.msi and install the application.
 - **Single Day**: A specific date when the resource is unavailable.
 - **Date Range**: A continuous period (e.g., vacation).
 
+### Kanban Board
+
+The **Kanban Board** tab provides an interactive, visual way to manage tasks organized by status:
+
+- **Status Columns**:
+  - 📝 **To Do**: Tasks that haven't started yet
+  - 🚀 **In Progress**: Tasks currently being worked on
+  - ⚠️ **Delayed**: Tasks past their end date and not complete
+  - 🚫 **Blocked**: Tasks with blocking dependencies or issues
+  - ✅ **Completed**: Finished tasks (100% complete)
+
+- **Task Cards**: Each card displays:
+  - Task name, ID, and WBS
+  - Start and end dates
+  - Duration
+  - Progress percentage
+  - Assigned resources
+  - Notes preview
+
+- **Interactions**:
+  - **Click** any card to view full details and edit notes
+  - **Drag and drop** cards between columns (visual organization)
+  - **Filter by View**: Show all tasks, task-level only, or summary tasks only
+  - **Filter by Resource**: View tasks assigned to specific resources
+
 ### Gantt Chart
 
 The **Gantt Chart** tab provides a visual representation of your project timeline.
@@ -195,9 +220,11 @@ The **Gantt Chart** tab provides a visual representation of your project timelin
 ### Dashboard
 
 The **Dashboard** tab gives you a high-level overview of your project, including:
--   Project dates, task counts, completion %.
--   **Total Project Cost**.
-- 	Budget and cost tables.
+-   Project dates, task counts, and completion percentages.
+-   **Smart Project Diagnosis**: Run a comprehensive health check that integrates Monte Carlo risk data, schedule deadlines, and EVM metrics to provide a plain-English status report.
+-   **Total Project Cost** with dynamic currency formatting.
+-   Detailed budget and cost tables per resource.
+-   Monthly expense breakdown visualization.
 
 ### Importing and Exporting Data
 
@@ -207,10 +234,11 @@ The **Dashboard** tab gives you a high-level overview of your project, including
 
 ### Project Baselining
 
-Baselines allow you to capture snapshots of your project.
-- **Create**: `Settings > Baselines > Set Baseline...`
-- **Compare**: `Settings > Baselines > View Baseline Comparison`.
-- **Visualize**: Variance in start/end dates, duration, and completion.
+Baselines allow you to capture snapshots of your project at different milestones.
+-   **Capacity**: Store up to 11 unique baselines per project.
+-   **Create**: `Settings > Baselines > Set Baseline...`
+-   **Compare**: `Settings > Baselines > View Baseline Comparison`.
+-   **Visualize**: Color-coded variance in start/end dates, duration, and completion.
 
 ## 🎲 Monte Carlo Risk Analysis
 
@@ -223,8 +251,20 @@ The Monte Carlo analysis feature forecasts project completion dates under uncert
 
 - **Results**:
   - **Confidence Table**: P50 (Median), P80 (Low Risk), P90 (High Confidence).
-  - **Top Risk Drivers**: Tasks most frequently on the critical path.
-  - **Completion Date Distribution**: Histogram of possible completion dates.
+  - Top Risk Drivers: Tasks most frequently on the critical path.
+  - Completion Date Distribution: Histogram of possible completion dates.
+
+## 📈 Earned Value Management (EVM) Analysis
+
+Track your project's cost and schedule performance with professional precision.
+
+- **Metrics**: Real-time calculation of CPI, SPI, CV, SV, EAC, and VAC.
+- **Health Summary**: Automatic executive summary explains project status in plain English (e.g., "Over Budget but Ahead of Schedule").
+- **Visuals**: Charts comparing Planned vs. Actual cost.
+- **Excel Export**: Detailed export with multiple sheets:
+  - **Executive Summary**: High-level KPI dashboard.
+  - **Task Metrics**: Detailed breakdown per task.
+  - **Glossary**: Definitions of all EVM terms for stakeholders.
 
 ## Screenshots
 
@@ -240,13 +280,26 @@ The Monte Carlo analysis feature forecasts project completion dates under uncert
 | --- | --- |
 | ![Dashboard](./screenshot/Dashboard.png) | ![Resource](./screenshot/Resource.png) |
 
-| Project Baseline | Risk Analysis |
+| Project Baseline | Set Project Baseline |
 | --- | --- |
-| ![Project Baseline](./screenshot/Project%20Baseline.png) | ![Risk Analysis](./screenshot/Risk%20Analysis.png) |
+| ![Project Baseline](./screenshot/Project%20Baseline.png) | ![Set Project Baseline](./screenshot/Set%20Project%20Baseline.png) |
 
-| Project Settings | |
+| Risk Analysis | EVM Analysis |
 | --- | --- |
-| ![Project Settings](./screenshot/Project%20Settings.png) | |
+| ![Risk Analysis](./screenshot/Risk%20Analysis.png) | ![EVM Analysis](./screenshot/EVM%20Analysis.png) |
+
+| Kanban Board | Edit Kanban Tile |
+| --- | --- |
+| ![Kanban Board](./screenshot/Kanban%20Board.png) ![Edit Kanban Tile](./screenshot/Kanban%20Tile%20Edit.png) |
+
+| Project Settings | Calendar Settings |
+| --- | --- |
+| ![Project Settings](./screenshot/Project%20Settings.png) ![Calendar Settings](./screenshot/Calendar%20Settings.png) |
+
+| Holidays Settings | Interface Settings |
+| --- | --- |
+| ![Project Settings](./screenshot/Holidays%20Settings.png) ![Risk Analysis](./screenshot/Interface%20Settings.png) |
+
 
 ## ⌨️ Shortcuts
 
@@ -320,6 +373,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## 📈 Security and Distribution
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (Secure Design).
+- **VirusTotal Report for MSI Installer**: [VirusTotal Report](https://www.virustotal.com/gui/file/1bee77abd9f0b187b0535eaaa87729750d16ba5b1116884dd42fac829257612a)
 - **Offline-First**: No data leaves your machine.
 - **Secure Updates**: HTTPS + SHA256 Hash Verification.
 - **Input Validation**: Strict limits on task counts (10k) and string lengths (250) to prevent DoS.

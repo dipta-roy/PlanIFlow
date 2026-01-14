@@ -4,18 +4,19 @@ import logging
 from data_manager.models import Task, Resource, DependencyType, TaskStatus, ScheduleType, Baseline, TaskSnapshot
 from settings_manager.settings_manager import ProjectSettings, DurationUnit
 from data_manager.validator import ProjectValidator
+from calendar_manager.calendar_manager import CalendarManager
 
 class DataManager:
     def __init__(self, calendar_manager=None):
         self.tasks: List[Task] = []
         self.resources: List[Resource] = [] # Initialize as empty, load_from_dict will handle default if needed
-        self.calendar_manager = calendar_manager
+        self.calendar_manager = calendar_manager or CalendarManager()
         self.project_name: str = "Untitled Project"
         self.settings = ProjectSettings()
-        self.baselines: List[Baseline] = []  # Maximum 3 baselines
+        self.baselines: List[Baseline] = []  # Maximum 11 baselines
+        self._sync_calendar_bounds()
     
     # Task CRUD Operations
-    
     def _generate_wbs(self):
         """Generate WBS for all tasks based on their hierarchy."""
         # Sort tasks by parent_id and then by id to ensure consistent WBS generation
@@ -70,6 +71,8 @@ class DataManager:
         # Auto-adjust dependent tasks
         self._auto_adjust_dependent_tasks(task)
         
+        self._sync_calendar_bounds()
+        
         return True
     
     def update_task(self, task_id: int, updated_task: Task) -> bool:
@@ -88,9 +91,6 @@ class DataManager:
                 if updated_task.is_summary and updated_task.schedule_type == ScheduleType.MANUALLY_SCHEDULED:
                     # Revert to Auto Scheduled if an attempt is made to set a summary task to Manual
                     updated_task.schedule_type = ScheduleType.AUTO_SCHEDULED
-                    # Optionally, log a warning or return False to indicate validation failure
-                    # For now, we'll just force it to Auto Scheduled
-
                 if not self._validate_predecessors(updated_task, exclude_id=task_id):
                     return False
                 
@@ -98,12 +98,7 @@ class DataManager:
                 if old_task.schedule_type == ScheduleType.MANUALLY_SCHEDULED and \
                    updated_task.schedule_type == ScheduleType.AUTO_SCHEDULED:
                     self._auto_calculate_dates_from_predecessors(updated_task)
-                # If an auto-scheduled task's duration is manually changed, switch to manually scheduled
 
-                # If it's still Auto Scheduled, or changed from Auto to Manual,
-                # _auto_calculate_dates_from_predecessors will be called by _auto_adjust_dependent_tasks
-                # if needed, or skipped if it's Manual.
-                
                 self.tasks[i] = updated_task
 
                 self._generate_wbs()
@@ -126,6 +121,8 @@ class DataManager:
                 
                 # Update dependent tasks of the task itself
                 self._auto_adjust_dependent_tasks(updated_task)
+                
+                self._sync_calendar_bounds()
                 
                 return True
         return False
@@ -234,8 +231,6 @@ class DataManager:
             new_parent = self.get_task(new_parent_id)
             if new_parent:
                 if not new_parent.is_summary:  # Only update if not already a summary
-                    # Note: When converting to summary, we don't necessarily update dependent tasks
-                    # unless dates change, which _update_summary handles
                     new_parent.is_summary = True
                     new_parent.font_bold = True  # Auto-apply bold formatting
                 
@@ -246,9 +241,73 @@ class DataManager:
                         self._auto_adjust_dependent_tasks(sum_task)
         
         return True
+
+    def swap_task_ids(self, id1: int, id2: int) -> bool:
+        """Swap IDs of two tasks and update all references (parent_id, predecessors)"""
+        task1 = self.get_task(id1)
+        task2 = self.get_task(id2)
+        if not task1 or not task2:
+            return False
+        
+        # 1. Update references in other tasks
+        for task in self.tasks:
+            # Update parent references
+            if task.parent_id == id1:
+                task.parent_id = id2
+            elif task.parent_id == id2:
+                task.parent_id = id1
+            
+            # Update predecessor references
+            new_preds = []
+            param_changed = False
+            for pred_id, type_, lag in task.predecessors:
+                if pred_id == id1:
+                    new_preds.append((id2, type_, lag))
+                    param_changed = True
+                elif pred_id == id2:
+                    new_preds.append((id1, type_, lag))
+                    param_changed = True
+                else:
+                    new_preds.append((pred_id, type_, lag))
+            
+            if param_changed:
+                task.predecessors = new_preds
+                
+        # 2. Swap IDs
+        task1.id, task2.id = task2.id, task1.id
+        
+        # 3. Regenerate WBS
+        self._generate_wbs()
+        return True
+
+    def move_task_vertically(self, task_id: int, direction: str) -> bool:
+        """Move task 'up' or 'down' among siblings by swapping IDs"""
+        task = self.get_task(task_id)
+        if not task:
+            return False
+            
+        siblings = self.get_child_tasks(task.parent_id)
+        
+        try:
+            curr_index = [t.id for t in siblings].index(task_id)
+        except ValueError:
+            return False
+            
+        target_index = -1
+        if direction == 'up':
+            if curr_index > 0:
+                target_index = curr_index - 1
+        elif direction == 'down':
+            if curr_index < len(siblings) - 1:
+                target_index = curr_index + 1
+        
+        if target_index != -1:
+            target_task = siblings[target_index]
+            return self.swap_task_ids(task.id, target_task.id)
+            
+        return False
     
     # Resource CRUD Operations (unchanged)
-    
     def add_resource(self, resource: Resource) -> bool:
         """Add a new resource"""
         if any(r.name == resource.name for r in self.resources):
@@ -375,14 +434,11 @@ class DataManager:
                         days_to_add = lag_days
 
                         work_end_hour, work_end_min = self.calendar_manager.get_working_end_time()
-                        # If predecessor is not a milestone, or if it ends late, we move to the next day
-                        # Only apply this forward shift for non-negative lag. Negative lag means we go backwards from the end date.
                         if lag_days >= 0 and (not predecessor.is_milestone or (start_from.hour > work_end_hour) or (start_from.hour == work_end_hour and start_from.minute >= work_end_min)):
                             days_to_add += 1
                         
                         constraint_start = self.calendar_manager.add_working_days(start_from, days_to_add)
                         
-                        # If we moved to a new day (implicit in days_to_add > lag for positive, or just any negative lag), snap to start
                         if days_to_add > lag_days or lag_days < 0:
                            start_h, start_m = self.calendar_manager.get_working_start_time()
                            constraint_start = constraint_start.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
@@ -410,9 +466,7 @@ class DataManager:
                 constraint_end = predecessor.start_date + lag
                 if latest_end is None or constraint_end > latest_end:
                     latest_end = constraint_end
-        
-        # Apply constraints to task
-        # Store original duration before modifying start/end dates
+
         original_duration_days = task.calculate_duration_days(self.calendar_manager)
 
         if latest_start is not None:
@@ -446,12 +500,7 @@ class DataManager:
     def _auto_adjust_dependent_tasks(self, initial_task: Task):
         """Auto-shift dependent tasks when a task changes, using an iterative approach"""
         queue = [initial_task.id] # Store task IDs in the queue
-        # Use a set to keep track of tasks that have been added to the queue
-        # to avoid redundant processing within a single propagation cycle
         queued_ids = {initial_task.id}
-        
-        # Use a separate set to track tasks whose dates have been finalized in this cycle
-        # This prevents infinite loops in circular dependencies, but allows re-evaluation if needed
         finalized_ids = set()
 
         while queue:
@@ -459,10 +508,6 @@ class DataManager:
             task = self.get_task(task_id)
             if not task or task_id in finalized_ids:
                 continue
-
-            # Special handling for Summary Tasks
-            # Summary tasks are driven by their children, but they drive their successors.
-            # If a summary task is in the queue, it means it was updated (by children) or needs propagation.
             if task.is_summary:
                 finalized_ids.add(task_id)
                 
@@ -494,10 +539,7 @@ class DataManager:
                         if sum_id not in queued_ids:
                              queue.append(sum_id)
                              queued_ids.add(sum_id)
-                
-                # Add all direct successors to the queue for re-evaluation
-                # This ensures that when a manually scheduled task's dates change,
-                # its auto-scheduled successors are still updated
+
                 for successor in self.get_successors(task.id):
                     # Only add AUTO_SCHEDULED successors to the queue
                     if successor.schedule_type == ScheduleType.AUTO_SCHEDULED and successor.id not in queued_ids:
@@ -524,23 +566,15 @@ class DataManager:
                         if sum_id not in queued_ids:
                             queue.append(sum_id)
                             queued_ids.add(sum_id)
-                            # Also ensure the summary task itself is marked for processing if it has dependents
-                            # (Wait, queue logic handles processing. Just appending ID is enough)
-                
-                # Add all direct successors to the queue for re-evaluation
                 for successor in self.get_successors(task.id):
                     # Only add AUTO_SCHEDULED successors to the queue
                     if successor.schedule_type == ScheduleType.AUTO_SCHEDULED and successor.id not in queued_ids:
                         queue.append(successor.id)
                         queued_ids.add(successor.id)
 
-        # After all dependencies are resolved, update all summary tasks from bottom-up
-        # This ensures summary tasks reflect the latest dates of their children
         for task in sorted(self.tasks, key=lambda t: t.get_level(self.tasks), reverse=True):
             if task.is_summary:
                 self._update_summary_task_dates(task.id)
-
-
     
     def _update_summary_task_dates(self, summary_task_id: int):
         """Update summary task dates based on child tasks"""
@@ -551,7 +585,6 @@ class DataManager:
         children = self.get_child_tasks(summary_task_id)
         if not children:
             return
-        # *** EXCLUDE MILESTONES FROM DURATION CALCULATION ***
         non_milestone_children = [c for c in children if not c.is_milestone]
         
         # Find earliest start and latest end among children
@@ -723,8 +756,19 @@ class DataManager:
         Task._next_id = data.get('next_task_id', 1)
         self.project_name = data.get('project_name', 'Untitled Project')
         
+        # Load settings first
+        if 'project_settings' in data:
+            self.settings.from_dict(data['project_settings'])
+        elif 'settings' in data: # Backward compatibility
+             self.settings.from_dict(data['settings'])
+
+        if 'calendar_settings' in data:
+            self.calendar_manager.from_dict(data['calendar_settings'])
+        
         self.tasks = [Task.from_dict(t) for t in data.get('tasks', [])]
         self.resources = [Resource.from_dict(r) for r in data.get('resources', [])]
+        
+        self._sync_calendar_bounds()
     
     def clear_all(self):
         """Clear all data"""
@@ -767,6 +811,30 @@ class DataManager:
         
         return affected_parents
     
+    def recalculate_all_tasks(self):
+        """Force recalculation of all task dates based on current calendar and dependencies"""
+        if not self.tasks:
+            return
+            
+        self._sync_calendar_bounds()
+            
+        # 1. Update all summary task dates based on children (bottom-up)
+        for task in sorted(self.tasks, key=lambda t: t.get_level(self.tasks), reverse=True):
+            if task.is_summary:
+                self._update_summary_task_dates(task.id)
+        
+        # 2. Re-calculate all auto-scheduled tasks (top-down / dependency based)
+        # We start with top-level tasks and propagate changes
+        for task in self.get_top_level_tasks():
+            self._auto_adjust_dependent_tasks(task)
+            
+        # 3. Final pass for summaries
+        for task in sorted(self.tasks, key=lambda t: t.get_level(self.tasks), reverse=True):
+            if task.is_summary:
+                self._update_summary_task_dates(task.id)
+        
+        self._sync_calendar_bounds()
+
     def bulk_outdent_tasks(self, task_ids: List[int]) -> bool:
         """Outdent multiple tasks at once"""
         tasks = [self.get_task(tid) for tid in task_ids if self.get_task(tid)]
@@ -867,14 +935,8 @@ class DataManager:
         
         # Ensure there's always at least a default resource if none were loaded
         if not self.resources:
-            self.resources.append(Resource(name="Default Resource", max_hours_per_day=8.0, billing_rate=50.0))
+            self.resources.append(Resource(name="Default Resource", max_hours_per_day=8.0, billing_rate=0.0))
         
-        # NOTE: We do NOT re-evaluate task dates on import to preserve the exact times
-        # from the JSON file. Date recalculation should only happen during explicit
-        # scheduling operations, not during import.
-        
-        # Update summary task dates after all individual task dates are set
-        # This ensures hierarchy dates are correct
         for task in self.get_top_level_tasks():
             if task.is_summary:
                 self._update_summary_task_dates(task.id)
@@ -1044,8 +1106,6 @@ class DataManager:
             task.slack = None
             task.is_critical = False
 
-        # 2. Forward Pass: Calculate Early Start (ES) and Early Finish (EF)
-        # Process tasks in topological order (or by ID for simplicity, assuming no circular deps)
         sorted_tasks = sorted(self.tasks, key=lambda t: t.id)
 
         for task in sorted_tasks:
@@ -1103,8 +1163,6 @@ class DataManager:
                     else:
                         task.early_finish = task.early_start + timedelta(days=duration_days - 1)
 
-        # 3. Backward Pass: Calculate Late Start (LS) and Late Finish (LF)
-        # Determine project finish date (latest EF of all tasks)
         project_finish_date = max(t.early_finish for t in self.tasks if t.early_finish) if self.tasks else datetime.now()
 
         # Initialize LF for tasks with no successors to project_finish_date
@@ -1257,12 +1315,14 @@ class DataManager:
             # Add Total column
             for resource_name, cost in resource_costs_in_period.items():
                 period_total_cost += cost
-            row_data.append(f"${period_total_cost:.2f}")
+            
+            symbol = self.settings.currency.symbol
+            row_data.append(f"{symbol}{period_total_cost:.2f}")
 
             # Add individual resource columns
             for resource in self.resources:
                 cost = resource_costs_in_period[resource.name]
-                row_data.append(f"${cost:.2f}")
+                row_data.append(f"{symbol}{cost:.2f}")
             rows.append(row_data)
         
         return {'headers': column_headers, 'rows': rows}
@@ -1279,8 +1339,8 @@ class DataManager:
         Returns:
             True if successful, False if limit reached or name exists
         """
-        # Check if we've reached the maximum of 3 baselines
-        if len(self.baselines) >= 3:
+        # Check if we've reached the maximum of 11 baselines
+        if len(self.baselines) >= 11:
             return False
         
         # Check if baseline name already exists
@@ -1493,4 +1553,15 @@ class DataManager:
             'comparisons': comparisons,
             'summary': summary
         }
+
+    def _sync_calendar_bounds(self):
+        """Sync project start/end dates to calendar manager for recurring holiday bounds"""
+        if not hasattr(self, 'calendar_manager') or not self.calendar_manager:
+            return
+            
+        start_date = self.settings.project_start_date if hasattr(self, 'settings') else None
+        # Use latest task end date as project end
+        end_date = self.get_project_end_date()
+        
+        self.calendar_manager.set_project_bounds(start_date, end_date)
 

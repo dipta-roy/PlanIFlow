@@ -7,10 +7,7 @@ from PyQt6.QtGui import QColor, QBrush, QPainter, QFont
 import sys
 import os
 from datetime import datetime
-
-# Constants for ColorDelegate
 from constants.constants import CIRCLE_SIZE, LEFT_PADDING, TEXT_SHIFT, ICON_SIZE
-
 
 class SortableTreeWidgetItem(QTreeWidgetItem):
     """Custom tree widget item with proper sorting for different data types"""
@@ -36,11 +33,7 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
             return False
 
         column = tree.sortColumn()
-        
-        # Debug logging to file
-        # with open("debug_sort.txt", "a") as f:
-        #     f.write(f"Sort Column: {column}\n")
-        
+       
         # Helper for secondary sort by ID
         def sort_by_id_secondary():
             return self._get_id() < other._get_id()
@@ -318,8 +311,6 @@ def get_resource_path(relative_path):
     
     return os.path.join(base_path, relative_path)
 
-
-
 class ExpandCollapseDelegate(QStyledItemDelegate):
     """Custom delegate to show expand/collapse buttons"""
     
@@ -334,8 +325,6 @@ class ExpandCollapseDelegate(QStyledItemDelegate):
         if option.state & QStyle.StateFlag.State_Selected:
              painter.fillRect(option.rect, option.palette.highlight())
 
-        # super().paint(painter, option, index) # Avoid default painting which might enforce white background
-        
         # Get the tree widget item
         item = self.tree_widget.itemFromIndex(index)
         

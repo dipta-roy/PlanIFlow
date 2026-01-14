@@ -29,6 +29,7 @@ class GanttChart(FigureCanvas):
         self.show_summary_tasks = True # New attribute
         self.show_critical_path = False # New attribute for critical path
         self.current_scale = "Days" # Default scale
+        self.display_tasks = [] # Cache for ordered tasks
         
         # Color scheme for status indicators
         self.status_colors = constants.GANTT_STATUS_COLORS
@@ -105,10 +106,10 @@ class GanttChart(FigureCanvas):
         # Calculate critical path if enabled
         if self.show_critical_path and self.data_manager:
             self.data_manager.calculate_critical_path()
-
-        # Filter out summary tasks or show them differently
-        # For now, we'll show all tasks but render summary tasks differently
-        display_tasks = self._get_display_order(tasks)
+            
+        display_items = self._get_display_order_with_levels(tasks)
+        self.display_tasks = [item[0] for item in display_items]
+        display_tasks = self.display_tasks
         
         if not display_tasks:
             self.ax.text(0.5, 0.5, 'No tasks to display', 
@@ -125,10 +126,8 @@ class GanttChart(FigureCanvas):
         y_pos.reverse()  # Reverse so first task is at top
         
         # Create task name labels with hierarchy indicators
-        
         task_labels = []
-        for task in display_tasks:
-            level = task.get_level(self.tasks) if self.data_manager else 0
+        for i, (task, level) in enumerate(display_items):
             indent = "  " * level
             
             # *** ADD MILESTONE INDICATOR ***
@@ -141,15 +140,18 @@ class GanttChart(FigureCanvas):
             
             task_labels.append(label)
         
-        # Calculate date range for the chart
-        if self.tasks:
-            min_date = min(task.start_date for task in self.tasks)
-            max_date = max(task.end_date for task in self.tasks)
+        # Calculate date range for the chart based on displayed tasks
+        if display_tasks:
+            min_date = min(task.start_date for task in display_tasks)
+            max_date = max(task.end_date for task in display_tasks)
             total_days = (max_date - min_date).days
         else:
             min_date = datetime.now()
             max_date = datetime.now() + timedelta(days=30)
             total_days = 30
+        
+        # Explicitly set X-axis limits with a small fixed padding (1 day) to prevent shift
+        self.ax.set_xlim(mdates.date2num(min_date) - 1, mdates.date2num(max_date) + 1)
         
         # Draw non-working time shading in the background
         self._draw_non_working_time(min_date, max_date)
@@ -222,7 +224,6 @@ class GanttChart(FigureCanvas):
         
         # Format x-axis dates based on current_scale
         # (min_date, max_date, total_days already calculated above)
-
         # Dynamic locator and formatter selection
         if self.current_scale == "Hours" and total_days < 7:
             self.ax.xaxis.set_major_locator(mdates.HourLocator(interval=6))
@@ -248,7 +249,6 @@ class GanttChart(FigureCanvas):
             self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
             self.ax.xaxis.set_major_formatter(mdates.AutoDateFormatter(self.ax.xaxis.get_major_locator()))
 
-        
         # Rotate date labels
         plt.setp(self.ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
         
@@ -280,30 +280,42 @@ class GanttChart(FigureCanvas):
             # Add a red circle around critical milestones
             circle = mpatches.Circle((milestone_date, y), radius=0.4, color='red', fill=False, linewidth=2, zorder=4)
             self.ax.add_patch(circle)
+         
+    def _get_display_order_with_levels(self, tasks: List[Task]) -> List[tuple]:
+        """Get tasks and their levels in hierarchical display order (depth-first), optimized"""
+        if not tasks:
+            return []
+            
+        # Build children map once for O(1) lookups
+        children_map = {}
+        for task in tasks:
+            pid = task.parent_id
+            if pid not in children_map:
+                children_map[pid] = []
+            children_map[pid].append(task)
+            
+        # Pre-sort children by start date
+        for pid in children_map:
+            children_map[pid].sort(key=lambda t: t.start_date)
+            
+        display_ordered = []
         
-
-    
-    def _get_display_order(self, tasks: List[Task]) -> List[Task]:
-        """Get tasks in hierarchical display order (depth-first)"""
-        if not self.data_manager:
-            return sorted(tasks, key=lambda t: t.start_date)
-        
-        display_order = []
-        
-        def add_task_and_children(task: Task):
+        def add_task_and_children(task: Task, level: int):
             # Only add summary tasks if show_summary_tasks is True
             if not task.is_summary or self.show_summary_tasks:
-                display_order.append(task)
-            children = self.data_manager.get_child_tasks(task.id)
-            for child in sorted(children, key=lambda t: t.start_date):
-                add_task_and_children(child)
+                display_ordered.append((task, level))
+            
+            # Recursive depth-first traversal
+            children = children_map.get(task.id, [])
+            for child in children:
+                add_task_and_children(child, level + 1)
         
-        # Start with top-level tasks
-        top_level = self.data_manager.get_top_level_tasks()
-        for task in sorted(top_level, key=lambda t: t.start_date):
-            add_task_and_children(task)
-        
-        return display_order
+        # Start from top-level tasks (parent_id is None)
+        top_level = children_map.get(None, [])
+        for task in top_level:
+            add_task_and_children(task, 0)
+            
+        return display_ordered
     
     def _draw_regular_task(self, y: float, start_num: float, duration: int, 
                           color: str, task: Task, is_critical: bool = False):
@@ -336,9 +348,10 @@ class GanttChart(FigureCanvas):
 
     
     def _draw_dependencies(self, display_tasks: List[Task], y_pos: List[int]):
-        """Draw dependency arrows with type indicators"""
-        # Create task position mapping
+        """Draw dependency arrows with type indicators, optimized lookups"""
+        # Create task position and object mapping for O(1) lookups
         task_positions = {task.id: y_pos[i] for i, task in enumerate(display_tasks)}
+        task_map = {task.id: task for task in display_tasks}
         
         for i, task in enumerate(display_tasks):
             if not task.predecessors:
@@ -349,8 +362,8 @@ class GanttChart(FigureCanvas):
             task_end = mdates.date2num(task.end_date)
             
             for pred_id, dep_type_str, lag_days in task.predecessors:
-                # Find predecessor in display list
-                pred_task = next((t for t in display_tasks if t.id == pred_id), None)
+                # Optimized lookup instead of scanning the list
+                pred_task = task_map.get(pred_id)
                 if not pred_task:
                     continue
                 
@@ -498,107 +511,84 @@ class GanttChart(FigureCanvas):
         return 'white' if luminance < 0.5 else 'black'
     
     def _draw_non_working_time(self, min_date: datetime, max_date: datetime):
-        """Draw shaded backgrounds for non-working time periods"""
+        """Draw shaded backgrounds for non-working time periods, optimized by merging spans"""
         if not self.data_manager or not self.data_manager.calendar_manager:
             return
         
         calendar = self.data_manager.calendar_manager
         
-        # Get the y-axis limits to cover the full chart height
-        y_min, y_max = self.ax.get_ylim()
-        
         # Determine shading color based on theme
         if self.dark_mode:
-            shade_color = '#1a1a1a'  # Darker shade for dark mode
+            shade_color = '#1a1a1a'
             shade_alpha = 0.5
         else:
-            shade_color = '#e0e0e0'  # Light gray for light mode
+            shade_color = '#e0e0e0'
             shade_alpha = 0.3
         
-        # Shade based on scale
+        spans = []
+        
+        # Collect non-working spans based on scale
         if self.current_scale in ["Hours", "Days"]:
-            # Parse working hours from calendar
             try:
                 work_start_parts = calendar.working_hours_start.split(':')
                 work_end_parts = calendar.working_hours_end.split(':')
-                work_start_hour = int(work_start_parts[0])
-                work_start_minute = int(work_start_parts[1])
-                work_end_hour = int(work_end_parts[0])
-                work_end_minute = int(work_end_parts[1])
+                ws_h, ws_m = int(work_start_parts[0]), int(work_start_parts[1])
+                we_h, we_m = int(work_end_parts[0]), int(work_end_parts[1])
             except:
-                # Fallback to default 8 AM - 4 PM
-                work_start_hour, work_start_minute = 8, 0
-                work_end_hour, work_end_minute = 16, 0
+                ws_h, ws_m, we_h, we_m = 8, 0, 16, 0
             
-            # Shade non-working days AND non-working hours
+            # Use a slightly wider range to ensure full coverage
             current_date = min_date.replace(hour=0, minute=0, second=0, microsecond=0)
-            end_date = max_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            end_date = max_date.replace(hour=23, minute=59, second=59)
             
             while current_date <= end_date:
-                # Check if this is a non-working day (weekend/holiday)
                 if not calendar.is_working_day(current_date):
-                    # Shade the entire day
-                    day_start = mdates.date2num(current_date)
-                    day_end = mdates.date2num(current_date + timedelta(days=1))
-                    
-                    self.ax.axvspan(day_start, day_end, 
-                                   facecolor=shade_color, 
-                                   alpha=shade_alpha, 
-                                   zorder=0)
+                    spans.append((mdates.date2num(current_date), 
+                                 mdates.date2num(current_date + timedelta(days=1))))
                 else:
-                    # It's a working day - shade non-working hours
+                    # Before work
+                    if ws_h > 0 or ws_m > 0:
+                        start = current_date.replace(hour=0, minute=0, second=0)
+                        end = current_date.replace(hour=ws_h, minute=ws_m, second=0)
+                        spans.append((mdates.date2num(start), mdates.date2num(end)))
                     
-                    # Shade before work starts (midnight to work start)
-                    if work_start_hour > 0 or work_start_minute > 0:
-                        day_midnight = current_date.replace(hour=0, minute=0, second=0)
-                        day_work_start = current_date.replace(hour=work_start_hour, 
-                                                             minute=work_start_minute, 
-                                                             second=0)
-                        
-                        before_work_start = mdates.date2num(day_midnight)
-                        before_work_end = mdates.date2num(day_work_start)
-                        
-                        self.ax.axvspan(before_work_start, before_work_end,
-                                       facecolor=shade_color,
-                                       alpha=shade_alpha,
-                                       zorder=0)
-                    
-                    # Shade after work ends (work end to midnight)
-                    if work_end_hour < 24 or work_end_minute < 59:
-                        day_work_end = current_date.replace(hour=work_end_hour, 
-                                                           minute=work_end_minute, 
-                                                           second=0)
-                        day_next_midnight = (current_date + timedelta(days=1)).replace(
-                            hour=0, minute=0, second=0)
-                        
-                        after_work_start = mdates.date2num(day_work_end)
-                        after_work_end = mdates.date2num(day_next_midnight)
-                        
-                        self.ax.axvspan(after_work_start, after_work_end,
-                                       facecolor=shade_color,
-                                       alpha=shade_alpha,
-                                       zorder=0)
+                    # After work
+                    if we_h < 24 or we_m < 59:
+                        start = current_date.replace(hour=we_h, minute=we_m, second=0)
+                        end = (current_date + timedelta(days=1)).replace(hour=0, minute=0, second=0)
+                        spans.append((mdates.date2num(start), mdates.date2num(end)))
                 
                 current_date += timedelta(days=1)
         
         elif self.current_scale in ["Week", "Month", "Year"]:
-            # Shade weekends (Saturday and Sunday)
             current_date = min_date.replace(hour=0, minute=0, second=0, microsecond=0)
-            end_date = max_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-            
+            end_date = max_date.replace(hour=23, minute=59, second=59)
             while current_date <= end_date:
-                # Check if Saturday (5) or Sunday (6)
                 if current_date.weekday() in [5, 6]:
-                    day_start = mdates.date2num(current_date)
-                    day_end = mdates.date2num(current_date + timedelta(days=1))
-                    
-                    # Draw vertical rectangle for weekend day
-                    self.ax.axvspan(day_start, day_end, 
-                                   facecolor=shade_color, 
-                                   alpha=shade_alpha, 
-                                   zorder=0)
-                
+                    spans.append((mdates.date2num(current_date), 
+                                 mdates.date2num(current_date + timedelta(days=1))))
                 current_date += timedelta(days=1)
+
+        if not spans:
+            return
+
+        # Merge consecutive spans
+        spans.sort()
+        merged_spans = []
+        if spans:
+            curr_start, curr_end = spans[0]
+            for next_start, next_end in spans[1:]:
+                # Use a small epsilon for floating point comparison of date numbers
+                if next_start <= curr_end + 1e-9:
+                    curr_end = max(curr_end, next_end)
+                else:
+                    merged_spans.append((curr_start, curr_end))
+                    curr_start, curr_end = next_start, next_end
+            merged_spans.append((curr_start, curr_end))
+
+        # Draw merged spans
+        for start, end in merged_spans:
+            self.ax.axvspan(start, end, facecolor=shade_color, alpha=shade_alpha, zorder=0)
 
     
     def _on_scroll(self, event):
@@ -654,7 +644,7 @@ class GanttChart(FigureCanvas):
             return
         
         # Get display tasks in same order as chart
-        display_tasks = self._get_display_order(self.tasks)
+        display_tasks = self.display_tasks
         y_positions = list(range(len(display_tasks)))
         y_positions.reverse()
         

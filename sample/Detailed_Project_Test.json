@@ -1,0 +1,635 @@
+{
+  "version": "2.2",
+  "project_name": "PlanIFlow V3 Development",
+  "project_data": {
+    "project_name": "PlanIFlow V3 Development",
+    "settings": {
+      "duration_unit": "days",
+      "default_date_format": "yyyy-mm-dd",
+      "currency": "USD",
+      "app_font_size": 10,
+      "project_start_date": "2026-01-01T08:00:00"
+    },
+    "tasks": [
+      {
+        "id": 1,
+        "name": "PlanIFlow V3 Project",
+        "start_date": "2026-01-01T08:00:00",
+        "end_date": "2026-02-14T17:00:00",
+        "percent_complete": 40,
+        "predecessors": [],
+        "assigned_resources": [],
+        "notes": "Main project container",
+        "parent_id": null,
+        "is_summary": true,
+        "is_milestone": false,
+        "wbs": "1",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": true,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 2,
+        "name": "Phase 1: Initiation",
+        "start_date": "2026-01-01T08:00:00",
+        "end_date": "2026-01-07T17:00:00",
+        "percent_complete": 100,
+        "predecessors": [],
+        "assigned_resources": [],
+        "notes": "",
+        "parent_id": 1,
+        "is_summary": true,
+        "is_milestone": false,
+        "wbs": "1.1",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": true,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 3,
+        "name": "Kickoff Meeting",
+        "start_date": "2026-01-01T08:00:00",
+        "end_date": "2026-01-01T08:00:00",
+        "percent_complete": 100,
+        "predecessors": [],
+        "assigned_resources": [
+          [
+            "Manager",
+            100
+          ]
+        ],
+        "notes": "Start of project",
+        "parent_id": 2,
+        "is_summary": false,
+        "is_milestone": true,
+        "wbs": "1.1.1",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": true,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 4,
+        "name": "Gather Requirements",
+        "start_date": "2026-01-02T08:00:00",
+        "end_date": "2026-01-07T17:00:00",
+        "percent_complete": 100,
+        "predecessors": [
+          [
+            3,
+            "FS",
+            0
+          ]
+        ],
+        "assigned_resources": [
+          [
+            "Analyst",
+            100
+          ],
+          [
+            "Manager",
+            20
+          ]
+        ],
+        "notes": "Interviews with stakeholders",
+        "parent_id": 2,
+        "is_summary": false,
+        "is_milestone": false,
+        "wbs": "1.1.2",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 5,
+        "name": "Phase 2: Development",
+        "start_date": "2026-01-08T08:00:00",
+        "end_date": "2026-01-28T17:00:00",
+        "percent_complete": 60,
+        "predecessors": [
+          [
+            4,
+            "FS",
+            0
+          ]
+        ],
+        "assigned_resources": [],
+        "notes": "",
+        "parent_id": 1,
+        "is_summary": true,
+        "is_milestone": false,
+        "wbs": "1.2",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": true,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 6,
+        "name": "Frontend Architecture",
+        "start_date": "2026-01-08T08:00:00",
+        "end_date": "2026-01-14T17:00:00",
+        "percent_complete": 100,
+        "predecessors": [],
+        "assigned_resources": [
+          [
+            "Senior Dev",
+            100
+          ]
+        ],
+        "notes": "Choosing framework",
+        "parent_id": 5,
+        "is_summary": false,
+        "is_milestone": false,
+        "wbs": "1.2.1",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 7,
+        "name": "Backend DB Design",
+        "start_date": "2026-01-08T08:00:00",
+        "end_date": "2026-01-12T17:00:00",
+        "percent_complete": 100,
+        "predecessors": [],
+        "assigned_resources": [
+          [
+            "Backend Dev",
+            100
+          ]
+        ],
+        "notes": "",
+        "parent_id": 5,
+        "is_summary": false,
+        "is_milestone": false,
+        "wbs": "1.2.2",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 8,
+        "name": "Implement API",
+        "start_date": "2026-01-13T08:00:00",
+        "end_date": "2026-01-20T17:00:00",
+        "percent_complete": 50,
+        "predecessors": [
+          [
+            7,
+            "FS",
+            0
+          ]
+        ],
+        "assigned_resources": [
+          [
+            "Backend Dev",
+            100
+          ]
+        ],
+        "notes": "Delay expected here",
+        "parent_id": 5,
+        "is_summary": false,
+        "is_milestone": false,
+        "wbs": "1.2.3",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 9,
+        "name": "Implement UI Components",
+        "start_date": "2026-01-15T08:00:00",
+        "end_date": "2026-01-28T17:00:00",
+        "percent_complete": 30,
+        "predecessors": [
+          [
+            6,
+            "FS",
+            0
+          ]
+        ],
+        "assigned_resources": [
+          [
+            "Junior Dev",
+            100
+          ],
+          [
+            "Senior Dev",
+            50
+          ]
+        ],
+        "notes": "",
+        "parent_id": 5,
+        "is_summary": false,
+        "is_milestone": false,
+        "wbs": "1.2.4",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 10,
+        "name": "Phase 3: Testing",
+        "start_date": "2026-01-29T08:00:00",
+        "end_date": "2026-02-14T17:00:00",
+        "percent_complete": 0,
+        "predecessors": [
+          [
+            9,
+            "FS",
+            0
+          ],
+          [
+            8,
+            "FS",
+            0
+          ]
+        ],
+        "assigned_resources": [],
+        "notes": "",
+        "parent_id": 1,
+        "is_summary": true,
+        "is_milestone": false,
+        "wbs": "1.3",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": true,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 11,
+        "name": "Integration Testing",
+        "start_date": "2026-01-29T08:00:00",
+        "end_date": "2026-02-04T17:00:00",
+        "percent_complete": 0,
+        "predecessors": [],
+        "assigned_resources": [
+          [
+            "Tester",
+            100
+          ]
+        ],
+        "notes": "",
+        "parent_id": 10,
+        "is_summary": false,
+        "is_milestone": false,
+        "wbs": "1.3.1",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 12,
+        "name": "Bug Fixes",
+        "start_date": "2026-02-05T08:00:00",
+        "end_date": "2026-02-11T17:00:00",
+        "percent_complete": 0,
+        "predecessors": [
+          [
+            11,
+            "FS",
+            0
+          ]
+        ],
+        "assigned_resources": [
+          [
+            "Senior Dev",
+            100
+          ]
+        ],
+        "notes": "",
+        "parent_id": 10,
+        "is_summary": false,
+        "is_milestone": false,
+        "wbs": "1.3.2",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      },
+      {
+        "id": 13,
+        "name": "Deployment",
+        "start_date": "2026-02-12T08:00:00",
+        "end_date": "2026-02-14T17:00:00",
+        "percent_complete": 0,
+        "predecessors": [
+          [
+            12,
+            "FS",
+            0
+          ]
+        ],
+        "assigned_resources": [
+          [
+            "DevOps",
+            100
+          ]
+        ],
+        "notes": "Go Live!",
+        "parent_id": 1,
+        "is_summary": false,
+        "is_milestone": false,
+        "wbs": "1.4",
+        "schedule_type": "Auto",
+        "font_family": null,
+        "font_size": null,
+        "font_color": "#000000",
+        "font_bold": false,
+        "font_italic": false,
+        "font_underline": false,
+        "background_color": "#FFFFFF"
+      }
+    ],
+    "resources": [
+      {
+        "name": "Manager",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 80.0
+      },
+      {
+        "name": "Analyst",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 60.0
+      },
+      {
+        "name": "Senior Dev",
+        "max_hours_per_day": 8.0,
+        "exceptions": [
+          "2026-01-16"
+        ],
+        "billing_rate": 100.0
+      },
+      {
+        "name": "Backend Dev",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 90.0
+      },
+      {
+        "name": "Junior Dev",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 40.0
+      },
+      {
+        "name": "Tester",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 50.0
+      },
+      {
+        "name": "DevOps",
+        "max_hours_per_day": 8.0,
+        "exceptions": [],
+        "billing_rate": 110.0
+      }
+    ],
+    "baselines": [
+      {
+        "name": "Initial Plan",
+        "created_date": "2025-12-30T10:00:00",
+        "snapshots": [
+          {
+            "task_id": 1,
+            "task_name": "PlanIFlow V3 Project",
+            "start_date": "2026-01-01T08:00:00",
+            "end_date": "2026-02-10T17:00:00",
+            "duration": 30,
+            "percent_complete": 0,
+            "wbs": "1"
+          },
+          {
+            "task_id": 2,
+            "task_name": "Phase 1: Initiation",
+            "start_date": "2026-01-01T08:00:00",
+            "end_date": "2026-01-07T17:00:00",
+            "duration": 5,
+            "percent_complete": 0,
+            "wbs": "1.1"
+          },
+          {
+            "task_id": 3,
+            "task_name": "Kickoff Meeting",
+            "start_date": "2026-01-01T08:00:00",
+            "end_date": "2026-01-01T08:00:00",
+            "duration": 0,
+            "percent_complete": 0,
+            "wbs": "1.1.1"
+          },
+          {
+            "task_id": 4,
+            "task_name": "Gather Requirements",
+            "start_date": "2026-01-02T08:00:00",
+            "end_date": "2026-01-07T17:00:00",
+            "duration": 4,
+            "percent_complete": 0,
+            "wbs": "1.1.2"
+          },
+          {
+            "task_id": 5,
+            "task_name": "Phase 2: Development",
+            "start_date": "2026-01-08T08:00:00",
+            "end_date": "2026-01-25T17:00:00",
+            "duration": 12,
+            "percent_complete": 0,
+            "wbs": "1.2"
+          },
+          {
+            "task_id": 6,
+            "task_name": "Frontend Architecture",
+            "start_date": "2026-01-08T08:00:00",
+            "end_date": "2026-01-12T17:00:00",
+            "duration": 3,
+            "percent_complete": 0,
+            "wbs": "1.2.1"
+          },
+          {
+            "task_id": 7,
+            "task_name": "Backend DB Design",
+            "start_date": "2026-01-08T08:00:00",
+            "end_date": "2026-01-12T17:00:00",
+            "duration": 3,
+            "percent_complete": 0,
+            "wbs": "1.2.2"
+          },
+          {
+            "task_id": 8,
+            "task_name": "Implement API",
+            "start_date": "2026-01-13T08:00:00",
+            "end_date": "2026-01-18T17:00:00",
+            "duration": 4,
+            "percent_complete": 0,
+            "wbs": "1.2.3"
+          },
+          {
+            "task_id": 9,
+            "task_name": "Implement UI Components",
+            "start_date": "2026-01-13T08:00:00",
+            "end_date": "2026-01-25T17:00:00",
+            "duration": 9,
+            "percent_complete": 0,
+            "wbs": "1.2.4"
+          },
+          {
+            "task_id": 10,
+            "task_name": "Phase 3: Testing",
+            "start_date": "2026-01-26T08:00:00",
+            "end_date": "2026-02-10T17:00:00",
+            "duration": 11,
+            "percent_complete": 0,
+            "wbs": "1.3"
+          },
+          {
+            "task_id": 11,
+            "task_name": "Integration Testing",
+            "start_date": "2026-01-26T08:00:00",
+            "end_date": "2026-01-30T17:00:00",
+            "duration": 4,
+            "percent_complete": 0,
+            "wbs": "1.3.1"
+          },
+          {
+            "task_id": 12,
+            "task_name": "Bug Fixes",
+            "start_date": "2026-02-02T08:00:00",
+            "end_date": "2026-02-06T17:00:00",
+            "duration": 4,
+            "percent_complete": 0,
+            "wbs": "1.3.2"
+          },
+          {
+            "task_id": 13,
+            "task_name": "Deployment",
+            "start_date": "2026-02-09T08:00:00",
+            "end_date": "2026-02-10T17:00:00",
+            "duration": 2,
+            "percent_complete": 0,
+            "wbs": "1.4"
+          }
+        ]
+      }
+    ],
+    "calendar_settings": {
+      "working_days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "hours_per_day": 8.0,
+      "non_working_days": [
+        "2026-01-01"
+      ],
+      "custom_holidays": [
+        {
+          "name": "New Year",
+          "start_date": "2026-01-01",
+          "end_date": "2026-01-01",
+          "comment": "Happy New Year"
+        }
+      ],
+      "working_hours_start": "08:00",
+      "working_hours_end": "16:00"
+    }
+  },
+  "calendar_settings": {
+    "working_days": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "hours_per_day": 8.0,
+    "non_working_days": [
+      "2026-01-01"
+    ],
+    "custom_holidays": [
+      {
+        "name": "New Year",
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-01",
+        "comment": "Happy New Year"
+      }
+    ],
+    "working_hours_start": "08:00",
+    "working_hours_end": "16:00"
+  },
+  "project_settings": {
+    "duration_unit": "days",
+    "default_date_format": "yyyy-mm-dd",
+    "currency": "USD",
+    "app_font_size": 10,
+    "project_start_date": "2026-01-01T08:00:00"
+  },
+  "saved_at": "2026-01-14T02:38:08.889643",
+  "metadata": {
+    "total_tasks": 13,
+    "summary_tasks": 4,
+    "work_tasks": 9,
+    "total_resources": 7,
+    "overall_completion": 43.40136054421769,
+    "duration_unit": "days"
+  }
+}

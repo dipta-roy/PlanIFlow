@@ -118,7 +118,13 @@
                                 "type": "string",
                                 "enum": [
                                     "Auto Scheduled",
-                                    "Manually Scheduled"
+                                    "Manually Scheduled",
+                                    "Auto",
+                                    "Manual",
+                                    "A",
+                                    "M",
+                                    "(A)",
+                                    "(M)"
                                 ]
                             },
                             "font_family": {
@@ -273,6 +279,26 @@
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                },
+                "custom_holidays": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "start_date": {
+                                "type": "string"
+                            },
+                            "end_date": {
+                                "type": "string"
+                            },
+                            "comment": {
+                                "type": "string"
+                            }
+                        }
                     }
                 },
                 "working_hours_start": {

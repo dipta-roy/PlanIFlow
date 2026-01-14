@@ -1,25 +1,21 @@
 """ui_helpers.py - helper utilities extracted from ui_main.py"""
 
-
 import sys, os
 import base64
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QApplication
 from constants.app_images import LOGO_ICO_BASE64
 
-
 def get_resource_path(relative_path):
     """
     Get absolute path to resource, works for dev and for PyInstaller
     """
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except AttributeError:
         base_path = os.path.abspath(".")
     
     return os.path.join(base_path, relative_path)
-
 
 def set_application_icon(window, logo_base64=None):
     """Set application icon for window and QApplication using base64 encoded icon"""

@@ -1,5 +1,5 @@
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QGroupBox, QTableWidget, QHeaderView, QScrollArea, QTableWidgetItem
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QGroupBox, QTableWidget, QHeaderView, QScrollArea, QTableWidgetItem, QProgressBar, QPushButton
 from PyQt6.QtCore import Qt
 from datetime import datetime, timedelta
 from settings_manager.settings_manager import DurationUnit
@@ -32,7 +32,8 @@ def create_dashboard(main_window):
     main_window.total_resources_label = QLabel("Resources: 0")
     main_window.total_effort_label = QLabel("Effort: 0h")
 
-    main_window.total_cost_label = QLabel("Cost: $0.00")
+    symbol = main_window.data_manager.settings.currency.symbol
+    main_window.total_cost_label = QLabel(f"Cost: {symbol}0.00")
     
     # New status tiles
     main_window.upcoming_tasks_label = QLabel("Upcoming: 0/0")
@@ -82,6 +83,67 @@ def create_dashboard(main_window):
     # Charts Layout
     charts_layout = QHBoxLayout()
     layout.addLayout(charts_layout)
+    
+    # --- INTELLIGENCE DASHBOARD ---
+    intel_group = QGroupBox()
+    intel_group.setStyleSheet("""
+        QGroupBox {
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #E0E0E0;
+            margin-top: 10px;
+        }
+    """)
+    intel_layout = QVBoxLayout(intel_group)
+    intel_layout.setContentsMargins(15, 15, 15, 15)
+    
+    # 1. Header Row: Title + Action Button
+    header_layout = QHBoxLayout()
+    
+    title_label = QLabel("🧠 Smart Project Diagnosis")
+    title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #37474F;")
+    
+    main_window.refresh_intel_btn = QPushButton("🚀 Run Diagnosis")
+    main_window.refresh_intel_btn.setFixedWidth(150)
+    main_window.refresh_intel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    main_window.refresh_intel_btn.setStyleSheet("""
+        QPushButton {
+            background-color: #2196F3; 
+            color: white; 
+            font-weight: bold; 
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+        }
+        QPushButton:hover {
+            background-color: #1976D2;
+        }
+    """)
+    main_window.refresh_intel_btn.clicked.connect(main_window._run_intelligent_diagnosis)
+    
+    header_layout.addWidget(title_label)
+    header_layout.addStretch()
+    header_layout.addWidget(main_window.refresh_intel_btn)
+    
+    intel_layout.addLayout(header_layout)
+    
+    # 2. Progress Bar (slim line below header)
+    main_window.intel_progress = QProgressBar()
+    main_window.intel_progress.setFixedHeight(2)
+    main_window.intel_progress.setTextVisible(False)
+    main_window.intel_progress.setStyleSheet("QProgressBar { border: none; background: transparent; } QProgressBar::chunk { background-color: #2196F3; }")
+    main_window.intel_progress.setVisible(False)
+    intel_layout.addWidget(main_window.intel_progress)
+    
+    # 3. Results Area
+    main_window.intel_results_label = QLabel("AI-powered analysis of your schedule, cost, and risks will appear here.")
+    main_window.intel_results_label.setWordWrap(True)
+    main_window.intel_results_label.setStyleSheet("color: #78909C; font-style: italic; margin-top: 8px;")
+    
+    intel_layout.addWidget(main_window.intel_results_label)
+    
+    layout.addWidget(intel_group)
+    # ------------------------------
 
     # Task Status Pie Chart
     main_window.task_status_figure = Figure(figsize=(4, 4))
@@ -98,19 +160,16 @@ def create_dashboard(main_window):
     main_window.cost_trend_canvas = FigureCanvas(main_window.cost_trend_figure)
     charts_layout.addWidget(main_window.cost_trend_canvas)
 
-
-
-
     # Monthly/Daily Cost Breakdown
     layout.addWidget(QLabel("<h3>💰 Monthly/Daily Cost Breakdown</h3>"))
     cost_breakdown_group = QGroupBox()
     main_window.cost_breakdown_layout = QVBoxLayout(cost_breakdown_group)
     main_window.cost_breakdown_table = QTableWidget()
-    main_window.cost_breakdown_table.setMinimumHeight(200) # Increased height
+    main_window.cost_breakdown_table.setMinimumHeight(200)
     main_window.cost_breakdown_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
     main_window.cost_breakdown_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
     main_window.cost_breakdown_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-    main_window.cost_breakdown_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Set stretch mode here
+    main_window.cost_breakdown_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     main_window.cost_breakdown_layout.addWidget(main_window.cost_breakdown_table)
     layout.addWidget(cost_breakdown_group)
 
@@ -146,9 +205,6 @@ def update_dashboard(main_window):
                     # Assuming task_duration_hours is already in hours or converted to hours
                     # If duration unit is days, convert to hours using resource's max_hours_per_day
                     if data_manager.settings.duration_unit == DurationUnit.DAYS:
-                        # This is a simplification. A more accurate calculation would consider working days within the task duration.
-                        # For now, let's assume 8 hours per day if duration is in days.
-                        # Or, better, use calendar_manager.calculate_working_hours for the task duration.
                         task_hours_for_resource = data_manager.calendar_manager.calculate_working_hours(task.start_date, task.end_date, resource_exceptions=resource.exceptions) * (allocation_percent / 100.0)
                     else: # DurationUnit.HOURS
                         task_hours_for_resource = task_duration_hours * (allocation_percent / 100.0)
@@ -156,8 +212,9 @@ def update_dashboard(main_window):
                     total_effort += task_hours_for_resource
                     total_project_cost += task_hours_for_resource * resource.billing_rate
 
+    symbol = data_manager.settings.currency.symbol
     main_window.total_effort_label.setText(f"Effort: {total_effort:.0f}h")
-    main_window.total_cost_label.setText(f"Cost: ${total_project_cost:.2f}")
+    main_window.total_cost_label.setText(f"Cost: {symbol}{total_project_cost:.2f}")
 
     # Calculate task status counts
     upcoming_count = 0
@@ -167,7 +224,7 @@ def update_dashboard(main_window):
     total_work_tasks = 0
 
     for task in data_manager.tasks:
-        if not task.is_summary: # Only count non-summary tasks for status breakdown
+        if not task.is_summary:
             total_work_tasks += 1
             status = task.get_status()
             if status == TaskStatus.UPCOMING:
@@ -254,7 +311,7 @@ def update_task_status_pie_chart(main_window, upcoming_count, in_progress_count,
 
     ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%',
            shadow=True, startangle=140, textprops={'fontsize': 8})
-    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    ax.axis('equal')
     ax.set_title('Task Status Breakdown', fontsize=10)
 
     main_window.task_status_canvas.draw()
@@ -390,10 +447,20 @@ def update_cost_trend_line_chart(main_window, data_manager):
         ax.plot(dates, costs, marker='o', linestyle='-', markersize=2)
         ax.set_title(title, fontsize=10)
         ax.set_xlabel('Date', fontsize=8)
-        ax.set_ylabel('Cost ($)', fontsize=8)
+        symbol = data_manager.settings.currency.symbol
+        ax.set_ylabel(f'Cost ({symbol})', fontsize=8)
         ax.tick_params(axis='x', rotation=45, labelsize=7)
         ax.tick_params(axis='y', labelsize=8)
         ax.grid(True)
         main_window.cost_trend_figure.tight_layout()
 
     main_window.cost_trend_canvas.draw()
+
+def clear_dashboard(main_window):
+    """Reset dashboard Smart Diagnosis section."""
+    if hasattr(main_window, 'intel_results_label'):
+        main_window.intel_results_label.setText("AI-powered analysis of your schedule, cost, and risks will appear here.")
+        main_window.intel_results_label.setStyleSheet("color: #78909C; font-style: italic; margin-top: 8px;")
+    
+    if hasattr(main_window, 'intel_progress'):
+        main_window.intel_progress.setVisible(False)

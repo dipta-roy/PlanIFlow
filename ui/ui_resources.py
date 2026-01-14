@@ -19,9 +19,10 @@ class ResourceSheet(QWidget):
         # Resource table
         self.resource_table = QTableWidget()
         self.resource_table.setColumnCount(8) 
+        symbol = self.data_manager.settings.currency.symbol
         self.resource_table.setHorizontalHeaderLabels([
             "Resource Name", "Max Hours/Day", "Total Hours", 
-            "Tasks Assigned", "Billing Rate ($/hr)", "Total Amount ($)", "Exceptions", "Status"
+            "Tasks Assigned", f"Billing Rate ({symbol}/hr)", f"Total Amount ({symbol})", "Exceptions", "Status"
         ])
         # Add tooltips to headers
         header = self.resource_table.horizontalHeader()
@@ -30,7 +31,7 @@ class ResourceSheet(QWidget):
             "The maximum number of hours the resource can work per day.",
             "The total hours assigned to the resource across all tasks.",
             "The number of tasks assigned to the resource.",
-            "The billing rate for the resource in dollars per hour.",
+            "The billing rate for the resource in currency per hour.",
             "The total cost for the resource (Total Hours * Billing Rate).",
             "Dates or date ranges when the resource is unavailable.",
             "The allocation status of the resource (e.g., OK, Over-allocated)."
@@ -58,25 +59,22 @@ class ResourceSheet(QWidget):
         header.setStretchLastSection(False)
 
         # Set default width for Resource Name column
-        self.resource_table.setColumnWidth(0, 200)
-        
-        self.resource_table.setColumnWidth(1, 120)
-        self.resource_table.setColumnWidth(2, 120)
-        self.resource_table.setColumnWidth(3, 120)
+        self.resource_table.setColumnWidth(0, 250)
+        self.resource_table.setColumnWidth(1, 100)
+        self.resource_table.setColumnWidth(2, 100)
+        self.resource_table.setColumnWidth(3, 100)
         self.resource_table.setColumnWidth(4, 120)
         self.resource_table.setColumnWidth(5, 120)
-        
         self.resource_table.setColumnWidth(6, 900)
         self.resource_table.setColumnWidth(7, 100)
         
-        layout.addWidget(QLabel("<h3>Resource Allocation</h3>"))
+        #layout.addWidget(QLabel("<h3>Resource Allocation</h3>"))
         layout.addWidget(self.resource_table)
         
         # Warnings
         self.resource_warnings = QTextEdit()
         self.resource_warnings.setReadOnly(True)
         self.resource_warnings.setMaximumHeight(150)
-        
         layout.addWidget(QLabel("<h3>⚠️ Over-Allocation Warnings</h3>"))
         layout.addWidget(self.resource_warnings)
 
@@ -88,17 +86,13 @@ class ResourceSheet(QWidget):
         
         row = item.row()
         resource_name = self.resource_table.item(row, 0).text()
-        
         menu = QMenu(self)
-        
         edit_action = QAction("✏️ Edit Resource", self)
         edit_action.triggered.connect(self._edit_resource_dialog)
         menu.addAction(edit_action)
-        
         delete_action = QAction("🗑️ Delete Resource", self)
         delete_action.triggered.connect(self._delete_resource)
         menu.addAction(delete_action)
-        
         menu.exec(self.resource_table.mapToGlobal(position))
 
     def _edit_resource_dialog(self):
@@ -113,16 +107,13 @@ class ResourceSheet(QWidget):
         resource = self.data_manager.get_resource(resource_name)
         
         if resource:
-            dialog = ResourceDialog(self, resource)
+            dialog = ResourceDialog(self, self.data_manager, resource)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 resource_data = dialog.get_resource_data()
-                
-                # Ensure types
                 resource_data['billing_rate'] = float(resource_data.get('billing_rate', 0.0))
                 
                 def on_success():
                     self.parent_window._update_all_views()
-                    # If name changed, status message might use new name
                     new_name = resource_data['name']
                     self.parent_window.status_label.setText(f"Resource '{new_name}' updated")
                 
@@ -133,7 +124,7 @@ class ResourceSheet(QWidget):
 
     def _add_resource_dialog(self):
         """Show add resource dialog"""
-        dialog = ResourceDialog(self)
+        dialog = ResourceDialog(self, self.data_manager)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             resource_data = dialog.get_resource_data()
             
@@ -178,6 +169,13 @@ class ResourceSheet(QWidget):
 
     def update_summary(self):
         """Update resource summary"""
+        # Refresh header labels to update currency symbols
+        symbol = self.data_manager.settings.currency.symbol
+        self.resource_table.setHorizontalHeaderLabels([
+            "Resource Name", "Max Hours/Day", "Total Hours", 
+            "Tasks Assigned", f"Billing Rate ({symbol}/hr)", f"Total Amount ({symbol})", "Exceptions", "Status"
+        ])
+
         self.resource_table.setRowCount(0)
         
         allocation = self.data_manager.get_resource_allocation()
@@ -200,8 +198,8 @@ class ResourceSheet(QWidget):
             self.resource_table.setItem(row, 1, QTableWidgetItem(str(resource.max_hours_per_day)))
             self.resource_table.setItem(row, 2, QTableWidgetItem(f"{total_hours:.1f}"))
             self.resource_table.setItem(row, 3, QTableWidgetItem(str(tasks_assigned)))
-            self.resource_table.setItem(row, 4, QTableWidgetItem(f"{resource.billing_rate:.2f}"))
-            self.resource_table.setItem(row, 5, QTableWidgetItem(f"{alloc.get('total_amount', 0.0):.2f}"))
+            self.resource_table.setItem(row, 4, QTableWidgetItem(f"{symbol}{resource.billing_rate:.2f}"))
+            self.resource_table.setItem(row, 5, QTableWidgetItem(f"{symbol}{alloc.get('total_amount', 0.0):.2f}"))
             self.resource_table.setItem(row, 6, QTableWidgetItem(", ".join(resource.exceptions))) 
             self.resource_table.setItem(row, 7, QTableWidgetItem(status))
         

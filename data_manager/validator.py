@@ -8,18 +8,14 @@ class ProjectValidator:
     """Validator for project data in JSON and Excel formats"""
     
     if getattr(sys, 'frozen', False):
-        # Running in a frozen bundle (cx_Freeze / PyInstaller)
-        # We expect data_manager/project_schema.json relative to the executable dir
-        # or the lib dir depending on how it was packed.
-        # With our current setup, it is in {INSTALL_DIR}/data_manager/project_schema.json
         base_dir = os.path.dirname(sys.executable)
         SCHEMA_PATH = os.path.join(base_dir, 'data_manager', 'project_schema.json')
     else:
         # Running in normal Python environment
         SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'project_schema.json')
 
-    MAX_TASKS = 10000  # Security limit to prevent DoS
-    MAX_STR_LEN = 250  # Limit for names and notes
+    MAX_TASKS = 10000 
+    MAX_STR_LEN = 250 
     
     @staticmethod
     def validate_json(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -77,9 +73,6 @@ class ProjectValidator:
 
                 # 4. Check date logic
                 try:
-                    # These are strings in JSON, need to parse them to compare
-                    # Note: We don't have the DataManager's date format here, 
-                    # but we can try common ones or just isoformat if it's from our app
                     from dateutil.parser import parse
                     start = parse(task['start_date'])
                     end = parse(task['end_date'])
@@ -120,9 +113,6 @@ class ProjectValidator:
             logging.error(f"Schema file not found at {ProjectValidator.SCHEMA_PATH}")
             return False, ["Validation schema file missing."]
         except ValidationError as e:
-            # ValidationError is now locally imported, so we need to handle it carefully
-            # or use a generic exception if we can't import it.
-            # Actually, if it's not imported, we already returned above.
             path = " -> ".join(map(str, e.path)) if e.path else "root"
             return False, [f"JSON Validation Error at {path}: {e.message}"]
         except Exception as e:
@@ -165,9 +155,6 @@ class ProjectValidator:
         s_str = str(s).strip()
         if len(s_str) > ProjectValidator.MAX_STR_LEN:
             s_str = s_str[:ProjectValidator.MAX_STR_LEN]
-        
-        # Simple character sanitization: remove potential control characters
-        # We can expand this if specific special characters are problematic
         return "".join(char for char in s_str if ord(char) >= 32 or char in '\n\r\t')
 
     @staticmethod
@@ -235,8 +222,9 @@ class ProjectValidator:
 
                 # Validate Schedule Mode if exists
                 if 'Schedule Mode' in df_tasks.columns:
-                    mode = str(row['Schedule Mode'])
-                    if mode not in ['Auto Scheduled', 'Manually Scheduled']:
+                    mode = str(row['Schedule Mode']).strip()
+                    allowed_modes = ['Auto Scheduled', 'Manually Scheduled', 'Auto', 'Manual', 'A', 'M', '(A)', '(M)']
+                    if mode not in allowed_modes:
                         errors.append(f"Task '{task_name}' (ID {task_id}) has invalid Schedule Mode: '{mode}'")
 
                 # 4. Logical validation
@@ -295,8 +283,6 @@ class ProjectValidator:
                                 type_match = re.match(r'^([A-Z\-]+)', content)
                                 if type_match:
                                     dep_val = type_match.group(1).strip()
-                                    # We don't necessarily need to check if it's in valid_dep_values here 
-                                    # because the import logic handles fallbacks, but let's be strict if we want "validation"
                                 else:
                                     errors.append(f"Task '{task_name}' (ID {task_id}) has invalid dependency type format: '{item}'")
                             else:

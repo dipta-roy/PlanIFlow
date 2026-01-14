@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from settings_manager.settings_manager import DateFormat
 
-
 class TaskSnapshot:
     """Snapshot of a task's state at a specific point in time"""
     

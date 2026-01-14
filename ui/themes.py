@@ -60,7 +60,6 @@ class ThemeManager:
         app.setPalette(dark_palette)
     
     @staticmethod
-    @staticmethod
     def get_stylesheet(dark_mode: bool, font_size: int = 9) -> str:
         """Get additional stylesheet for widgets"""
         

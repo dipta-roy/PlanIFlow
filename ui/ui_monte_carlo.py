@@ -86,7 +86,6 @@ class MonteCarloTab(QWidget):
         # Controls
         controls_group = QGroupBox("Simulation Settings")
         controls_layout = QHBoxLayout()
-        
         controls_layout.addWidget(QLabel("Iterations:"))
         self.iterations_spin = QSpinBox()
         self.iterations_spin.setRange(100, 10000)
@@ -98,13 +97,13 @@ class MonteCarloTab(QWidget):
         self.run_btn.clicked.connect(self.run_simulation)
         controls_layout.addWidget(self.run_btn)
         
+        controls_layout.addStretch()
+
         self.help_btn = QPushButton("About Monte Carlo")
         self.help_btn.setFixedWidth(150)
         self.help_btn.setToolTip("About Monte Carlo Analysis")
         self.help_btn.clicked.connect(self.show_help)
         controls_layout.addWidget(self.help_btn)
-        
-        controls_layout.addStretch()
         controls_group.setLayout(controls_layout)
         layout.addWidget(controls_group)
         
@@ -290,6 +289,6 @@ class MonteCarloTab(QWidget):
         report.append(f"Based on the simulation, there is a reasonable likelihood of completing the project by {fmt(results.get('p50_date'))} (P50).")
         report.append(f"However, to be 80% confident, planning toward {fmt(results.get('p80_date'))} is safer.")
         if results.get('stdev_days', 0) > 5:
-             report.append("High variance indicates significant schedule risk.")
+             report.append("\nHigh variance indicates significant schedule risk.")
         
         self.results_text.setText("\n".join(report))

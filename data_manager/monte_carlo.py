@@ -26,10 +26,7 @@ class SimulatedTask:
         self.simulated_duration = 0.0
         self.start_date: datetime = task.start_date
         self.end_date: datetime = task.end_date
-        
-        # Determine duration range (Triangle distribution parameters)
-        # Rule: If uncertainty ranges are missing, assume ±25%
-        # We assume the current duration is the "Most Likely" (mode)
+
         self.mode_duration = float(self.base_duration_days)
         self.min_duration = self.mode_duration * 0.75
         self.max_duration = self.mode_duration * 1.25
@@ -40,10 +37,8 @@ class SimulatedTask:
         if self.is_milestone or self.is_summary:
             self.simulated_duration = 0.0
         else:
-            # Triangular distribution
-            # Ensure non-negative
             low = max(0.1, self.min_duration)
-            high = max(low, self.max_duration) # High must be >= low
+            high = max(low, self.max_duration)
             mode = max(low, min(high, self.mode_duration))
             
             self.simulated_duration = random.triangular(low, high, mode)
@@ -85,10 +80,6 @@ class MonteCarloSimulator:
             'critical_tasks': {} # Counter for tasks on critical path
         }
         
-        # Cache working hours for speed (avoid repeated lookups in loops if possible)
-        # But CalendarManager methods are needed.
-        # Optimizing: We will assume standard logic call overhead is acceptable for 1000 iter.
-        
         for i in range(iterations):
             self._run_single_iteration(results)
             
@@ -100,16 +91,6 @@ class MonteCarloSimulator:
         # 1. Randomize Durations
         for task in self._sim_tasks.values():
             task.randomize_duration()
-            
-        # 2. Calculate Dates (CPM)
-        # We need a queue-based approach similar to DataManager but simplified
-        # Since we randomized everything, we should probably just reset start times 
-        # or rely on propagation.
-        # A Topological Sort is better for a full recalc.
-        
-        # Build dependency graph for sort
-        # Nodes: Task IDs
-        # Edges: Predecessor -> Task
         in_degree = {uid: 0 for uid in self._sim_tasks}
         graph = {uid: [] for uid in self._sim_tasks}
         
@@ -130,8 +111,6 @@ class MonteCarloSimulator:
                 in_degree[v] -= 1
                 if in_degree[v] == 0:
                     queue.append(v)
-        
-        # Handle cycles if any (though unlikely if validated by app)
         if len(topo_order) < len(self._sim_tasks):
             # Fallback: add remaining tasks
             remain = [uid for uid in self._sim_tasks if uid not in topo_order]
@@ -139,33 +118,11 @@ class MonteCarloSimulator:
             
         # 3. Calculate Dates in Topo Order
         project_start = self.original_tasks[0].start_date if self.original_tasks else datetime.now() 
-        # Find earliest start from original tasks as anchor? 
-        # Or anchor tasks with no predecessors to Project Start?
-        # DataManager doesn't enforce a project start, tasks just float or have constraints.
-        # "If no prefixes, reset to original start date" (from DataManager)
-        
-        # We will follow top-down pass for dependencies
-        
+       
         for uid in topo_order:
             task = self._sim_tasks[uid]
             self._calculate_task_dates(task)
-            
-            # If it's a summary task, we might need to update it from children?
-            # But children might be processed later in Topo Order if they depend on other things?
-            # Actually, hierarchy is separate from dependency.
-            # Realistically, Summary tasks are containers.
-            # We should calculate Leaf tasks first? 
-            # Limitation: The simple Topo Sort handles dependencies. 
-            # It doesn't handle "Summary task expands to encompass children".
-            # We need a second pass or iterative pass for Summary Tasks.
             pass
-
-        # 4. Bubble up Summary Dates (Bottom-Up by Hierarchy)
-        # Sort by level deep to shallow
-        # We can just iterate multiple times or sort by hierarchy level
-        # Assuming DataManager level logic is correct
-        
-        # Get hierarchy levels
         levels = []
         for uid, task in self._sim_tasks.items():
             # Calculate level (inefficient but safe)
@@ -217,26 +174,14 @@ class MonteCarloSimulator:
     def _calculate_task_dates(self, task: SimulatedTask):
         """Calculate start and end dates based on predecessors"""
         if not task.predecessors:
-            # Keep original start date anchor if no predecessors
-            # (Assuming original start date is valid anchor)
-            # Recalculate end based on new duration
             duration_days = int(round(task.simulated_duration))
             if duration_days < 0: duration_days = 0
-            
-            # Using simplified calendar math for speed if possible
-            # But consistency matters.
-            # task.start_date is already set from init (original start)
-            
-            # Logic from DataManager:
             if task.is_milestone:
                 task.end_date = task.start_date
             else:
                 task.end_date = self.calendar_manager.add_working_days(
                     task.start_date, max(0, duration_days - 1)
-                ) # -1 because start day counts
-                # Fix time to end of day? 
-                # DataManager uses add_working_days which returns date (often preserved time or midnight). 
-                # Simplification: Stick to dates.
+                ) 
             return
 
         # Has predecessors
@@ -251,18 +196,8 @@ class MonteCarloSimulator:
             lag = timedelta(days=lag_days)
             
             if dep_type == DependencyType.FS:
-                # Simplification: Only FS supported for now properly? 
-                # DataManager supports all. 
-                # Let's try basic FS logic.
-                
-                # Pred Finish -> Start
-                # Add 1 day if not same day start? 
-                # DataManager: constraint_start = pred.end_date + lag (days) ... logic
-                
-                # Using CalendarManager
                 try:
                     constraint_start = self.calendar_manager.add_working_days(pred.end_date, lag_days)
-                    # Loophole: DataManager adds 1 day if pred is regular task (Finish -> Next Morning Start)
                     if not pred.is_milestone:
                          constraint_start = self.calendar_manager.add_working_days(constraint_start, 1)
 
@@ -321,12 +256,7 @@ class MonteCarloSimulator:
         p50_date = dates[p50_idx]
         p80_date = dates[p80_idx]
         p90_date = dates[p90_idx]
-        
-        # Mean duration (days from today? or just project duration?)
-        # Let's calc duration from earliest start of first run (or avg start?)
-        # We'll just return the dates and formatted strings.
-        
-        # Calc standard deviation of completion timestamp
+
         timestamps = [d.timestamp() for d in dates]
         mean_ts = statistics.mean(timestamps)
         try:

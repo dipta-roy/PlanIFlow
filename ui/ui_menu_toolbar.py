@@ -1,6 +1,5 @@
 """ui_menu_toolbar.py - functions to build menu bar and toolbar for MainWindow"""
 
-
 from PyQt6.QtGui import QAction, QPixmap
 import base64
 from PyQt6.QtCore import Qt, QSize
@@ -17,7 +16,9 @@ def create_menu_bar(window):
     new_action.setShortcut("Ctrl+N")
     new_action.triggered.connect(window._new_project)
     file_menu.addAction(new_action)
+
     file_menu.addSeparator()
+    
     open_action = QAction("&Open Project...", window)
     open_action.setShortcut("Ctrl+O")
     open_action.triggered.connect(window._open_project)
@@ -58,7 +59,6 @@ def create_menu_bar(window):
     exit_action.setShortcut("Ctrl+Q")
     exit_action.triggered.connect(window.close)
     file_menu.addAction(exit_action)
-
 
     edit_menu = menubar.addMenu("&Edit")
     # Add Task
@@ -160,6 +160,7 @@ def create_menu_bar(window):
     format_menu.addSeparator()
     
     clear_format_action = QAction("&Clear Formatting", window)
+    clear_format_action.setShortcut("Ctrl+Shift+X")
     clear_format_action.triggered.connect(window._clear_formatting)
     format_menu.addAction(clear_format_action)
 
@@ -175,7 +176,7 @@ def create_menu_bar(window):
 
     window.auto_refresh_action = QAction("&Auto-Refresh", window)
     window.auto_refresh_action.setCheckable(True)
-    window.auto_refresh_action.setChecked(True)  # Default ON
+    window.auto_refresh_action.setChecked(True)
     window.auto_refresh_action.triggered.connect(window._toggle_auto_refresh)
     view_menu.addAction(window.auto_refresh_action)
 
@@ -200,13 +201,20 @@ def create_menu_bar(window):
 
     window.toggle_wbs_action = QAction("&Show WBS Column", window)
     window.toggle_wbs_action.setCheckable(True)
-    window.toggle_wbs_action.setChecked(True) # Default to visible
+    window.toggle_wbs_action.setChecked(True)
     window.toggle_wbs_action.triggered.connect(window._toggle_wbs_column_visibility)
     view_menu.addAction(window.toggle_wbs_action)
 
     view_menu.addSeparator()
 
     sort_menu = view_menu.addMenu("&Sort By")
+    window.sort_menu = sort_menu
+
+    window.sort_wbs_action = QAction("&WBS", window)
+    window.sort_wbs_action.setVisible(window.toggle_wbs_action.isChecked())
+    window.sort_wbs_action.triggered.connect(lambda: window._sort_by_column(3))
+    sort_menu.addAction(window.sort_wbs_action)
+
 
     sort_id_action = QAction("Task &ID", window)
     sort_id_action.triggered.connect(lambda: window._sort_by_column(2))
@@ -263,8 +271,6 @@ def create_menu_bar(window):
     project_settings_action.triggered.connect(window._show_project_settings_dialog)
     settings_menu.addAction(project_settings_action)
     
-    # Removed separate Calendar and Date Format actions as they are now tabs in Project Settings
-    
     settings_menu.addSeparator()
     
     # Baseline Management
@@ -290,6 +296,10 @@ def create_menu_bar(window):
     mc_help_action = QAction("Monte Carlo &Analysis Help", window)
     mc_help_action.triggered.connect(window._show_monte_carlo_help)
     help_menu.addAction(mc_help_action)
+
+    evm_help_action = QAction("&EVM Analysis Help", window)
+    evm_help_action.triggered.connect(window._show_evm_help)
+    help_menu.addAction(evm_help_action)
 
     about_action = QAction("&About", window)
     about_action.triggered.connect(window._show_about)
@@ -325,7 +335,6 @@ def create_toolbar(window):
             logo_label.setStyleSheet("padding: 5px;")
             toolbar.addWidget(logo_label)
             
-            # Add separator after logo
             toolbar.addSeparator()
     except Exception as e:
         print(f"Error loading logo: {e}")
@@ -390,6 +399,24 @@ def create_toolbar(window):
     insert_task_btn.triggered.connect(window._insert_task_below)
     toolbar.addAction(insert_task_btn)
 
+    expand_selected_btn = QAction("⊕", window)
+    expand_selected_btn.setToolTip("Expand selected summary task and all subtasks")
+    expand_selected_btn.triggered.connect(window._expand_selected)
+    toolbar.addAction(expand_selected_btn)
+
+    toolbar.addSeparator()
+
+    # Move Options
+    move_up_btn = QAction("⬆", window)
+    move_up_btn.setToolTip("Move Task Up")
+    move_up_btn.triggered.connect(window._move_task_up)
+    toolbar.addAction(move_up_btn)
+
+    move_down_btn = QAction("⬇", window)
+    move_down_btn.setToolTip("Move Task Down")
+    move_down_btn.triggered.connect(window._move_task_down)
+    toolbar.addAction(move_down_btn)
+
     toolbar.addSeparator()
 
     # Hierarchy Management
@@ -450,16 +477,18 @@ def create_toolbar(window):
 
     toolbar.addSeparator()
 
-    # *** ADD EXPAND/COLLAPSE BUTTONS ***
-    expand_selected_btn = QAction("⊕", window)
-    expand_selected_btn.setToolTip("Expand selected summary task and all subtasks")
-    expand_selected_btn.triggered.connect(window._expand_selected)
-    toolbar.addAction(expand_selected_btn)
-
     # Resource Management
     add_resource_btn = QAction("👤", window)
     add_resource_btn.setToolTip("Add Resource")
     add_resource_btn.triggered.connect(window._add_resource_dialog)
     toolbar.addAction(add_resource_btn)
+
+    toolbar.addSeparator()
+
+    # EVM Analysis
+    refresh_evm_btn = QAction("📈", window)
+    refresh_evm_btn.setToolTip("Refresh EVM Analysis")
+    refresh_evm_btn.triggered.connect(lambda: window.tabs.setCurrentIndex(5) or window.evm_tab.refresh_data())
+    toolbar.addAction(refresh_evm_btn)
 
 

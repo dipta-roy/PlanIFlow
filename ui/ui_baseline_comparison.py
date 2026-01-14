@@ -11,7 +11,6 @@ from PyQt6.QtCore import Qt, QModelIndex
 
 import pandas as pd
 
-
 class BaselineStatusDelegate(QStyledItemDelegate):
     """Delegate to draw status indicator circle"""
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
@@ -55,7 +54,6 @@ class BaselineStatusDelegate(QStyledItemDelegate):
         
         painter.restore()
 
-
 class BaselineComparisonTab(QWidget):
     """Tab for comparing current project against baselines"""
     
@@ -65,7 +63,7 @@ class BaselineComparisonTab(QWidget):
         self.current_comparison = None
         
         self._create_ui()
-        self.refresh_baselines()  # Populate dropdown on initialization
+        self.refresh_baselines()
     
     def showEvent(self, event):
         """Refresh baselines when tab becomes visible"""
@@ -97,29 +95,116 @@ class BaselineComparisonTab(QWidget):
         
         layout.addLayout(header_layout)
         
-        # Summary statistics
-        self.summary_group = QGroupBox("Comparison Summary")
-        summary_layout = QFormLayout(self.summary_group)
+        # Summary statistics - Professional Card Layout
+        self.summary_group = QGroupBox("📊 Comparison Summary")
+        self.summary_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 13px;
+                border: 1px solid #D0D0D0;
+                border-radius: 8px;
+                margin-top: 5px;
+                padding-top: 8px;
+                background-color: #FAFAFA;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0 5px;
+                color: #37474F;
+            }
+        """)
+        summary_main_layout = QVBoxLayout(self.summary_group)
+        summary_main_layout.setSpacing(5)
         
+        # Baseline Info Header
+        info_widget = QWidget()
+        info_widget.setStyleSheet("""
+            QWidget {
+                background-color: #37474F;
+                border-radius: 6px;
+                padding: 4px;
+            }
+        """)
+        info_layout = QHBoxLayout(info_widget)
+        info_layout.setContentsMargins(10, 2, 10, 2)
+        
+        baseline_info_label = QLabel("📅 Baseline Date:")
+        baseline_info_label.setStyleSheet("font-weight: bold; color: white; font-size: 10pt;")
         self.baseline_date_label = QLabel("-")
-        self.total_tasks_label = QLabel("-")
-        self.on_track_label = QLabel("-")
-        self.late_label = QLabel("-")
-        self.early_label = QLabel("-")
-        self.new_tasks_label = QLabel("-")
-        self.deleted_tasks_label = QLabel("-")
-        self.avg_duration_var_label = QLabel("-")
-        self.avg_completion_var_label = QLabel("-")
+        self.baseline_date_label.setStyleSheet("color: white; font-weight: 600; font-size: 10pt;")
         
-        summary_layout.addRow("Baseline Date:", self.baseline_date_label)
-        summary_layout.addRow("Total Tasks:", self.total_tasks_label)
-        summary_layout.addRow("On Track:", self.on_track_label)
-        summary_layout.addRow("Late:", self.late_label)
-        summary_layout.addRow("Early:", self.early_label)
-        summary_layout.addRow("New Tasks:", self.new_tasks_label)
-        summary_layout.addRow("Deleted Tasks:", self.deleted_tasks_label)
-        summary_layout.addRow("Avg Duration Variance:", self.avg_duration_var_label)
-        summary_layout.addRow("Avg Completion Variance:", self.avg_completion_var_label)
+        info_layout.addWidget(baseline_info_label)
+        info_layout.addWidget(self.baseline_date_label)
+        info_layout.addStretch()
+        
+        summary_main_layout.addWidget(info_widget)
+        
+        # Status Metrics - Consistent Card Layout
+        status_container = QWidget()
+        status_layout = QHBoxLayout(status_container)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(5)
+        
+        # Helper function to create consistent metric cards
+        def create_metric_card(title, icon):
+            card = QWidget()
+            card.setStyleSheet("""
+                QWidget {
+                    background-color: white;
+                    border-radius: 6px;
+                }
+            """)
+            card.setFixedHeight(60)
+            
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(5, 2, 5, 2)
+            card_layout.setSpacing(0)
+            
+            # Icon and title row
+            header_layout = QHBoxLayout()
+            icon_label = QLabel(icon)
+            icon_label.setStyleSheet("font-size: 12pt; background: transparent;")
+            
+            title_label = QLabel(title)
+            title_label.setStyleSheet("font-weight: 600; color: #546E7A; font-size: 9pt; background: transparent;")
+            
+            header_layout.addWidget(icon_label)
+            header_layout.addWidget(title_label)
+            header_layout.addStretch()
+            
+            card_layout.addLayout(header_layout)
+            
+            # Value label
+            value_label = QLabel("-")
+            value_label.setStyleSheet("font-weight: bold; font-size: 20pt; color: #37474F; background: transparent;")
+            value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_layout.addWidget(value_label)
+            
+            return card, value_label
+        
+        # Create metric cards with consistent styling
+        total_card, self.total_tasks_label = create_metric_card("Total", "📋")
+        on_track_card, self.on_track_label = create_metric_card("On Track", "✓")
+        late_card, self.late_label = create_metric_card("Late", "⚠")
+        early_card, self.early_label = create_metric_card("Early", "⚡")
+        new_card, self.new_tasks_label = create_metric_card("New", "➕")
+        deleted_card, self.deleted_tasks_label = create_metric_card("Deleted", "✖")
+        
+        # Add variance cards to the same row
+        duration_card, self.avg_duration_var_label = create_metric_card("Avg Dur. Var", "📏")
+        completion_card, self.avg_completion_var_label = create_metric_card("Avg Comp. Var", "📊")
+        
+        status_layout.addWidget(total_card)
+        status_layout.addWidget(on_track_card)
+        status_layout.addWidget(late_card)
+        status_layout.addWidget(early_card)
+        status_layout.addWidget(new_card)
+        status_layout.addWidget(deleted_card)
+        status_layout.addWidget(duration_card)
+        status_layout.addWidget(completion_card)
+        
+        summary_main_layout.addWidget(status_container)
         
         layout.addWidget(self.summary_group)
         
@@ -236,48 +321,43 @@ class BaselineComparisonTab(QWidget):
         self._update_summary(comparison_data['summary'], comparison_data['baseline_date'])
         self._update_comparison_tree(comparison_data['comparisons'])
     
+    
     def _update_summary(self, summary, baseline_date):
         """Update summary statistics"""
-        self.baseline_date_label.setText(baseline_date.strftime('%Y-%m-%d %H:%M:%S'))
-        self.total_tasks_label.setText(str(summary['total_tasks']))
-        self.on_track_label.setText(str(summary['tasks_on_track']))
+        # Define consistent value label style
+        value_style = "font-weight: bold; font-size: 20pt; color: #37474F; background: transparent;"
         
-        # Color code late/early
+        self.baseline_date_label.setText(baseline_date.strftime('%Y-%m-%d %H:%M:%S'))
+        
+        self.total_tasks_label.setText(str(summary['total_tasks']))
+        self.total_tasks_label.setStyleSheet(value_style)
+        
+        self.on_track_label.setText(str(summary['tasks_on_track']))
+        self.on_track_label.setStyleSheet(value_style)
+        
+        # Update late/early counts
         late_count = summary['tasks_late']
         self.late_label.setText(str(late_count))
-        if late_count > 0:
-            self.late_label.setStyleSheet("color: #D32F2F; font-weight: bold;")
-        else:
-            self.late_label.setStyleSheet("")
+        self.late_label.setStyleSheet(value_style)
         
         early_count = summary['tasks_early']
         self.early_label.setText(str(early_count))
-        if early_count > 0:
-            self.early_label.setStyleSheet("color: #388E3C; font-weight: bold;")
-        else:
-            self.early_label.setStyleSheet("")
+        self.early_label.setStyleSheet(value_style)
         
         self.new_tasks_label.setText(str(summary['tasks_new']))
-        self.deleted_tasks_label.setText(str(summary['tasks_deleted']))
+        self.new_tasks_label.setStyleSheet(value_style)
         
-        # Format variances
+        self.deleted_tasks_label.setText(str(summary['tasks_deleted']))
+        self.deleted_tasks_label.setStyleSheet(value_style)
+        
+        # Format variances - simple numeric format
         duration_var = summary['avg_duration_variance']
-        self.avg_duration_var_label.setText(f"{duration_var:+.2f}")
-        if duration_var > 0:
-            self.avg_duration_var_label.setStyleSheet("color: #D32F2F;")
-        elif duration_var < 0:
-            self.avg_duration_var_label.setStyleSheet("color: #388E3C;")
-        else:
-            self.avg_duration_var_label.setStyleSheet("")
+        self.avg_duration_var_label.setText(f"{duration_var:.1f}")
+        self.avg_duration_var_label.setStyleSheet(value_style)
         
         completion_var = summary['avg_completion_variance']
-        self.avg_completion_var_label.setText(f"{completion_var:+.1f}%")
-        if completion_var < 0:
-            self.avg_completion_var_label.setStyleSheet("color: #D32F2F;")
-        elif completion_var > 0:
-            self.avg_completion_var_label.setStyleSheet("color: #388E3C;")
-        else:
-            self.avg_completion_var_label.setStyleSheet("")
+        self.avg_completion_var_label.setText(f"{completion_var:.1f}")
+        self.avg_completion_var_label.setStyleSheet(value_style)
     
     def _update_comparison_tree(self, comparisons):
         """Update the comparison tree with task data"""
@@ -418,11 +498,12 @@ class BaselineComparisonTab(QWidget):
         self.avg_duration_var_label.setText("-")
         self.avg_completion_var_label.setText("-")
         
-        # Clear styles
-        self.late_label.setStyleSheet("")
-        self.early_label.setStyleSheet("")
-        self.avg_duration_var_label.setStyleSheet("")
-        self.avg_completion_var_label.setStyleSheet("")
+        # Restore consistent style even when cleared
+        value_style = "font-weight: bold; font-size: 20pt; color: #37474F; background: transparent;"
+        self.late_label.setStyleSheet(value_style)
+        self.early_label.setStyleSheet(value_style)
+        self.avg_duration_var_label.setStyleSheet(value_style)
+        self.avg_completion_var_label.setStyleSheet(value_style)
     
     def _export_comparison(self):
         """Export baseline comparison to Excel"""
@@ -522,8 +603,19 @@ class BaselineComparisonTab(QWidget):
                     max_length = max(len(str(cell.value)) for cell in col)
                     comparison_sheet.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
             
-            QMessageBox.information(self, "Success", 
-                                  f"Baseline comparison exported successfully to:\n{file_path}")
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Success")
+            msg_box.setText(f"Baseline comparison exported successfully to:\n{file_path}")
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            
+            open_button = msg_box.addButton("Open File", QMessageBox.ButtonRole.ActionRole)
+            msg_box.addButton(QMessageBox.StandardButton.Ok)
+            
+            msg_box.exec()
+            
+            if msg_box.clickedButton() == open_button:
+                import os
+                os.startfile(file_path)
         
         except Exception as e:
             QMessageBox.critical(self, "Export Error", 

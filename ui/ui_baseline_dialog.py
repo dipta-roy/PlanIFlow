@@ -7,8 +7,6 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QInputDialog, QGroupBox, QFormLayout)
 from PyQt6.QtCore import Qt
 
-
-
 class BaselineDialog(QDialog):
     """Dialog for managing project baselines"""
     
@@ -33,7 +31,7 @@ class BaselineDialog(QDialog):
         
         # Info label
         info_label = QLabel("Baselines capture a snapshot of your project at a specific point in time.\n"
-                           "You can create up to 3 baselines and compare them against the current project state.")
+                           "You can create up to 11 baselines and compare them against the current project state.")
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
         
@@ -99,12 +97,12 @@ class BaselineDialog(QDialog):
             self.baseline_list.addItem(item)
         
         # Update create button state
-        self.create_btn.setEnabled(len(baselines) < 3)
+        self.create_btn.setEnabled(len(baselines) < 11)
         
-        if len(baselines) >= 3:
-            self.create_btn.setText("Maximum Baselines Reached (3/3)")
+        if len(baselines) >= 11:
+            self.create_btn.setText("Maximum Baselines Reached (11/11)")
         else:
-            self.create_btn.setText(f"Create New Baseline ({len(baselines)}/3)")
+            self.create_btn.setText(f"Create New Baseline ({len(baselines)}/11)")
     
     def _on_selection_changed(self):
         """Handle baseline selection change"""
@@ -155,7 +153,7 @@ class BaselineDialog(QDialog):
             else:
                 QMessageBox.warning(self, "Error", 
                                   "Failed to create baseline. The name may already exist or "
-                                  "the maximum number of baselines (3) has been reached.")
+                                  "the maximum number of baselines (11) has been reached.")
     
     def _rename_baseline(self):
         """Rename the selected baseline"""

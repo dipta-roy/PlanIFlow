@@ -5,8 +5,6 @@ from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-import os
-from datetime import datetime
 from ui.gantt_chart import GanttChart
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
@@ -19,6 +17,8 @@ import constants.constants as constants
 from constants.app_images import LOGO_BASE64
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from data_manager.temp_manager import TempFileManager
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib import colors as rl_colors
 
 class PDFExporter:
     def __init__(self, project_data, file_path, calendar_manager):
@@ -34,6 +34,18 @@ class PDFExporter:
         
         self.logo_data=base64.b64decode(LOGO_BASE64)
         self.logo_img = io.BytesIO(self.logo_data)
+        self.currency_symbol = self._get_safe_currency_symbol()
+
+    def _get_safe_currency_symbol(self):
+        """Returns a currency symbol that is safe for standard PDF fonts."""
+        currency = self.project_data.settings.currency
+        symbol = currency.symbol
+        # Standard PDF fonts like Helvetica don't support many symbols like Rupee (₹).
+        # Fallback to currency code for known problematic symbols in these fonts.
+        problematic_codes = ['INR', 'TRY', 'RUB', 'KRW', 'AED', 'SAR']
+        if currency.code in problematic_codes:
+            return f"{currency.code} "
+        return symbol
 
     def _get_base_table_style(self):
         """Returns a base TableStyle with common styling for all tables."""
@@ -180,6 +192,63 @@ class PDFExporter:
         self.add_gantt_chart()
         self.add_resource_and_cost_details()
         self.add_monthly_expense_breakdown()
+        self.add_holiday_details()
+
+    def add_holiday_details(self):
+        """Add project-level holidays to the PDF report."""
+        if not self.calendar_manager or not self.calendar_manager.custom_holidays:
+            return
+
+        self.story.append(Paragraph("Project Holidays", self.styles['h2']))
+        self.story.append(Spacer(1, 0.1 * inch))
+        
+        info_text = "The following dates are designated as project-wide non-working days."
+        self.story.append(Paragraph(info_text, self.styles['Normal']))
+        self.story.append(Spacer(1, 0.1 * inch))
+
+        # Create custom style for holiday table cells to be consistent with other tables
+        holiday_cell_style = self.styles['Normal'].clone('holiday_cell_style')
+        holiday_cell_style.fontSize = constants.PDF_TABLE_FONT_SIZE
+        holiday_cell_style.fontName = constants.PDF_TABLE_FONT_NAME
+        holiday_cell_style.leading = constants.PDF_TABLE_FONT_SIZE + 2
+        holiday_cell_style.alignment = TA_LEFT
+
+        # Holidays Table headers
+        data = [["Holiday Name", "Start Date", "End Date", "Recurring", "Comment"]]
+        
+        for h in self.calendar_manager.custom_holidays:
+            recurring_text = "Yes" if h.get('is_recurring') else "No"
+            data.append([
+                Paragraph(h.get('name', 'Holiday'), holiday_cell_style),
+                Paragraph(h.get('start_date', ''), holiday_cell_style),
+                Paragraph(h.get('end_date', ''), holiday_cell_style),
+                Paragraph(recurring_text, holiday_cell_style),
+                Paragraph(h.get('comment', ''), holiday_cell_style)
+            ])
+
+        # Calculate column widths
+        usable_width = landscape(letter)[0] - constants.PDF_LEFT_MARGIN - constants.PDF_RIGHT_MARGIN
+        col_widths = [
+            usable_width * 0.2,  # Name
+            usable_width * 0.15, # Start
+            usable_width * 0.15, # End
+            usable_width * 0.1,  # Recurring
+            usable_width * 0.4   # Comment
+        ]
+
+        table = Table(data, colWidths=col_widths)
+        
+        style = self._get_base_table_style()
+        style.add('BACKGROUND', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_BG_COLOR)
+        style.add('TEXTCOLOR', (0, 0), (-1, 0), constants.PDF_TABLE_HEADER_TEXT_COLOR)
+        style.add('FONTNAME', (0, 0), (-1, 0), constants.PDF_TABLE_FONT_NAME_BOLD)
+        style.add('ROWBACKGROUNDS', (0, 1), (-1, -1),
+                  [constants.PDF_TABLE_BODY_BG_COLOR_ODD, constants.PDF_TABLE_BODY_BG_COLOR_EVEN])
+        
+        table.setStyle(style)
+        self.story.append(table)
+        self.story.append(Spacer(1, 0.2 * inch))
+        self.story.append(PageBreak())
 
     def add_monthly_expense_breakdown(self):
         self.story.append(Paragraph("Monthly/Daily Expense Breakdown", self.styles['h2']))
@@ -199,6 +268,18 @@ class PDFExporter:
             self.story.append(PageBreak())
             return
 
+        # Sanitize symbols in rows (replace raw symbol with safe symbol)
+        raw_symbol = self.project_data.settings.currency.symbol
+        safe_rows = []
+        for row in rows:
+            safe_row = []
+            for cell in row:
+                cell_str = str(cell)
+                if raw_symbol in cell_str:
+                    cell_str = cell_str.replace(raw_symbol, self.currency_symbol)
+                safe_row.append(cell_str)
+            safe_rows.append(safe_row)
+
         # Create header style for wrapping
         header_style = self.styles['Normal'].clone('breakdown_header_style')
         header_style.textColor = constants.PDF_TABLE_HEADER_TEXT_COLOR
@@ -217,7 +298,7 @@ class PDFExporter:
 
         # Wrap row content in Paragraph objects
         wrapped_rows = []
-        for row in rows:
+        for row in safe_rows:
             wrapped_row = [Paragraph(str(cell), cell_style) for cell in row]
             wrapped_rows.append(wrapped_row)
 
@@ -283,7 +364,7 @@ class PDFExporter:
         self.story.append(Spacer(1, 0.2*inch))
         
         # Add application name below logo with larger font
-        from reportlab.lib.styles import ParagraphStyle
+
         app_name_style = ParagraphStyle(
             'AppName',
             parent=self.styles['Heading1'],
@@ -318,6 +399,8 @@ class PDFExporter:
             ["End Date:", project_end.strftime('%Y-%m-%d') if project_end else "N/A"],
             ["Total Tasks:", str(len(self.project_data.tasks))],
             ["Overall Completion:", f"{self.project_data.get_overall_completion():.1f}%"],
+            ["Currency:", self.project_data.settings.currency.name],
+            ["Total Project Cost:", f"{self.currency_symbol}{sum(data.get('total_amount', 0.0) for data in self.project_data.get_resource_allocation().values()):.2f}"],
         ]
 
         # Use maximum width for project details table
@@ -371,9 +454,7 @@ class PDFExporter:
         
 
     def add_task_details(self):
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.lib import colors as rl_colors
-        
+       
         self.story.append(Paragraph("Task Details", self.styles['h2']))
         self.story.append(Spacer(1, 0.1 * inch))
 
@@ -469,14 +550,27 @@ class PDFExporter:
                 else:
                     font_name = base_font
                 
-                # Create custom style for this specific task based on its font properties
-                custom_task_style = ParagraphStyle(
-                    f'task_style_{task.id}',
+                # Use standard report font size for consistency across all tables
+                task_font_size = constants.PDF_TABLE_FONT_SIZE
+
+                # Create custom styles for this specific task
+                custom_task_style_left = ParagraphStyle(
+                    f'task_style_left_{task.id}',
                     parent=task_style,
                     fontName=font_name,
-                    fontSize=constants.PDF_TABLE_FONT_SIZE,  # Always use consistent font size
+                    fontSize=task_font_size,
+                    leading=task_font_size + 2,
                     textColor=rl_colors.HexColor(getattr(task, 'font_color', '#000000')),
                     alignment=TA_LEFT
+                )
+                custom_task_style_center = ParagraphStyle(
+                    f'task_style_center_{task.id}',
+                    parent=task_style,
+                    fontName=font_name,
+                    fontSize=task_font_size,
+                    leading=task_font_size + 2,
+                    textColor=rl_colors.HexColor(getattr(task, 'font_color', '#000000')),
+                    alignment=TA_CENTER
                 )
                 
                 # Apply underline using HTML tag if needed
@@ -486,7 +580,7 @@ class PDFExporter:
                     formatted_display_name = display_name
                 
                 # Wrap task name in Paragraph with custom style
-                task_name_para = Paragraph(formatted_display_name, custom_task_style)
+                task_name_para = Paragraph(formatted_display_name, custom_task_style_left)
                 
                 # Store background color for this task
                 bg_color = getattr(task, 'background_color', '#FFFFFF')
@@ -505,31 +599,31 @@ class PDFExporter:
                 for pred_id, dep_type, lag in task.predecessors:
                     lag_str = f"+{lag}d" if lag > 0 else (f"{lag}d" if lag < 0 else "")
                     deps_list.append(f"{pred_id}{dep_type}{lag_str}")
-                dependencies = Paragraph(", ".join(deps_list) if deps_list else "-", task_style)
+                dependencies = Paragraph(", ".join(deps_list) if deps_list else "-", custom_task_style_left)
                 
                 # Format resources
                 res_list = []
                 for res_name, allocation in task.assigned_resources:
                     res_list.append(f"{res_name} ({allocation}%)")
-                resources = Paragraph(", ".join(res_list) if res_list else "-", task_style)
+                resources = Paragraph(", ".join(res_list) if res_list else "-", custom_task_style_left)
                 
                 # Status
-                status_text = task.get_status_text()
+                status_text = Paragraph(task.get_status_text(), custom_task_style_center)
                 
                 # Format notes with word wrapping
                 notes_text = task.notes if task.notes else "-"
-                notes_para = Paragraph(notes_text, task_style)
+                notes_para = Paragraph(notes_text, custom_task_style_left)
 
                 table_data.append([
-                    str(task.id),
-                    task.wbs if task.wbs else "",
+                    Paragraph(str(task.id), custom_task_style_center),
+                    Paragraph(task.wbs if task.wbs else "", custom_task_style_center),
                     task_name_para,
-                    duration_text,
-                    task.start_date.strftime('%Y-%m-%d'),
-                    task.end_date.strftime('%Y-%m-%d'),
+                    Paragraph(duration_text, custom_task_style_center),
+                    Paragraph(task.start_date.strftime('%Y-%m-%d'), custom_task_style_center),
+                    Paragraph(task.end_date.strftime('%Y-%m-%d'), custom_task_style_center),
                     dependencies,
                     resources,
-                    f"{task.percent_complete}%",
+                    Paragraph(f"{task.percent_complete}%", custom_task_style_center),
                     status_text,
                     notes_para
                 ])
@@ -634,7 +728,8 @@ class PDFExporter:
         allocation = self.project_data.get_resource_allocation()
         total_project_cost = sum(data.get('total_amount', 0.0) for data in allocation.values())
 
-        data = [["Resource Name", "Max Hours/Day", "Billing Rate", "Total Hours Allocated", "Total Cost"]]
+        symbol = self.currency_symbol
+        data = [[f"Resource Name", "Max Hours/Day", f"Billing Rate ({symbol})", "Total Hours Allocated", f"Total Cost ({symbol})"]]
         for resource in self.project_data.resources:
             resource_name = resource.name
             details = allocation.get(resource_name, {})
@@ -642,17 +737,19 @@ class PDFExporter:
             # Wrap resource name in Paragraph for text wrapping
             resource_name_para = Paragraph(resource_name, resource_style)
             
+            symbol = self.currency_symbol
             data.append([
                 resource_name_para,
                 str(resource.max_hours_per_day),
-                f"${resource.billing_rate:.2f}",
+                f"{symbol}{resource.billing_rate:.2f}",
                 f"{details.get('total_hours', 0.0):.1f} hours",
-                f"${details.get('total_amount', 0.0):.2f}"
+                f"{symbol}{details.get('total_amount', 0.0):.2f}"
             ])
         
         # Add total row
+        symbol = self.currency_symbol
         total_label = Paragraph("<b>Total Project Cost:</b>", resource_style)
-        data.append(["", "", "", total_label, f"${total_project_cost:.2f}"])
+        data.append(["", "", "", total_label, f"{symbol}{total_project_cost:.2f}"])
 
         # Calculate column widths dynamically - use maximum width
         usable_width = landscape(letter)[0] - constants.PDF_LEFT_MARGIN - constants.PDF_RIGHT_MARGIN

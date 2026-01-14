@@ -2,9 +2,7 @@
 Baseline Operations Mixin - Baseline management methods for MainWindow
 """
 
-
 from ui.ui_baseline_dialog import BaselineDialog
-
 
 class BaselineOperationsMixin:
     """Mixin for baseline-related operations"""

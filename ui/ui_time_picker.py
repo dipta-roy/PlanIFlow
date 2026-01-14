@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTimeEdit,
                              QLabel, QSlider, QSpinBox)
 from PyQt6.QtCore import QTime, Qt, pyqtSignal
 
-
 class TimePickerWidget(QWidget):
     """Interactive time picker with sliders"""
     

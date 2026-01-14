@@ -5,12 +5,12 @@ Enhanced with hierarchical tasks, dependency types, and status indicators
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QTabWidget, QLabel, QLineEdit, QCheckBox, 
-                             QComboBox, QScrollArea, QStatusBar)
-from PyQt6.QtCore import Qt, QTimer, QEvent
+                             QComboBox, QScrollArea, QStatusBar, QProgressBar)
+from datetime import datetime
 from PyQt6.QtCore import Qt, QTimer, QEvent
 from data_manager.manager import DataManager
 from calendar_manager.calendar_manager import CalendarManager
-from command_manager.command_manager import CommandManager # Import CommandManager
+from command_manager.command_manager import CommandManager
 from ui.gantt_chart import GanttChart
 from ui.themes import ThemeManager
 from ui.ui_helpers import set_application_icon
@@ -20,6 +20,10 @@ from ui.ui_resources import ResourceSheet
 from ui.ui_tasks import create_task_tree
 from ui.ui_baseline_comparison import BaselineComparisonTab
 from ui.ui_monte_carlo import MonteCarloTab
+from ui.ui_evm_analysis import EVMAnalysisTab
+from ui.ui_update_dialog import UpdateDialog
+from ui.ui_kanban_board import KanbanBoard
+from PyQt6.QtGui import QShortcut, QKeySequence
 
 # Mixins
 from ui.ui_file_manager import FileOperationsMixin
@@ -77,9 +81,6 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         self._try_load_last_project()
     
 
-            
-
-    
     def _create_central_widget(self):
         """Create central widget with tabs"""
         central_widget = QWidget()
@@ -179,10 +180,6 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         self.resource_summary = self._create_resource_summary()
         self.tabs.addTab(self.resource_summary, "👥 Resources")
         
-        # Dashboard Tab
-        self.dashboard_tab = create_dashboard(self)
-        self.tabs.addTab(self.dashboard_tab, "📊 Dashboard")
-
         # Baseline Comparison Tab
         self.baseline_comparison = BaselineComparisonTab(self.data_manager, self)
         self.tabs.addTab(self.baseline_comparison, "📐 Baseline Comparison")
@@ -190,8 +187,18 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         # Monte Carlo Tab
         self.monte_carlo_tab = MonteCarloTab(self.data_manager)
         self.tabs.addTab(self.monte_carlo_tab, "🎲 Risk Analysis")
-        
 
+        # EVM Analysis Tab
+        self.evm_tab = EVMAnalysisTab(self)
+        self.tabs.addTab(self.evm_tab, "📈 EVM Analysis")
+        
+        # Kanban Board Tab
+        self.kanban_board = KanbanBoard(self)
+        self.tabs.addTab(self.kanban_board, "📋 Kanban Board")
+        
+        # Dashboard Tab
+        self.dashboard_tab = create_dashboard(self)
+        self.tabs.addTab(self.dashboard_tab, "📊 Dashboard")
         
         # Connect tab change signal
         self.tabs.currentChanged.connect(self._on_tab_changed)
@@ -285,9 +292,7 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
     def _update_zoom_label(self):
         """Update zoom label display"""
         current_size = getattr(self.data_manager.settings, 'app_font_size', 9)
-        # Base size 9 is 100%? Or 10?
-        # Let's say 10 is 100%. 9 is 90%.
-        percentage = int((current_size / 9.0) * 100) # Using 9 as base since we just changed default to 9
+        percentage = int((current_size / 9.0) * 100)
         self.zoom_label.setText(f"{percentage}%")
 
     def _show_monte_carlo_help(self):
@@ -295,9 +300,92 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
         if hasattr(self, 'monte_carlo_tab'):
             self.monte_carlo_tab.show_help()
 
+    def _show_evm_help(self):
+        """Show EVM help dialog"""
+        if hasattr(self, 'evm_tab'):
+            self.evm_tab.show_help()
+
+    def _run_intelligent_diagnosis(self):
+        """Perform comprehensive project diagnosis (Risk + Schedule + EVM)."""
+        if not self.data_manager.tasks:
+            self.intel_results_label.setText("No tasks available to analyze.")
+            return
+
+        self.intel_progress.setVisible(True)
+        self.intel_progress.setValue(10)
+        self.refresh_intel_btn.setEnabled(False)
+        self.status_label.setText("Running intelligent diagnosis...")
+        
+        QTimer.singleShot(100, self._execute_diagnosis_steps)
+
+    def _execute_diagnosis_steps(self):
+        """Step-by-step diagnosis logic."""
+        result_text = []
+        
+        # 1. Risk Analysis (Monte Carlo)
+        self.intel_progress.setValue(30)
+        try:
+            # Run simulation blindly (headless) if possible, or trigger tabs logic
+            # For simplicity, we trigger the analysis if the tab exists
+            if hasattr(self, 'monte_carlo_tab'):
+                 self.monte_carlo_tab.run_simulation() # This updates its own UI, but we need data
+                 # We assume completion for this 'turbo' check
+        except Exception as e:
+            result_text.append(f"❌ Risk Analysis failed: {e}")
+
+        # 2. Schedule Check
+        self.intel_progress.setValue(60)
+        end_date = self.data_manager.get_project_end_date()
+        if end_date:
+            days_left = (end_date - datetime.now()).days
+            if days_left < 0:
+                result_text.append(f"⚠️ <b>Schedule Alert:</b> Project is overdue by {abs(days_left)} days.")
+            else:
+                result_text.append(f"✅ <b>Schedule Status:</b> {days_left} days remaining until target end date ({end_date.strftime('%Y-%m-%d')}).")
+        
+        # 3. EVM Analysis
+        self.intel_progress.setValue(90)
+        latest_baseline = None
+        baselines = self.data_manager.get_all_baselines()
+        
+        if baselines:
+            # Get latest baseline by date
+            latest_baseline = sorted(baselines, key=lambda x: x.created_date, reverse=True)[0]
+            
+            # Run calculations
+            try:
+                if hasattr(self, 'evm_tab'):
+                     df = self.evm_tab.calculator.calculate_metrics(latest_baseline.name)
+                     if not df.empty:
+                         summary = self.evm_tab.calculator.get_summary_metrics(df)
+                         cpi = summary['CPI']
+                         spi = summary['SPI']
+                         
+                         cost_status = "Under Budget" if cpi >= 1.05 else ("On Budget" if cpi >= 0.95 else "Over Budget")
+                         sched_status = "Ahead of Schedule" if spi >= 1.05 else ("On Schedule" if spi >= 0.95 else "Behind Schedule")
+                         
+                         color_cost = "#27ae60" if cpi >= 1.0 else "#c0392b"
+                         color_sched = "#27ae60" if spi >= 1.0 else "#c0392b"
+                         
+                         result_text.append(f"📊 <b>EVM Status</b> (vs '{latest_baseline.name}'):")
+                         result_text.append(f"- Cost: <b style='color:{color_cost}'>{cost_status}</b> (CPI: {cpi:.2f})")
+                         result_text.append(f"- Schedule: <b style='color:{color_sched}'>{sched_status}</b> (SPI: {spi:.2f})")
+            except Exception as e:
+                result_text.append(f"❌ EVM Analysis failed: {e}")
+        else:
+             result_text.append("ℹ️ <b>EVM Analysis:</b> No Project Baseline found. Create one to track budget/schedule performance.")
+
+        # Finalize
+        self.intel_progress.setValue(100)
+        final_html = "<br>".join(result_text)
+        self.intel_results_label.setText(final_html)
+        
+        self.refresh_intel_btn.setEnabled(True)
+        self.intel_progress.setVisible(False)
+        self.status_label.setText("Diagnosis complete.")
+
     def _check_for_updates(self):
         """Show check for updates dialog"""
-        from ui.ui_update_dialog import UpdateDialog
         msg = UpdateDialog(self)
         msg.exec()
     
@@ -308,16 +396,15 @@ class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralV
             if event.key() == Qt.Key.Key_Tab:
                 if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
                     self._outdent_task()
-                    return True  # Event handled
+                    return True 
                 else:
                     self._indent_task()
-                    return True  # Event handled
+                    return True
         return super().eventFilter(obj, event)
 
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts"""
-        from PyQt6.QtGui import QShortcut, QKeySequence
-        
+      
         self.undo_shortcut = QShortcut(QKeySequence.StandardKey.Undo, self)
         self.undo_shortcut.activated.connect(self.undo)
         

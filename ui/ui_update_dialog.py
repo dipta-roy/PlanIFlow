@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QPushButton, 
                              QProgressBar, QMessageBox, QHBoxLayout, QFrame)
 from PyQt6.QtCore import Qt, pyqtSlot, QMetaObject, Q_ARG
-from constants.constants import APP_NAME, VERSION, REPO_OWNER, REPO_NAME
+from constants.constants import APP_NAME, VERSION
 from updater import Updater
 import sys
 
@@ -100,7 +100,8 @@ class UpdateDialog(QDialog):
              self.action_btn.setVisible(False)
 
         elif status == "ERROR":
-            self.status_label.setText(f"Error: {data}")
+            #self.status_label.setText(f"Error: {data}")
+            self.status_label.setText(f"Error in connecting... Check your internet connection.")
             self.status_label.setStyleSheet("color: red;")
             self.action_btn.setText("Retry")
             try: self.action_btn.clicked.disconnect()

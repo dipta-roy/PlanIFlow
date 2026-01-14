@@ -21,8 +21,6 @@ def package_installer():
     build_dir = os.path.join(base_dir, "build")
     installer_dir = os.path.join(base_dir, "installer")
     
-    # 1. Identify the Source Directory
-    # We expect dist/PlanIFlow_2.3.0.exe (as a folder)
     source_dir_name = "PlanIFlow_2.3.0.exe"
     source_path = os.path.join(dist_dir, source_dir_name)
     
@@ -68,21 +66,12 @@ def package_installer():
     
     installer_script = os.path.join(installer_dir, "installer_source.py")
     
-    # PyInstaller arguments
-    # --onefile: Single exe
-    # --noconsole: GUI only
-    # --add-data: Embed payload.zip
-    # --name: Output name
-    # --uac-admin: Request steps privileges (optional, maybe skip to avoid scary prompt if user installs to AppData?)
-    # User requested: "Ask user about destination path".
-    # Often installers need admin. But this is a simple self-extractor. I'll skip uac-admin to be friendly.
-    
     cmd = [
         "pyinstaller",
         "--noconfirm",
         "--onefile",
         "--noconsole",
-        "--name", "PlanIFlow_Setup_2.3.0",
+        "--name", "PlanIFlow_Setup_2.2.0",
         *(["--icon", icon_path] if icon_path else []),
         "--add-data", f"{payload_path};.",
         *(["--add-data", f"{icon_path};."] if icon_path else []),
@@ -101,7 +90,7 @@ def package_installer():
     if icon_path and os.path.exists(icon_path):
         os.remove(icon_path)
         
-    print(f"[SUCCESS] Installer created at: {os.path.join(dist_dir, 'PlanIFlow_Setup_2.3.0.exe')}")
+    print(f"[SUCCESS] Installer created at: {os.path.join(dist_dir, 'PlanIFlow_Setup_2.2.0.exe')}")
 
 if __name__ == "__main__":
     package_installer()

@@ -3,7 +3,7 @@ Calendar Manager - Handles work hours, holidays, and working days
 """
 
 from datetime import datetime, timedelta
-from typing import List, Set, Dict, Any
+from typing import List, Set, Dict, Any, Optional
 
 class CalendarManager:
     """Manages working calendar, holidays, and work hours"""
@@ -19,8 +19,21 @@ class CalendarManager:
         # Default hours per day (calculated from working hours)
         self.hours_per_day: float = 8.0
         
-        # Non-working days (holidays, special dates)
-        self.non_working_days: Set[str] = set()  # ISO date strings
+        # Fast-lookup set for non-working days (ISO strings)
+        self.non_working_days: Set[str] = set()
+        
+        # Structured holiday list (source of truth)
+        # Each entry: {"name": str, "start_date": str, "end_date": str, "comment": str, "is_recurring": bool}
+        self.custom_holidays: List[Dict[str, Any]] = []
+
+        # Project timeline bounds (used for recurring holidays)
+        self.project_start_date: Optional[datetime] = None
+        self.project_end_date: Optional[datetime] = None
+    
+    def set_project_bounds(self, start_date: Optional[datetime], end_date: Optional[datetime]):
+        """Set project timeline bounds for recurring holiday checks"""
+        self.project_start_date = start_date
+        self.project_end_date = end_date
     
     def reset_defaults(self):
         """Reset calendar to defaults"""
@@ -38,9 +51,35 @@ class CalendarManager:
         
         date_str = date.strftime('%Y-%m-%d')
 
-        # Check if it's a global non-working day
+        # Check if it's a global non-working day (fixed dates)
         if date_str in self.non_working_days:
             return False
+        
+        # Check if it's a recurring holiday
+        curr_md = (date.month, date.day)
+        for holiday in self.custom_holidays:
+            if holiday.get('is_recurring'):
+                # According to user requirement: recurrence only within project timeline
+                if self.project_start_date and date < self.project_start_date:
+                    continue
+                if self.project_end_date and date > self.project_end_date:
+                    continue
+
+                try:
+                    h_start = datetime.strptime(holiday['start_date'], '%Y-%m-%d')
+                    h_end = datetime.strptime(holiday.get('end_date') or holiday['start_date'], '%Y-%m-%d')
+                    
+                    start_md = (h_start.month, h_start.day)
+                    end_md = (h_end.month, h_end.day)
+                    
+                    if start_md <= end_md:
+                        if start_md <= curr_md <= end_md:
+                            return False
+                    else: # Crosses year boundary
+                        if curr_md >= start_md or curr_md <= end_md:
+                            return False
+                except (ValueError, KeyError):
+                    continue
         
         # Check if it's a resource-specific exception
         if resource_exceptions:
@@ -54,22 +93,62 @@ class CalendarManager:
                         if exception_start <= date.date() <= exception_end:
                             return False
                     except ValueError:
-                        # Log or handle malformed date range
                         pass
                 elif date_str == exception_entry.strip():
                     return False
         
         return True
     
+    def _sync_holidays(self):
+        """Synchronize custom_holidays list into the fast-lookup non_working_days set"""
+        self.non_working_days = set()
+        for holiday in self.custom_holidays:
+            try:
+                # For recurring holidays, we don't add them to non_working_days set
+                # because they apply to all years. They are checked dynamically in is_working_day.
+                if holiday.get('is_recurring'):
+                    continue
+
+                start = datetime.strptime(holiday['start_date'], '%Y-%m-%d')
+                # Optional end_date, defaults to start_date if missing
+                end_str = holiday.get('end_date') or holiday['start_date']
+                end = datetime.strptime(end_str, '%Y-%m-%d')
+                
+                curr = start
+                while curr <= end:
+                    self.non_working_days.add(curr.strftime('%Y-%m-%d'))
+                    curr += timedelta(days=1)
+            except (ValueError, KeyError):
+                continue
+
+    def add_custom_holiday(self, name: str, start_date: str, end_date: str = None, comment: str = "", is_recurring: bool = False):
+        """Add a holiday or holiday range"""
+        self.custom_holidays.append({
+            "name": name,
+            "start_date": start_date,
+            "end_date": end_date or start_date,
+            "comment": comment,
+            "is_recurring": is_recurring
+        })
+        self._sync_holidays()
+
+    def remove_custom_holiday(self, index: int):
+        """Remove holiday by its index in the custom_holidays list"""
+        if 0 <= index < len(self.custom_holidays):
+            self.custom_holidays.pop(index)
+            self._sync_holidays()
+
     def add_holiday(self, date: datetime):
-        """Add a non-working day"""
+        """Add a simple non-working day (Legacy support)"""
         date_str = date.strftime('%Y-%m-%d')
-        self.non_working_days.add(date_str)
+        self.add_custom_holiday("Holiday", date_str)
     
     def remove_holiday(self, date: datetime):
-        """Remove a non-working day"""
+        """Remove a non-working day (Legacy support)"""
         date_str = date.strftime('%Y-%m-%d')
-        self.non_working_days.discard(date_str)
+        # Find and remove any holiday matching this date
+        self.custom_holidays = [h for h in self.custom_holidays if h['start_date'] != date_str]
+        self._sync_holidays()
     
     def set_working_days(self, days: List[int]):
         """Set working days (0-6, Mon-Sun)"""
@@ -146,28 +225,16 @@ class CalendarManager:
         # Normalize to just date for iteration
         current_date_iter = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
         end_date_limit = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        
-        # Determine working interval for a day relative to that day's midnight
-        # work_start_td = timedelta(hours=start_h, minutes=start_m)
-        # work_end_td = timedelta(hours=end_h, minutes=end_m)
-        
+
         while current_date_iter <= end_date_limit:
-            # Check if this day is a working day
-            # We can pick a time (e.g. noon) to check, or just the date object if is_working_day handles it
             check_dt = current_date_iter.replace(hour=12) 
             if self.is_working_day(check_dt, resource_exceptions):
                 
                 # Define working window for this specific date
                 daily_work_start = current_date_iter.replace(hour=start_h, minute=start_m)
                 daily_work_end = current_date_iter.replace(hour=end_h, minute=end_m)
-                
-                # Handle overnight shifts? assuming day shift for now (end > start)
                 if daily_work_end < daily_work_start:
                     daily_work_end += timedelta(days=1)
-                
-                # Determine overlap of task duration with today's working window
-                # Task interval: [max(start_date, daily_work_start), min(end_date, daily_work_end)]
-                
                 overlap_start = max(start_date, daily_work_start)
                 overlap_end = min(end_date, daily_work_end)
                 
@@ -213,17 +280,11 @@ class CalendarManager:
             # Normalize times to timedelta from midnight
             work_start_td = timedelta(hours=start_h, minutes=start_m)
             work_end_td = timedelta(hours=end_h, minutes=end_m)
-            
-            # If work end is smaller than start (night shift), handle simply by assuming full 24h for now or error?
-            # Supporting typical day shifts for now.
             if work_end_td <= work_start_td:
                 # Fallback to simple addition if invalid range
                 return current_dt + timedelta(hours=hours)
 
             while hours_remaining > 0:
-                # 1. Ensure current_dt is inside working hours
-                
-                # If non-working day, move to next working day start
                 if not self.is_working_day(current_dt):
                     current_dt = self.get_next_working_day(current_dt)
                     current_dt = current_dt.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
@@ -282,6 +343,7 @@ class CalendarManager:
             'working_days': list(self.working_days),
             'hours_per_day': self.hours_per_day,
             'non_working_days': list(self.non_working_days),
+            'custom_holidays': self.custom_holidays,
             'working_hours_start': self.working_hours_start,
             'working_hours_end': self.working_hours_end
         }
@@ -289,7 +351,20 @@ class CalendarManager:
     def from_dict(self, data: Dict[str, Any]):
         """Import calendar settings from dictionary"""
         self.working_days = set(data.get('working_days', [0, 1, 2, 3, 4]))
-        self.non_working_days = set(data.get('non_working_days', []))
+        self.custom_holidays = data.get('custom_holidays', [])
+        
+        # If custom_holidays is missing but non_working_days exists, convert them (Legacy)
+        if not self.custom_holidays and 'non_working_days' in data:
+            old_days = data.get('non_working_days', [])
+            for day_str in old_days:
+                self.custom_holidays.append({
+                    "name": "Holiday",
+                    "start_date": day_str,
+                    "end_date": day_str,
+                    "comment": ""
+                })
+        
+        self._sync_holidays()
         
         # Backward compatibility: use hours_per_day if available
         self.hours_per_day = data.get('hours_per_day', 8.0)
@@ -313,6 +388,4 @@ class CalendarManager:
                 self.working_hours_end = f"{end_h:02d}:{end_m:02d}"
             except Exception:
                  self.working_hours_end = '16:00'
-        
-        # Ensure consistency
         self.hours_per_day = self._calculate_hours_from_times()

@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 from data_manager.manager import DataManager
 from data_manager.models import Task, Resource, DependencyType, ScheduleType
-from settings_manager.settings_manager import DateFormat, DurationUnit
+from settings_manager.settings_manager import DateFormat, DurationUnit, Currency
 from calendar_manager.calendar_manager import CalendarManager
 from data_manager.validator import ProjectValidator
 
@@ -62,12 +62,12 @@ class Exporter:
                     'Task ID': task.id,
                     'WBS': task.wbs,
                     'Task Name': display_name,
-                    'Type': 'Milestone' if task.is_milestone else ('Summary' if task.is_summary else 'Task'),  # *** ADD TYPE COLUMN ***
+                    'Type': 'Milestone' if task.is_milestone else ('Summary' if task.is_summary else 'Task'),
                     'Schedule Mode': task.schedule_type.value,
                     'Level': level,
                     'Parent ID': task.parent_id if task.parent_id else '',
                     'Is Summary': 'Yes' if task.is_summary else 'No',
-                    'Is Milestone': 'Yes' if task.is_milestone else 'No',  # *** ADD THIS ***
+                    'Is Milestone': 'Yes' if task.is_milestone else 'No',
                     'Start Date': task.start_date.strftime(date_format_str),
                     'End Date': task.end_date.strftime(date_format_str) if not task.is_milestone else task.start_date.strftime(date_format_str),
                     duration_label: 0 if task.is_milestone else (f"{duration:.1f}" if data_manager.settings.duration_unit == DurationUnit.HOURS else int(duration)),
@@ -102,11 +102,14 @@ class Exporter:
             allocation = data_manager.get_resource_allocation()
             for resource in data_manager.get_all_resources():
                 res_alloc = allocation.get(resource.name, {})
+                symbol = data_manager.settings.currency.symbol
                 resources_data.append({
                     'Resource Name': ProjectValidator.sanitize_string(resource.name),
                     'Max Hours/Day': resource.max_hours_per_day,
                     'Total Hours Allocated': res_alloc.get('total_hours', 0),
                     'Tasks Assigned': res_alloc.get('tasks_assigned', 0),
+                    f'Billing Rate ({symbol}/hr)': resource.billing_rate,
+                    f'Total Amount ({symbol})': res_alloc.get('total_amount', 0.0),
                     'Exceptions': ','.join(resource.exceptions)
                 })
             
@@ -126,7 +129,9 @@ class Exporter:
                     'Total Project Duration (days)',
                     'Export Date',
                     'File Version',
-                    'Date Format'
+                    'Date Format',
+                    'Currency',
+                    'Total Project Cost'
                 ],
                 'Value': [
                     ProjectValidator.sanitize_string(data_manager.project_name),
@@ -145,7 +150,9 @@ class Exporter:
                         if data_manager.get_project_start_date() and data_manager.get_project_end_date() else 'N/A',
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     '2.3',
-                    date_format_enum.value
+                    date_format_enum.value,
+                    data_manager.settings.currency.name,
+                    f"{data_manager.settings.currency.symbol}{sum(data.get('total_amount', 0.0) for data in allocation.values()):.2f}"
                 ]
             }
             
@@ -208,7 +215,6 @@ class Exporter:
                     
                     for row_idx, row in df_tasks.iterrows():
                         # Apply status color to entire row
-                        cell = task_sheet.cell(row=row_idx + 2, column=status_col_idx)
                         color_name = row['Status Color']
                         
                         color_map = {
@@ -226,33 +232,51 @@ class Exporter:
                             for col in range(1, len(df_tasks.columns) + 1):
                                 task_sheet.cell(row=row_idx + 2, column=col).fill = fill
                         
-                        # Apply font styling to Task Name cell
-                        task_name_cell = task_sheet.cell(row=row_idx + 2, column=task_name_col_idx)
+                        # Get font styling with strict defaults to avoid corruption
+                        font_family = row.get('Font Family')
+                        if not font_family or pd.isna(font_family):
+                            font_family = 'Arial'
                         
-                        # Get font styling from row data
-                        font_family = row.get('Font Family', 'Arial')
-                        font_size = row.get('Font Size', 10)
-                        font_color_hex = row.get('Font Color', '#000000').lstrip('#')
-                        bg_color_hex = row.get('Background Color', '#FFFFFF').lstrip('#')
+                        font_size_val = row.get('Font Size')
+                        if pd.isna(font_size_val) or font_size_val is None:
+                            font_size = 10
+                        else:
+                            try:
+                                font_size = int(font_size_val)
+                                if font_size <= 0: font_size = 10
+                            except:
+                                font_size = 10
+                                
+                        font_color_hex = str(row.get('Font Color', '000000')).lstrip('#')
+                        if not font_color_hex or len(font_color_hex) != 6:
+                            font_color_hex = '000000'
+                        
+                        # Use standard ARGB for absolute safety in openpyxl
+                        safe_font_color = "FF" + font_color_hex
+                        
                         is_bold = row.get('Font Bold', 'No') == 'Yes'
                         is_italic = row.get('Font Italic', 'No') == 'Yes'
                         is_underline = row.get('Font Underline', 'No') == 'Yes'
                         
-                        # Create and apply font
+                        # Apply font to all columns in the row
                         cell_font = Font(
                             name=font_family,
                             size=font_size,
                             bold=is_bold,
                             italic=is_italic,
                             underline='single' if is_underline else None,
-                            color=font_color_hex
+                            color=safe_font_color
                         )
-                        task_name_cell.font = cell_font
+                        for col_idx in range(1, len(df_tasks.columns) + 1):
+                            task_sheet.cell(row=row_idx + 2, column=col_idx).font = cell_font
                         
-                        # Apply background color (override status color for this cell)
-                        if bg_color_hex != 'FFFFFF':  # Only apply if not default white
-                            bg_fill = PatternFill(start_color=bg_color_hex,
-                                                 end_color=bg_color_hex,
+                        task_name_cell = task_sheet.cell(row=row_idx + 2, column=task_name_col_idx)
+                        
+                        # Apply background color
+                        bg_color_hex = str(row.get('Background Color', 'FFFFFF')).lstrip('#')
+                        if bg_color_hex != 'FFFFFF' and len(bg_color_hex) == 6:
+                            bg_fill = PatternFill(start_color="FF" + bg_color_hex,
+                                                 end_color="FF" + bg_color_hex,
                                                  fill_type='solid')
                             task_name_cell.fill = bg_fill
                 
@@ -325,6 +349,26 @@ class Exporter:
                     for col in baseline_meta_sheet.columns:
                         max_length = max(len(str(cell.value)) for cell in col)
                         baseline_meta_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
+                
+                # Write Holidays if present
+                if data_manager.calendar_manager and data_manager.calendar_manager.custom_holidays:
+                    holiday_data = []
+                    for h in data_manager.calendar_manager.custom_holidays:
+                        holiday_data.append({
+                            'Holiday Name': h.get('name', ''),
+                            'Start Date': h.get('start_date', ''),
+                            'End Date': h.get('end_date', ''),
+                            'Comment': h.get('comment', '')
+                        })
+                    
+                    if holiday_data:
+                        df_holidays = pd.DataFrame(holiday_data)
+                        df_holidays.to_excel(writer, sheet_name='Holidays', index=False)
+                        
+                        holiday_sheet = writer.sheets['Holidays']
+                        for col in holiday_sheet.columns:
+                            max_length = max(len(str(cell.value)) for cell in col)
+                            holiday_sheet.column_dimensions[col[0].column_letter].width = max_length + 2
             
             return True
             
@@ -386,6 +430,12 @@ class Exporter:
                                 calendar_manager.working_hours_end = wh_end
                         except:
                             pass
+                    elif row['Metric'] == 'Currency':
+                        try:
+                            currency_str = str(row['Value'])
+                            data_manager.settings.currency = Currency[currency_str]
+                        except:
+                            data_manager.settings.currency = Currency.USD
             
                 # Recalculate hours per day based on imported times
                 calendar_manager.hours_per_day = calendar_manager._calculate_hours_from_times()
@@ -515,7 +565,7 @@ class Exporter:
                     is_summary=is_summary,
                     is_milestone=is_milestone,
                     wbs=row.get('WBS'),
-                    schedule_type=ScheduleType(str(row.get('Schedule Mode', 'Auto Scheduled'))) if str(row.get('Schedule Mode', 'Auto Scheduled')) in [item.value for item in ScheduleType] else ScheduleType.AUTO_SCHEDULED,
+                    schedule_type=ScheduleType.from_string(str(row.get('Schedule Mode', 'Auto Scheduled'))),
                     # Font styling with backward compatibility
                     font_family=str(row.get('Font Family', 'Arial')) if pd.notna(row.get('Font Family')) else 'Arial',
                     font_size=int(row.get('Font Size', 10)) if pd.notna(row.get('Font Size')) else 10,
@@ -558,10 +608,18 @@ class Exporter:
                     if pd.notna(row.get('Exceptions', '')) and str(row['Exceptions']).strip():
                         exceptions = [x.strip() for x in str(row['Exceptions']).split(',')]
                     
+                    # Find billing rate column flexibly (in case of different symbols)
+                    billing_rate = 0.0
+                    for col in df_resources.columns:
+                        if "Billing Rate" in str(col):
+                            billing_rate = float(row.get(col, 0.0))
+                            break
+
                     resource = Resource(
                         name=ProjectValidator.sanitize_string(str(row['Resource Name'])),
                         max_hours_per_day=float(row.get('Max Hours/Day', 8.0)),
-                        exceptions=exceptions
+                        exceptions=exceptions,
+                        billing_rate=billing_rate
                     )
                     data_manager.resources.append(resource)
             except Exception as e:
@@ -614,6 +672,44 @@ class Exporter:
             except Exception as e:
                 # Baselines sheet doesn't exist - backward compatibility
                 print(f"No baselines found in Excel file (backward compatibility): {e}")
+
+            # Import global holidays from 'Holidays' sheet
+            try:
+                df_holidays = pd.read_excel(filepath, sheet_name='Holidays')
+                
+                custom_holidays = []
+                for _, row in df_holidays.iterrows():
+                    start_val = row.get('Start Date')
+                    if pd.notna(start_val):
+                        # Ensure string format %Y-%m-%d
+                        if isinstance(start_val, datetime):
+                            start_str = start_val.strftime('%Y-%m-%d')
+                        else:
+                            start_str = str(start_val).split(' ')[0] # Handle YYYY-MM-DD HH:MM:SS
+                        
+                        end_val = row.get('End Date')
+                        if pd.notna(end_val):
+                            if isinstance(end_val, datetime):
+                                end_str = end_val.strftime('%Y-%m-%d')
+                            else:
+                                end_str = str(end_val).split(' ')[0]
+                        else:
+                            end_str = start_str
+                            
+                        custom_holidays.append({
+                            "name": str(row.get('Holiday Name', 'Holiday')),
+                            "start_date": start_str,
+                            "end_date": end_str,
+                            "comment": str(row.get('Comment', '')) if pd.notna(row.get('Comment')) else ""
+                        })
+                
+                if custom_holidays:
+                    calendar_manager.custom_holidays = custom_holidays
+                    calendar_manager._sync_holidays()
+                    
+            except Exception as e:
+                # Holidays sheet doesn't exist - backward compatibility
+                print(f"No 'Holidays' sheet found in Excel (backward compatibility)")
             
             return data_manager, True, ""
             
