@@ -16,7 +16,7 @@ build_exe_options = {
     "packages": [
         "os", "sys", "ctypes", 
         "calendar_manager", "command_manager", "constants", 
-        "data_manager", "exporter", "settings_manager", "ui",
+        "data_manager", "exporter", "settings_manager", "ui", "updater",
         "PyQt6", "pandas", "openpyxl", "matplotlib", "reportlab", 
         "numpy", "PIL", "jsonschema", "dateutil", "referencing", "attrs"
     ],
@@ -57,7 +57,7 @@ bdist_msi_options = {
     "upgrade_code": UPGRADE_CODE,
     "initial_target_dir": r"[ProgramFilesFolder]\PlaniFlow",
     "install_icon": icon_path,
-    "target_name": "PlanIFlow_Setup_2.4.0.msi",
+    "target_name": "PlanIFlow_Setup_2.5.0.msi",
 }
 
 # Executable Configuration
@@ -72,7 +72,7 @@ target = Executable(
 
 setup(
     name="PlanIFlow",
-    version="2.4.0",
+    version="2.5.0",
     description="PlanIFlow Project Planner",
     author="Dipta Roy",
     options={

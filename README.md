@@ -86,7 +86,7 @@ The application follows a modular architecture, separating data management, UI, 
 - **Core**: Python + PyQt6
 - **Data**: In-memory Pandas DataFrames, persisted to JSON/Excel.
 - **Security**: Strict input validation, no database server, no telemetry.
-- **Network**: Restricted to `updater.py` for GitHub Releases checks.
+- **Network**: Restricted to `updater/` package for GitHub Releases checks.
 
 ## 🚀 Getting Started
 
@@ -107,7 +107,7 @@ run.bat
 
 or 
 
-Use the `build_msi.bat` script to generate an `PlanIFlow_Setup_2.4.1.msi` file.
+Use the `build_msi.bat` script to generate an `PlanIFlow_Setup_2.2.0.msi` file.
 
 ```bash
 build_msi.bat
@@ -355,7 +355,7 @@ To build a standalone executable or a professional installer from the source cod
 | Path                                     | Description                                                                                             |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `main.py`                                | Main entry point of the application.                                                                    |
-| `updater.py`                             | Handles secure updates (check, download, hash verification).                                            |
+| `updater/`                                | Handles secure updates (check, download, hash verification).                                            |
 | `data_manager/`                          | Core logic for tasks, resources, validation, and Monte Carlo.                                           |
 | `ui/`                                    | PyQt6 widgets, dialogs, and main window logic.                                                          |
 | `installer/`                             | Scripts for building the MSI installer.                                                                 |

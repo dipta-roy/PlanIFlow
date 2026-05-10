@@ -132,30 +132,33 @@ class Updater:
     def install_update(self, msi_path):
         """Starts installation of the downloaded MSI."""
         thread = threading.Thread(target=self._install_worker, args=(msi_path,))
-        thread.daemon = True
+        thread.daemon = False # Ensure thread finishes launching the process even if main thread exits
         thread.start()
 
     def _install_worker(self, msi_path):
         try:
-            if self.callback:
-                self.callback("INSTALL_STARTED", None)
-            
-            # /i install
-            # /qn silent (no UI)
-            
             # Construct command to run updated app after install
             import sys
             current_exe = sys.executable
             
-            # Chain commands: Install -> Wait 5s -> Start App
-            # We use 'start "" ' to ensure it detaches completely.
-            # subprocess.Popen with shell=True handles the command execution via cmd.exe.
-            # Double quotes around paths are sufficient. 
-            # Added /norestart to msiexec to prevent unexpected reboots.    
-            cmd = f'msiexec /i "{msi_path}" /qn /norestart && timeout /t 5 && start "" "{current_exe}"'
+            # Chain commands: 
+            # 1. Wait for this process to exit (timeout 2s)
+            # 2. Run the MSI installer silently
+            # 3. Wait for installer to finish (start /wait)
+            # 4. Wait another 2s to be sure files are released
+            # 5. Restart the application
+            # 6. Delete the temporary MSI file
             
-            # Using Popen to detach.
+            # Using '&' instead of '&&' to ensure execution continues even if msiexec returns 
+            # a non-zero code (like 3010 for 'reboot required' which is a success).
+            cmd = f'timeout /t 2 /nobreak & start /wait "" msiexec /i "{msi_path}" /qn /norestart & timeout /t 2 /nobreak & start "" "{current_exe}" & del /q "{msi_path}"'
+            
+            # Launch the detached command process
             subprocess.Popen(cmd, shell=True)
+            
+            # Now notify the UI that it's safe to exit
+            if self.callback:
+                self.callback("INSTALL_STARTED", None)
             
         except Exception as e:
             logging.error(f"Install failed: {e}")

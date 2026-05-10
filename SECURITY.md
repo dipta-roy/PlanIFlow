@@ -1,7 +1,7 @@
 # **PlanIFlow - Formal Security Assessment Report**  
 ## **PlanIFlow v2.4.1 – Offline-First Desktop Project Management Application**  
 **Assessment Conducted:** 10th May 2026  
-**Scope:** All Python source files (`*.py`) including `main.py`, `ui/`, `data_manager/`, `updater.py`, and build scripts.  
+**Scope:** All Python source files (`*.py`) including `main.py`, `ui/`, `data_manager/`, `updater/`, and build scripts.  
 **Methodology:** Static code analysis (SAST), manual code review, data flow tracing, STRIDE threat modeling, CVSS v3.1 scoring.  
 **Classification:** **LOW RISK – SECURE FOR INTENDED USE**
 
@@ -20,7 +20,7 @@ The application is **secure by design** for its intended use case: **single-user
 
 | Item 						| Details 													|
 |---------------------------|-----------------------------------------------------------|
-| **Files Analyzed** 		| ~55 `.py` files (e.g., `main.py`, `updater.py`, `data_manager/validator.py`, `installer/package_installer.py`) |
+| **Files Analyzed** 		| ~55 `.py` files (e.g., `main.py`, `updater/updater.py`, `data_manager/validator.py`, `installer/package_installer.py`) |
 | **Analysis Type** 		| White-box static analysis (SAST) and manual code review. 	|
 | **Tools Used** 			| Manual code review, dependency check, CVSS v3.1 scoring. |
 | **Threat Model** 			| STRIDE Analysis (Spoofing, Tampering, Repudiation, Info Disclosure, DoS, Elevation of Privilege). |
@@ -36,7 +36,7 @@ The application is **secure by design** for its intended use case: **single-user
 [Update Manager] ← (HTTPS/TLS) → [GitHub Releases API]
 ```
 
-- **Minimal Network Stack**: `requests` is used only in `updater.py` for version checks and downloads. No server listeners or telemetry.
+- **Minimal Network Stack**: `requests` is used only in `updater/` for version checks and downloads. No server listeners or telemetry.
 - **No Database Server**: Data is managed in-memory with `pandas` and persisted via local JSON/Excel files. SQLite is present (`sqlite3.dll`) but used only as a library dependency (e.g. by pandas internally), not for central app storage.
 - **No Privilege Escalation**: Runs in user-context. Installer creation uses `PyInstaller`; main app uses `cx_Freeze`.
 - **All file I/O is user-initiated** via `QFileDialog` or standard temporary file mechanisms.
@@ -51,7 +51,7 @@ The application has a **minimal** remote attack surface, limited strictly to the
 |:---|:---|:---|:---|
 | **Auto-Update Check** | HTTPS (Outbound) | Low | Uses `requests` with strict TLS verification to fetch data from `api.github.com`. |
 | **Update Download** | HTTPS (Outbound) | Low | Downloads `.msi` files from GitHub Releases. |
-| **Hash Verification** | SHA256 | Low | `updater.py` verifies the SHA256 hash of downloaded MSI files against a trusted hash file from the release before execution. |
+| **Hash Verification** | SHA256 | Low | `updater/updater.py` verifies the SHA256 hash of downloaded MSI files against a trusted hash file from the release before execution. |
 
 ### **4.2 File Input Validation & Sanitization**
 
@@ -81,7 +81,7 @@ The application avoids unsafe deserialization methods.
 ### **4.5 Privilege & Command Execution**
 
 - **Runtime `subprocess`**: **Restricted**. 
-    - `updater.py`: Executes `msiexec /i ...` to run the downloaded installer. This is standard practice for updates.
+    - `updater/updater.py`: Executes `msiexec /i ...` to run the downloaded installer. This is standard practice for updates.
     - `installer/package_installer.py`: Uses `subprocess.check_call` to invoke `pyinstaller` during the *build* process.
 - **Build System**: The main application is frozen using `cx_Freeze`. The final installer is wrapped using `PyInstaller`.
 - **Registry/Privileges**: The application runs entirely in user-context. The installer may request elevation (UAC) if installing to system directories.
@@ -98,10 +98,10 @@ The project's dependencies are explicitly pinned in `requirements.txt`.
 | matplotlib 	| `3.10.7`		    | None. | Low 	|
 | reportlab 	| `4.4.5`		    | None. | Low 	|
 | numpy 		| `2.1.2`		    | None. | Low 	|
-| Pillow        | `12.2.0`          | None. | Low 	|
+| Pillow        | `12.0.0`          | None. | Low 	|
 | jsonschema    | `4.23.0`          | None. | Low   |
 | python-dateutil| `2.9.0`          | None. | Low   |
-| requests      | `2.33.0`          | None. | Low   |
+| requests      | `2.32.5`          | None. | Low   |
 | cx_Freeze     | `8.5.3`           | None. | Low   |
 
 ## **5. STRIDE Threat Modeling**
@@ -110,7 +110,7 @@ A STRIDE analysis was performed to identify and mitigate potential threats in th
 
 | Threat Category | Potential Scenario | Mitigation Strategy | Status |
 |:---|:---|:---|:---|
-| **S**poofing | Attacker impersonates the GitHub update server to serve malicious payloads. | **TLS/HTTPS Verification**: The `updater.py` uses `requests` which enforces strict SSL/TLS certificate validation. | ✅ Mitigated |
+| **S**poofing | Attacker impersonates the GitHub update server to serve malicious payloads. | **TLS/HTTPS Verification**: The `updater/` package uses `requests` which enforces strict SSL/TLS certificate validation. | ✅ Mitigated |
 | **T**ampering | Attacker modifies local JSON/Excel project files to inject malicious code or crash the app. | **Input Validation**: `ProjectValidator` enforces schema compliance, data type checks, and string sanitization. No `eval()` or macro execution is permitted. | ✅ Mitigated |
 | **T**ampering | Attacker modifies the downloaded installer binary during transit. | **Hash Verification**: The application calculates the SHA256 hash of the downloaded MSI and compares it against a signed/trusted hash file before execution. | ✅ Mitigated |
 | **R**epudiation | User denies actions taken within the application (e.g., deleting a critical task). | **Scope Note**: As a single-user offline desktop app, non-repudiation is not a primary security requirement. Local file system logs provide basic traceability. | ⚪ Accepted |

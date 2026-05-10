@@ -61,9 +61,20 @@ class TempFileManager:
 
     @classmethod
     def cleanup_old_sessions(cls):
-        """Scan system temp directory and remove leftover session directories from previous runs"""
+        """Scan system temp directory and remove leftover session directories and update installers"""
         try:
             temp_root = tempfile.gettempdir()
+            
+            # 1. Cleanup leftover update installer if it exists
+            update_msi = os.path.join(temp_root, "PlanIFlow_Update.msi")
+            if os.path.exists(update_msi):
+                try:
+                    os.remove(update_msi)
+                    logging.info("Cleaned up leftover update installer.")
+                except:
+                    pass # May be in use or locked
+            
+            # 2. Cleanup session directories
             for item in os.listdir(temp_root):
                 item_path = os.path.join(temp_root, item)
                 if os.path.isdir(item_path) and item.startswith("planiflow_"):
