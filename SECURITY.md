@@ -1,6 +1,6 @@
 # **PlanIFlow - Formal Security Assessment Report**  
-## **PlanIFlow v2.4.0 – Offline-First Desktop Project Management Application**  
-**Assessment Conducted:** January 15, 2026  
+## **PlanIFlow v2.4.1 – Offline-First Desktop Project Management Application**  
+**Assessment Conducted:** 10th May 2026  
 **Scope:** All Python source files (`*.py`) including `main.py`, `ui/`, `data_manager/`, `updater.py`, and build scripts.  
 **Methodology:** Static code analysis (SAST), manual code review, data flow tracing, STRIDE threat modeling, CVSS v3.1 scoring.  
 **Classification:** **LOW RISK – SECURE FOR INTENDED USE**
@@ -98,10 +98,10 @@ The project's dependencies are explicitly pinned in `requirements.txt`.
 | matplotlib 	| `3.10.7`		    | None. | Low 	|
 | reportlab 	| `4.4.5`		    | None. | Low 	|
 | numpy 		| `2.1.2`		    | None. | Low 	|
-| Pillow        | `12.0.0`          | None. | Low 	|
+| Pillow        | `12.2.0`          | None. | Low 	|
 | jsonschema    | `4.23.0`          | None. | Low   |
 | python-dateutil| `2.9.0`          | None. | Low   |
-| requests      | `2.32.5`          | None. | Low   |
+| requests      | `2.33.0`          | None. | Low   |
 | cx_Freeze     | `8.5.3`           | None. | Low   |
 
 ## **5. STRIDE Threat Modeling**
@@ -142,7 +142,7 @@ A STRIDE analysis was performed to identify and mitigate potential threats in th
 
 ## **8. Conclusion**
 
-> **PlanIFlow v2.4.0 is secure, robust, and suitable for deployment.**
+> **PlanIFlow v2.4.1 is secure, robust, and suitable for deployment.**
 
 It adheres to **defense-in-depth principles**, balancing user convenience (auto-updates) with strong security controls (input validation, hash verification).
 
