@@ -107,7 +107,7 @@ run.bat
 
 or 
 
-Use the `build_msi.bat` script to generate an `PlanIFlow_Setup_2.2.0.msi` file.
+Use the `build_msi.bat` script to generate an `PlanIFlow_Setup_2.4.1.msi` file.
 
 ```bash
 build_msi.bat
