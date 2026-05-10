@@ -405,4 +405,4 @@ Go to **Help > Check for Updates**.
 - Icons: [Flaticon](https://flaticon.com).
 - Thanks to PyQt6 & Matplotlib communities.
 
-Built by [Dipta Roy](https://github.com/dipta-roy) with ❤️.
+Built by [Dipta Roy](https://dipta-roy.github.io) with ❤️.
