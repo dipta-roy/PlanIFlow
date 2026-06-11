@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from PyQt6.QtWidgets import QTreeWidgetItem, QMessageBox, QMenu
+from PyQt6.QtWidgets import QTreeWidgetItem, QMessageBox, QMenu, QDialog
 from PyQt6.QtGui import QAction, QColor, QBrush
 from PyQt6.QtCore import Qt, QTimer
 from data_manager.models import Task, DependencyType, ScheduleType
@@ -486,6 +486,13 @@ class TreeViewOperationsMixin:
         edit_action.triggered.connect(self._edit_task_dialog)
         menu.addAction(edit_action)
         
+        # Bulk edit action (if multiple tasks selected)
+        selected_items = self.task_tree.selectedItems()
+        if len(selected_items) > 1:
+            bulk_edit_action = QAction("✏️ Bulk Edit Selected Tasks...", self)
+            bulk_edit_action.triggered.connect(self._bulk_edit_tasks)
+            menu.addAction(bulk_edit_action)
+        
         # Delete action
         delete_action = QAction("🗑️ Delete Task", self)
         delete_action.triggered.connect(self._delete_task)
@@ -890,3 +897,82 @@ class TreeViewOperationsMixin:
             return '%d-%b-%Y'
         else: # DateFormat.YYYY_MM_DD
             return '%Y-%m-%d'
+
+    def _bulk_edit_tasks(self):
+        """Bulk edit selected tasks"""
+        selected_items = self.task_tree.selectedItems()
+        if not selected_items:
+            return
+            
+        task_ids = []
+        for item in selected_items:
+            task_id = item.data(2, Qt.ItemDataRole.UserRole)
+            if task_id is not None:
+                task_ids.append(task_id)
+                
+        if not task_ids:
+            return
+            
+        from ui.ui_bulk_edit_dialog import BulkEditDialog
+        dialog = BulkEditDialog(self, self.data_manager, len(task_ids))
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            updates = dialog.get_updates()
+            if not updates:
+                return
+                
+            from command_manager.commands import EditTaskCommand, MacroCommand
+            from copy import deepcopy
+            
+            commands = []
+            for tid in task_ids:
+                task = self.data_manager.get_task(tid)
+                if not task:
+                    continue
+                
+                task_updates = deepcopy(updates)
+                if task.is_summary or task.is_milestone:
+                    if 'duration' in task_updates:
+                        del task_updates['duration']
+                        
+                if not task_updates:
+                    continue
+                    
+                old_task_data = task.to_dict()
+                task_clone = Task.from_dict(old_task_data)
+                
+                if 'duration' in task_updates:
+                    task_clone.set_duration_and_update_end(
+                        task_updates['duration'], 
+                        self.data_manager.settings.duration_unit, 
+                        self.calendar_manager
+                    )
+                if 'percent_complete' in task_updates:
+                    task_clone.percent_complete = task_updates['percent_complete']
+                if 'predecessors' in task_updates:
+                    task_clone.predecessors = task_updates['predecessors']
+                if 'assigned_resources' in task_updates:
+                    task_clone.assigned_resources = task_updates['assigned_resources']
+                if 'notes' in task_updates:
+                    task_clone.notes = task_updates['notes']
+                    
+                new_task_data = task_clone.to_dict()
+                
+                cmd = EditTaskCommand(
+                    self.data_manager,
+                    tid,
+                    old_task_data,
+                    new_task_data
+                )
+                commands.append(cmd)
+                
+            if commands:
+                def on_success():
+                    def deferred_update():
+                        self._update_all_views()
+                        self.status_label.setText(f"✓ Bulk updated {len(commands)} task(s) successfully")
+                    QTimer.singleShot(0, deferred_update)
+                    
+                macro_cmd = MacroCommand(commands, on_success_callback=on_success)
+                if not self.command_manager.execute_command(macro_cmd):
+                    QMessageBox.warning(self, "Validation Error",
+                                      "Bulk update failed (e.g., circular dependency, invalid dates).")

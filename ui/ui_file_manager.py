@@ -72,6 +72,7 @@ class FileOperationsMixin:
             if success:
                 self.data_manager = data_manager
                 self.data_manager.calendar_manager = calendar_manager
+                self.data_manager.settings.add_listener(self._on_settings_changed)
                 self.calendar_manager = calendar_manager
                 self.current_file = file_path
                 # Update baseline comparison tab reference
@@ -149,6 +150,7 @@ class FileOperationsMixin:
             if success:
                 self.data_manager = data_manager
                 self.data_manager.calendar_manager = self.calendar_manager
+                self.data_manager.settings.add_listener(self._on_settings_changed)
                 # Update baseline comparison tab reference
                 if hasattr(self, 'baseline_comparison'):
                     self.baseline_comparison.data_manager = self.data_manager
@@ -258,6 +260,7 @@ class FileOperationsMixin:
                     if success:
                         self.data_manager = data_manager
                         self.data_manager.calendar_manager = calendar_manager
+                        self.data_manager.settings.add_listener(self._on_settings_changed)
                         self.calendar_manager = calendar_manager
                         self.current_file = path
                         # Update baseline comparison tab reference

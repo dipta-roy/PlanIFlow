@@ -329,3 +329,32 @@ class EditResourceCommand(Command):
                 self.on_success_callback()
             return True
         return False
+
+class MacroCommand(Command):
+    """Command to execute multiple commands as a single transaction"""
+    
+    def __init__(self, commands, on_success_callback=None):
+        self.commands = commands
+        self.on_success_callback = on_success_callback
+
+    def execute(self):
+        executed_commands = []
+        for cmd in self.commands:
+            if cmd.execute():
+                executed_commands.append(cmd)
+            else:
+                # Rollback executed commands
+                for roll in reversed(executed_commands):
+                    roll.undo()
+                return False
+        if self.on_success_callback:
+            self.on_success_callback()
+        return True
+
+    def undo(self):
+        for cmd in reversed(self.commands):
+            cmd.undo()
+        if self.on_success_callback:
+            self.on_success_callback()
+        return True
+

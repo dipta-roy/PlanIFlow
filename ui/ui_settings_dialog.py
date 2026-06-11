@@ -410,7 +410,7 @@ class SettingsDialog(QDialog):
 
         # 4. Save Interface Settings
         self.settings.default_date_format = self.date_format_combo.currentData()
-        self.settings.duration_unit = self.duration_unit_combo.currentData()
+        self.settings.set_duration_unit(self.duration_unit_combo.currentData())
         
         # Update App Font Size only if changed to avoid accidental resets
         new_font_size = self.font_size_spin.value()
