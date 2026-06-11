@@ -17,6 +17,22 @@ class GeneralViewOperationsMixin:
     def _update_all_views(self):
         """Update all UI views"""
         self._apply_stylesheet() # Ensure theme/font size is consistent
+        
+        # Update task tree header labels based on current settings
+        header_labels = [
+            "Schedule Type", "Status", "ID", "WBS", "Task Name", "Start Date", "End Date", 
+            self.data_manager.settings.get_duration_label(),
+            "% Complete", "Dependencies", "Resources", "Notes"
+        ]
+        self.task_tree.setHeaderLabels(header_labels)
+        
+        # Ensure WBS column visibility is respected
+        if hasattr(self, 'toggle_wbs_action'):
+            is_wbs_visible = self.toggle_wbs_action.isChecked()
+            self.task_tree.setColumnHidden(3, not is_wbs_visible)
+            if hasattr(self, 'sort_wbs_action'):
+                self.sort_wbs_action.setVisible(is_wbs_visible)
+                
         current_index = self.tabs.currentIndex()
         
         if current_index == 0: # Task List
