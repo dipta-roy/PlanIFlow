@@ -5,8 +5,9 @@ import traceback
 from data_manager.models import Task, ScheduleType, Resource
 from ui.ui_task_dialog import TaskDialog
 from ui.ui_resource_dialog import ResourceDialog
-from command_manager.commands import EditTaskCommand, DeleteTaskCommand, AddTaskCommand, MoveTaskCommand
+from command_manager.commands import EditTaskCommand, DeleteTaskCommand, AddTaskCommand, MoveTaskCommand, MacroCommand
 from constants.constants import ERROR_TITLE, ERROR_GENERIC_MESSAGE
+from ui.ui_bulk_add_dialog import BulkAddDialog
 
 class TaskOperationsMixin:
     """Mixin for task and resource operations in MainWindow"""
@@ -98,6 +99,72 @@ class TaskOperationsMixin:
             if not self.command_manager.execute_command(command):
                  QMessageBox.warning(self, "Validation Error", 
                                    "Task has circular dependencies or invalid dates.")
+    
+    def _bulk_add_tasks_dialog(self):
+        """Show dialog to bulk add tasks"""
+        selected_items = self.task_tree.selectedItems()
+        has_selection = len(selected_items) > 0
+        parent_id = None
+        if has_selection:
+            parent_id = selected_items[0].data(2, Qt.ItemDataRole.UserRole)
+            
+        dialog = BulkAddDialog(self, has_selection=has_selection)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            task_names = dialog.get_task_names()
+            if not task_names:
+                return
+            
+            # Create tasks with default values based on calendar settings
+            now = datetime.now()
+            start_hour, start_minute = self.data_manager.calendar_manager.get_working_start_time()
+            end_hour, end_minute = self.data_manager.calendar_manager.get_working_end_time()
+            
+            if self.data_manager.settings.project_start_date:
+                base_date = self.data_manager.settings.project_start_date
+            else:
+                base_date = now
+                
+            start_date = base_date.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+            end_date = base_date.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
+            
+            add_as_subtasks = dialog.is_add_as_subtasks()
+            effective_parent_id = parent_id if add_as_subtasks else None
+            
+            commands = []
+            for name in task_names:
+                task = Task(
+                    name=name,
+                    start_date=start_date,
+                    end_date=end_date,
+                    percent_complete=0,
+                    predecessors=[],
+                    assigned_resources=[],
+                    notes="",
+                    schedule_type=ScheduleType.AUTO_SCHEDULED,
+                    font_family='Arial',
+                    font_size=10,
+                    font_color='#000000',
+                    background_color='#FFFFFF'
+                )
+                commands.append(AddTaskCommand(
+                    self.data_manager, 
+                    task.to_dict(), 
+                    mode='append', 
+                    parent_id=effective_parent_id
+                ))
+            
+            def on_success():
+                self._update_all_views()
+                if effective_parent_id:
+                    self.expanded_tasks.add(effective_parent_id)
+                    self._update_all_views()
+                self.status_label.setText(f"✓ Successfully added {len(task_names)} tasks in bulk")
+                
+            macro = MacroCommand(commands, on_success_callback=on_success)
+            
+            if not self.command_manager.execute_command(macro):
+                QMessageBox.warning(self, "Validation Error", 
+                                  "Failed to add bulk tasks. Check dependencies or invalid dates.")
     
     def _add_subtask_dialog(self):
         """Show add subtask dialog"""

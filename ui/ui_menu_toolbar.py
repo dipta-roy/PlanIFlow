@@ -67,6 +67,12 @@ def create_menu_bar(window):
     add_task_action.triggered.connect(window._add_task_dialog)
     edit_menu.addAction(add_task_action)
 
+    # Bulk Add Tasks
+    bulk_add_task_action = QAction("Bulk Add &Tasks...", window)
+    bulk_add_task_action.setShortcut("Ctrl+Shift+D")
+    bulk_add_task_action.triggered.connect(window._bulk_add_tasks_dialog)
+    edit_menu.addAction(bulk_add_task_action)
+
     add_milestone_action = QAction("Add &Milestone", window)
     add_milestone_action.setShortcut("Ctrl+M")
     add_milestone_action.triggered.connect(window._add_milestone_dialog)
@@ -373,6 +379,11 @@ def create_toolbar(window):
     add_task_btn.setToolTip("Add Task")
     add_task_btn.triggered.connect(window._add_task_dialog)
     toolbar.addAction(add_task_btn)
+
+    bulk_add_task_btn = QAction("📑", window)
+    bulk_add_task_btn.setToolTip("Bulk Add Tasks (Ctrl+Shift+D)")
+    bulk_add_task_btn.triggered.connect(window._bulk_add_tasks_dialog)
+    toolbar.addAction(bulk_add_task_btn)
 
     add_subtask_btn = QAction("⨁", window)
     add_subtask_btn.setToolTip("Add Subtask")

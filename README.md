@@ -29,7 +29,6 @@ PlanIFlow is an **Offline-First**, standalone desktop application for project pl
 - [Screenshots](#screenshots)
 - [Shortcuts](#shortcuts)
 - [Batch Scripts](#batch-scripts)
-- [Building from Source](#building-from-source)
 - [Project Structure](#project-structure)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
@@ -43,6 +42,8 @@ PlanIFlow is an **Offline-First**, standalone desktop application for project pl
 - **Modular UI Architecture**: A well-organized and extensible user interface, making it easier to navigate and manage project elements.
 - **Project Settings Management**: Dedicated interface for configuring project-specific settings and preferences.
 - **Task Management**: Create, edit, delete tasks with dependencies (FS, SS, FF, SF + Lag).
+- **Bulk Add Tasks**: Quickly add multiple tasks at once by pasting a list of task names.
+- **Bulk Edit Tasks**: Update common properties (duration, completion %, predecessors, resources, notes) of multiple tasks simultaneously.
 - **Hierarchical Tasks**: Create summary tasks and sub-tasks.
 - **Inline Editing**: Directly edit task properties within the table for quick modifications.
 - **Context Menus**: Right-click on tasks for quick access to actions like edit, delete, indent, and outdent.
@@ -86,7 +87,7 @@ The application follows a modular architecture, separating data management, UI, 
 - **Core**: Python + PyQt6
 - **Data**: In-memory Pandas DataFrames, persisted to JSON/Excel.
 - **Security**: Strict input validation, no database server, no telemetry.
-- **Network**: Restricted to `updater/` package for GitHub Releases checks.
+- **Network**: Restricted to `updater/` package for GitHub releases checks.
 
 ## 🚀 Getting Started
 
@@ -103,14 +104,6 @@ Once the installation is complete, you can run the application by executing the 
 
 ```bash
 run.bat
-```
-
-or 
-
-Use the `build_msi.bat` script to generate an `PlanIFlow_Setup_2.2.0.msi` file.
-
-```bash
-build_msi.bat
 ```
 
 #### Linux/Mac
@@ -160,7 +153,7 @@ Download Code Verification Certificate: [Dipta Roy - Code Verification Certifica
 
 Once verified,
 ```
-Run PlanIFlow_2.2.0.msi and install the application.
+Run PlanIFlow_2.7.0.msi and install the application.
 ```
 
 ## 💻 Usage
@@ -174,11 +167,13 @@ Run PlanIFlow_2.2.0.msi and install the application.
 
 - **Add Resources**: Click the `👤 Add Resource` button in the toolbar.
 - **Add Tasks**: Click the `➕ Add Task` button to create a new task.
+- **Bulk Add Tasks**: Click the `📑 Bulk Add Tasks` button (or Edit > Bulk Add Tasks...) to paste a multiline list of task names and add them all in one batch (either as top-level tasks or subtasks under a selected task).
 - **Sub-tasks**: Select a task and click `➕ Add Subtask` to create a child task.
 
 ### Managing Tasks
 
 - **Inline Editing**: Double-click on a task field to edit.
+- **Bulk Edit Tasks**: Select multiple tasks, right-click, and choose **✏️ Bulk Edit Selected Tasks...** to bulk-update duration, completion %, predecessors, resources, or notes.
 - **Context Menu**: Right-click on any task row for more options.
 - **Indent/Outdent**: Use `Tab` and `Shift+Tab` to create hierarchy.
 
@@ -306,6 +301,7 @@ Track your project's cost and schedule performance with professional precision.
 | Shortcut         | Action                  |
 | ---------------- | ----------------------- |
 | `Ctrl+T`         | Add Task                |
+| `Ctrl+Shift+D`   | Bulk Add Tasks          |
 | `Ctrl+M`         | Add Milestone		     |
 | `Ctrl+Shift+T`   | Add Subtask             |
 | `Ctrl+N`         | New Project             |
@@ -330,25 +326,7 @@ Track your project's cost and schedule performance with professional precision.
 | Script              | Purpose                                                                        |
 | ------------------- | ------------------------------------------------------------------------------ |
 | `run.bat`           | Runs the application, installing dependencies if needed. |
-| `build.bat`         | Builds a standalone `.exe` (PyInstaller).                            |
-| `build_msi.bat`     | Builds a professional `.msi` installer using `cx_Freeze` + `PyInstaller` wrapper. |
 | `clean.bat`         | Cleans up build artifacts.   |
-
-## 🛠️ Building from Source
-
-To build a standalone executable or a professional installer from the source code, you can use the provided batch scripts.
-
--   **`build.bat`**: Creates a single `.exe` file in the `dist` folder.
--   **`build_msi.bat`**: RECOMMENDED. Creates a professional Windows Installer (`.msi`). This method is more compatible with antivirus software.
-
-### Building the MSI Installer
-
-1. Run `build_msi.bat` from the project root.
-2. The script will automatically:
-   - Create/Update virtual environment.
-   - Install dependencies.
-   - Compile the application.
-   - Package everything into a `.msi` file located in the `dist/` folder.
 
 ## 📂 Project Structure
 
@@ -373,7 +351,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## 📈 Security and Distribution
 
 - **Security Assessment**: [Full Report](https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md) – **Low Risk** (Secure Design).
-- **VirusTotal Report for MSI Installer**: [VirusTotal Report](https://www.virustotal.com/gui/file/1bee77abd9f0b187b0535eaaa87729750d16ba5b1116884dd42fac829257612a)
+- **VirusTotal Report for MSI Installer**: [VirusTotal Report](https://www.virustotal.com/gui/file/2b437fd3b2d6b627d79542de9487cdcf42e5f0e48ada15694e9c256f5bc6882a)
 - **Offline-First**: No data leaves your machine.
 - **Secure Updates**: HTTPS + SHA256 Hash Verification.
 - **Input Validation**: Strict limits on task counts (10k) and string lengths (250) to prevent DoS.

@@ -260,6 +260,7 @@ class GeneralViewOperationsMixin:
             ("Close Project", "Ctrl+W"),
             ("Quit", "Ctrl+Q"),
             ("Add Task", "Ctrl+T"),
+            ("Bulk Add Tasks", "Ctrl+Shift+D"),
             ("Add Milestone", "Ctrl+M"),
             ("Add Subtask", "Ctrl+Shift+T"),
             ("Insert Task Above", "Ctrl+Shift+A"),
