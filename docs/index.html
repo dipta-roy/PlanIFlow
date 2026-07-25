@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlanIFlow | Offline-First Project Planner</title>
+    <meta name="theme-color" content="#0f172a">
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="PlanIFlow is the ultimate offline-first desktop application for project planning, execution, and risk management. No cloud lock-in, total data control.">
+    <meta name="keywords" content="PlanIFlow, project planner, offline project management, Gantt chart software, Kanban board, Monte Carlo risk analysis, EVM, desktop application">
+    <meta name="author" content="Dipta Roy">
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="PlanIFlow | Offline-First Project Planner">
+    <meta property="og:description" content="Master your projects offline. The ultimate standalone desktop application for secure project planning, execution, and risk management.">
+    <!-- Replace this with a real screenshot URL if you host one -->
+    <meta property="og:image" content="https://dipta-roy.github.io/PlanIFlow/docs/screenshot/Dashboard.png">
+    <meta property="og:site_name" content="PlanIFlow">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="PlanIFlow | Offline-First Project Planner">
+    <meta property="twitter:description" content="Master your projects offline. The ultimate standalone desktop application for secure project planning, execution, and risk management.">
+    <meta property="twitter:image" content="https://dipta-roy.github.io/PlanIFlow/docs/screenshot/Dashboard.png">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-2EZ7F16X02"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-2EZ7F16X02');
+    </script>
+
+    <!-- Fonts & Styles -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Top Navigation -->
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo">📊 PlanIFlow</a>
+            <ul class="nav-links">
+                <li><a href="#hero" class="active">Overview</a></li>
+                <li><a href="#mvp">Core Value</a></li>
+                <li><a href="#interactive-features">Features</a></li>
+                <li><a href="#screenshots">Gallery</a></li>
+                <li><a href="#security">Security</a></li>
+                <li><a href="#download" class="btn outline-btn">Download</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section id="hero" class="hero section">
+            <div class="container text-center" data-animate="fade-up">
+                <h1 class="hero-title gradient-text">Stop Paying for Cloud Subscriptions. Take Back Control.</h1>
+                <p class="hero-subtitle">
+                    The ultimate offline-first desktop application for project planning, execution, and risk management.
+                    Own your data, manage your timelines securely, and deliver on budget.
+                </p>
+                <div class="badges justify-center mt-4">
+                    <span class="badge">Project Managers</span>
+                    <span class="badge">Security-Conscious Enterprises</span>
+                    <span class="badge">Solo Contractors</span>
+                </div>
+                <div class="hero-actions mt-6">
+                    <a href="#download" class="btn primary-btn btn-large magnetic">Download PlanIFlow</a>
+                    <a href="#mvp" class="btn secondary-btn btn-large magnetic">See the ROI</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section (Dynamic Counters) -->
+        <section id="stats" class="stats section bg-darker">
+            <div class="container">
+                <div class="stats-grid" data-animate="fade-up">
+                    <div class="stat-card">
+                        <div class="stat-number gradient-text" data-target="10000">0</div>
+                        <div class="stat-label">Tasks Supported per Project</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number gradient-text" data-target="11">0</div>
+                        <div class="stat-label">Project Baselines</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number gradient-text" data-target="100">0</div><span
+                            class="stat-suffix gradient-text">%</span>
+                        <div class="stat-label">Offline & Secure Data</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MVP / Core Value Propositions -->
+        <section id="mvp" class="mvp section">
+            <div class="container text-center" data-animate="fade-up">
+                <h2 class="section-title">Most Valuable Propositions (MVPs)</h2>
+                <p class="section-description">Why industry professionals are switching to PlanIFlow.</p>
+
+                <div class="mvp-grid mt-6">
+                    <div class="mvp-card glass-panel" data-animate="fade-up" data-delay="0.1s">
+                        <div class="feature-icon">🔒</div>
+                        <h3>Zero Data Exfiltration Risk</h3>
+                        <p>No databases, no cloud storage, no telemetry. Your project data stays on your local machine,
+                            passing the strictest enterprise security requirements.</p>
+                    </div>
+                    <div class="mvp-card glass-panel" data-animate="fade-up" data-delay="0.2s">
+                        <div class="feature-icon">💸</div>
+                        <h3>No Recurring Fees</h3>
+                        <p>Ditch the expensive monthly SaaS subscriptions. PlanIFlow provides professional-grade tools
+                            like EVM and Monte Carlo analysis with a one-time setup.</p>
+                    </div>
+                    <div class="mvp-card glass-panel" data-animate="fade-up" data-delay="0.3s">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Instant Native Performance</h3>
+                        <p>Built with PyQt6 and Python, experience zero latency. Large projects with thousands of tasks
+                            load instantly without waiting for a web request.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Feature Tabs (Minimum Viable Products) -->
+        <section id="interactive-features" class="interactive-features section bg-darker">
+            <div class="container">
+                <h2 class="section-title text-center" data-animate="fade-up">Core Minimum Viable Product</h2>
+                <p class="section-description text-center" data-animate="fade-up">Explore the robust features that make
+                    PlanIFlow the complete package.</p>
+
+                <div class="interactive-tabs-container mt-6" data-animate="fade-up">
+                    <!-- Tab Buttons -->
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" data-tab="gantt">Dynamic Gantt Charts</button>
+                        <button class="tab-btn" data-tab="kanban">Interactive Kanban</button>
+                        <button class="tab-btn" data-tab="risk">Monte Carlo Analysis</button>
+                        <button class="tab-btn" data-tab="evm">Earned Value (EVM)</button>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content-area glass-panel">
+                        <!-- Gantt Tab -->
+                        <div class="tab-pane active" id="tab-gantt">
+                            <div class="tab-split">
+                                <div class="tab-text">
+                                    <h3>Visualize Your Timeline</h3>
+                                    <p>Real-time visualization of your project timeline. Includes interactive tooltips,
+                                        zoom capabilities, and instant critical path highlighting to keep your project
+                                        on track.</p>
+                                    <ul class="check-list mt-4">
+                                        <li>Standard Dependency Notation (FS, SS, FF, SF)</li>
+                                        <li>Custom lead and lag times</li>
+                                        <li>Hierarchical summary and sub-tasks</li>
+                                    </ul>
+                                </div>
+                                <div class="tab-image">
+                                    <img src="../screenshot/Gantt Chart.png" alt="Dynamic Gantt Chart"
+                                        class="interactive-img">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Kanban Tab -->
+                        <div class="tab-pane" id="tab-kanban">
+                            <div class="tab-split">
+                                <div class="tab-text">
+                                    <h3>Agile Execution</h3>
+                                    <p>Visual task management with drag-and-drop cards. Organize your workflow
+                                        seamlessly by status: To Do, In Progress, Delayed, Blocked, and Completed.</p>
+                                    <ul class="check-list mt-4">
+                                        <li>Task-level and resource-level filtering</li>
+                                        <li>Quick-edit notes directly on cards</li>
+                                        <li>Visual block indicators</li>
+                                    </ul>
+                                </div>
+                                <div class="tab-image">
+                                    <img src="../screenshot/Kanban Board.png" alt="Interactive Kanban"
+                                        class="interactive-img">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Risk Tab -->
+                        <div class="tab-pane" id="tab-risk">
+                            <div class="tab-split">
+                                <div class="tab-text">
+                                    <h3>Forecast with Confidence</h3>
+                                    <p>Don't guess your completion dates. Run thousands of statistical simulations to
+                                        accurately forecast your project completion dates and identify the highest-risk
+                                        tasks.</p>
+                                    <ul class="check-list mt-4">
+                                        <li>P50, P80, P90 Confidence Intervals</li>
+                                        <li>Top Risk Drivers Identification</li>
+                                        <li>Completion Date Distribution Charts</li>
+                                    </ul>
+                                </div>
+                                <div class="tab-image">
+                                    <img src="../screenshot/Risk Analysis.png" alt="Monte Carlo Analysis"
+                                        class="interactive-img">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- EVM Tab -->
+                        <div class="tab-pane" id="tab-evm">
+                            <div class="tab-split">
+                                <div class="tab-text">
+                                    <h3>Professional Metrics</h3>
+                                    <p>Track project performance using industry-standard Earned Value Management
+                                        metrics. Instantly know if you are over budget or behind schedule.</p>
+                                    <ul class="check-list mt-4">
+                                        <li>Calculates CPI, SPI, CV, SV, EAC, and VAC</li>
+                                        <li>Plain-English Health Summaries</li>
+                                        <li>Comprehensive Excel Export Dashboard</li>
+                                    </ul>
+                                </div>
+                                <div class="tab-image">
+                                    <img src="../screenshot/EVM Analysis.png" alt="Earned Value Management"
+                                        class="interactive-img">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Screenshots Gallery Section -->
+        <section id="screenshots" class="screenshots section">
+            <div class="container">
+                <h2 class="section-title text-center" data-animate="fade-up">See it in Action</h2>
+                <div class="gallery-grid mt-6" data-animate="fade-up">
+                    <div class="gallery-item">
+                        <img src="../screenshot/Dashboard.png" alt="Dashboard" loading="lazy">
+                        <div class="gallery-caption">Comprehensive Dashboard</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="../screenshot/Project Baseline.png" alt="Project Baselining" loading="lazy">
+                        <div class="gallery-caption">Variance Tracking</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="../screenshot/Resource.png" alt="Resource Management" loading="lazy">
+                        <div class="gallery-caption">Resource Allocation</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="../screenshot/Task_List.png" alt="Task List" loading="lazy">
+                        <div class="gallery-caption">Advanced Task Management</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security Section -->
+        <section id="security" class="security section bg-darker">
+            <div class="container" data-animate="fade-up">
+                <div class="split-layout">
+                    <div class="security-content">
+                        <h2 class="section-title">Enterprise-Grade Security</h2>
+                        <h3 class="security-rating gradient-text">Assessment: LOW RISK – SECURE</h3>
+                        <p class="mt-4">
+                            PlanIFlow is designed from the ground up to respect your privacy and secure your data.
+                            Assessed via static code analysis, manual review, and STRIDE threat modeling.
+                        </p>
+                        <ul class="security-list mt-4">
+                            <li><strong>Zero Cloud Dependency:</strong> Fully offline data storage. No database server
+                                or persistent network listeners.</li>
+                            <li><strong>Strict Input Validation:</strong> Advanced parsing prevents memory exhaustion
+                                and blocks malformed data. Max limits applied to task strings and sizes.</li>
+                            <li><strong>Secure Auto-Updates:</strong> Uses HTTPS + SHA256 integrity verification to
+                                guarantee downloaded updates are untampered.</li>
+                        </ul>
+                    </div>
+                    <div class="security-badge-container glass-panel">
+                        <div class="shield-icon">🛡️</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action / Download -->
+        <section id="download" class="cta section">
+            <div class="container text-center glass-panel cta-panel" data-animate="fade-up">
+                <h2>Ready to take control of your projects?</h2>
+                <p class="mt-4 mb-6">Join users who trust PlanIFlow for their critical project management.</p>
+
+                <div id="latest-release-container" class="mb-6">
+                    <a href="https://github.com/dipta-roy/PlanIFlow/releases/latest" id="latest-download-btn"
+                        class="btn primary-btn btn-large magnetic" target="_blank">
+                        ⬇️ Download Latest Release <span id="latest-version-text"></span>
+                    </a>
+                    <p class="text-sm text-muted mt-2" id="latest-release-date"></p>
+                </div>
+
+                <div class="divider"></div>
+
+                <h3 class="mt-6 mb-4" style="color: var(--text-muted); font-size: 1.125rem;">Or run from source:</h3>
+                <div class="install-instructions">
+                    <div class="code-block">
+                        <div class="code-header">Windows (Source)</div>
+                        <code>run.bat</code>
+                    </div>
+                    <div class="code-block mt-4">
+                        <div class="code-header">Linux / Mac (Source)</div>
+                        <code>python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python3 main.py</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container text-center">
+            <p>Built with ❤️ by Dipta Roy.</p>
+            <p class="text-muted text-sm mt-2">Licensed under the MIT License.</p>
+        </div>
+    </footer>
+
+    <!-- Image Modal -->
+    <div id="image-modal" class="modal">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="modal-img">
+        <div id="modal-caption"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
