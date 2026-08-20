@@ -3,29 +3,31 @@ Contains task-related helper classes and a function to create the task tree widg
 This module exposes create_task_tree(main_window) -> QTreeWidget
 """
 
-from PyQt6.QtWidgets import QTreeWidget, QHeaderView, QComboBox, QDateEdit, QStyleOptionViewItem, QWidget, QStyle, QAbstractItemView
+from typing import Optional
+from PyQt6.QtWidgets import QTreeWidget, QHeaderView, QComboBox, QDateEdit, QStyleOptionViewItem, QWidget, QStyle, QAbstractItemView, QLineEdit
 from PyQt6.QtCore import Qt, QModelIndex, QAbstractItemModel, QDate
-from PyQt6.QtGui import QColor, QBrush, QPainter, QStandardItemModel, QStandardItem,  QShortcut, QKeySequence, QFont, QFontDatabase
+from PyQt6.QtGui import QColor, QBrush, QPainter, QStandardItemModel, QStandardItem, QShortcut, QKeySequence, QFont, QFontDatabase, QIcon
 from PyQt6.QtWidgets import QStyledItemDelegate
 from settings_manager.settings_manager import DateFormat
-from data_manager.models import ScheduleType
 from constants.constants import CIRCLE_SIZE, LEFT_PADDING, TEXT_SHIFT
 
 class ColorDelegate(QStyledItemDelegate):
     """Custom delegate to show colored status indicators"""
     
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+    def paint(self, painter: Optional[QPainter], option: QStyleOptionViewItem, index: QModelIndex):
         """Paint cell with color indicator and text"""
+        if not painter:
+            return
         # Get status color from item data
         color_name = index.data(Qt.ItemDataRole.UserRole)
         status_text = index.data(Qt.ItemDataRole.DisplayRole)
         
         # Draw background
-        if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(option.rect, option.palette.highlight())
+        if QStyle.StateFlag(option.state) & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())  # type: ignore
             text_color = option.palette.highlightedText().color()
         else:
-            painter.fillRect(option.rect, option.palette.base())
+            painter.fillRect(option.rect, option.palette.base())  # type: ignore
             text_color = option.palette.text().color()
         
         if color_name and status_text:
@@ -72,13 +74,13 @@ class ColorDelegate(QStyledItemDelegate):
         size.setHeight(max(size.height(), 24))
         return size
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+    def createEditor(self, parent: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex) -> Optional[QWidget]:
         """Disable editing for this column"""
         return None
 
 class NoEditDelegate(QStyledItemDelegate):
     """Delegate to disable editing for specific columns"""
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+    def createEditor(self, parent: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex) -> Optional[QWidget]:
         return None
 
 class DateDelegate(QStyledItemDelegate):
@@ -99,13 +101,15 @@ class DateDelegate(QStyledItemDelegate):
                 return "yyyy-MM-dd"
         return "yyyy-MM-dd" # Default fallback
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+    def createEditor(self, parent: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         editor = QDateEdit(parent)
         editor.setCalendarPopup(True)
         editor.setDisplayFormat(self._get_qdate_format_string())
         return editor
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex):
+    def setEditorData(self, editor: Optional[QWidget], index: QModelIndex):
+        if not editor or not isinstance(editor, QDateEdit):
+            return
         date_str = index.data(Qt.ItemDataRole.DisplayRole)
         if date_str and date_str != "Milestone":
             date = QDate.fromString(date_str, self._get_qdate_format_string())
@@ -113,14 +117,17 @@ class DateDelegate(QStyledItemDelegate):
         else:
             editor.setDate(QDate.currentDate())
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
+    def setModelData(self, editor: Optional[QWidget], model: Optional[QAbstractItemModel], index: QModelIndex):
+        if not model:
+            return
         if isinstance(editor, QDateEdit):
             model.setData(index, editor.date().toString(self._get_qdate_format_string()), Qt.ItemDataRole.EditRole)
         else:
             super().setModelData(editor, model, index)
 
-    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
-        editor.setGeometry(option.rect)
+    def updateEditorGeometry(self, editor: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex):
+        if editor:
+            editor.setGeometry(option.rect)
 
 class CheckableComboBox(QComboBox):
     """ComboBox with checkable items for multi-selection"""
@@ -139,10 +146,34 @@ class CheckableComboBox(QComboBox):
             item.setCheckState(Qt.CheckState.Checked)
         self._update_text()
 
-    def addItem(self, text, data=None):
+    def addItem(self, *args, **kwargs):
+        icon = None
+        text = ""
+        user_data = kwargs.get("userData", kwargs.get("data", None))
+
+        if args:
+            if isinstance(args[0], QIcon):
+                icon = args[0]
+                if len(args) > 1:
+                    text = str(args[1]) if args[1] is not None else ""
+                if len(args) > 2 and user_data is None:
+                    user_data = args[2]
+            else:
+                text = str(args[0]) if args[0] is not None else ""
+                if len(args) > 1 and user_data is None:
+                    user_data = args[1]
+        elif "text" in kwargs:
+            text = str(kwargs["text"]) if kwargs["text"] is not None else ""
+            if "icon" in kwargs:
+                icon = kwargs["icon"]
+
         item = QStandardItem(text)
+        if icon is not None:
+            item.setIcon(icon)
         item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
         item.setData(Qt.CheckState.Unchecked, Qt.ItemDataRole.CheckStateRole)
+        if user_data is not None:
+            item.setData(user_data, Qt.ItemDataRole.UserRole)
         self.model().appendRow(item)
 
     def addItems(self, texts):
@@ -190,14 +221,15 @@ class ResourceDelegate(QStyledItemDelegate):
         """Update the internal list of resource names"""
         self._resource_names = resource_names
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+    def createEditor(self, parent: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         if index.column() == 10: 
             editor = CheckableComboBox(parent)
             editor.addItems(self._resource_names)
             return editor
-        return super().createEditor(parent, option, index)
+        res = super().createEditor(parent, option, index)
+        return res if res is not None else QWidget(parent)
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex):
+    def setEditorData(self, editor: Optional[QWidget], index: QModelIndex):
         if index.column() == 10:
             current_resources_str = index.data(Qt.ItemDataRole.DisplayRole)
             if isinstance(editor, CheckableComboBox):
@@ -210,7 +242,9 @@ class ResourceDelegate(QStyledItemDelegate):
         else:
             super().setEditorData(editor, index)
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
+    def setModelData(self, editor: Optional[QWidget], model: Optional[QAbstractItemModel], index: QModelIndex):
+        if not model:
+            return
         if index.column() == 10:
             if isinstance(editor, CheckableComboBox):
                 checked_items = editor.get_checked_items()               
@@ -220,8 +254,9 @@ class ResourceDelegate(QStyledItemDelegate):
         else:
             super().setModelData(editor, model, index)
 
-    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
-        editor.setGeometry(option.rect)
+    def updateEditorGeometry(self, editor: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex):
+        if editor:
+            editor.setGeometry(option.rect)
 
 class ScheduleTypeDelegate(QStyledItemDelegate):
     """Custom delegate for Schedule Type column with a QComboBox"""
@@ -229,12 +264,12 @@ class ScheduleTypeDelegate(QStyledItemDelegate):
         super().__init__(parent)
         self.main_window = main_window
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+    def createEditor(self, parent: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         editor = QComboBox(parent)
         editor.addItems(["Auto Scheduled (Auto)", "Manually Scheduled (Manual)"])
         return editor
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex):
+    def setEditorData(self, editor: Optional[QWidget], index: QModelIndex):
         current_schedule_type = index.data(Qt.ItemDataRole.DisplayRole)
         if isinstance(editor, QComboBox):
             if current_schedule_type == "Auto":
@@ -244,7 +279,9 @@ class ScheduleTypeDelegate(QStyledItemDelegate):
             else:
                 editor.setCurrentText(current_schedule_type)
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
+    def setModelData(self, editor: Optional[QWidget], model: Optional[QAbstractItemModel], index: QModelIndex):
+        if not model:
+            return
         if isinstance(editor, QComboBox):
             text = editor.currentText()
             # Map back to code
@@ -263,20 +300,65 @@ class ScheduleTypeDelegate(QStyledItemDelegate):
         else:
             super().setModelData(editor, model, index)
 
-    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
-        editor.setGeometry(option.rect)
+    def updateEditorGeometry(self, editor: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex):
+        if editor:
+            editor.setGeometry(option.rect)
 
 class TaskNameDelegate(QStyledItemDelegate):
-    """Custom delegate for Task Name column with font styling"""
+    """Custom delegate for Task Name column with hierarchy indentation and font styling"""
     def __init__(self, parent=None, main_window=None):
         super().__init__(parent)
         self.main_window = main_window
+
+    def createEditor(self, parent: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+        editor = QLineEdit(parent)
+        return editor
+
+    def setEditorData(self, editor: Optional[QWidget], index: QModelIndex):
+        if isinstance(editor, QLineEdit):
+            item = None
+            tree_widget = self.parent()
+            if tree_widget and hasattr(tree_widget, 'itemFromIndex'):
+                item = tree_widget.itemFromIndex(index)
+            if item and self.main_window:
+                task_id = item.data(2, Qt.ItemDataRole.UserRole)
+                task = self.main_window.data_manager.get_task(task_id) if task_id is not None else None
+                if task:
+                    editor.setText(task.name)
+                    return
+        super().setEditorData(editor, index)
+
+    def setModelData(self, editor: Optional[QWidget], model: Optional[QAbstractItemModel], index: QModelIndex):
+        if isinstance(editor, QLineEdit) and model:
+            clean_name = editor.text().lstrip(' ▶◆').strip()
+            model.setData(index, clean_name, Qt.ItemDataRole.EditRole)
+        else:
+            super().setModelData(editor, model, index)
+
+    def updateEditorGeometry(self, editor: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex):
+        if editor:
+            item = None
+            tree_widget = self.parent()
+            if tree_widget and hasattr(tree_widget, 'itemFromIndex'):
+                item = tree_widget.itemFromIndex(index)
+            if item and self.main_window:
+                task_id = item.data(2, Qt.ItemDataRole.UserRole)
+                task = self.main_window.data_manager.get_task(task_id) if task_id is not None else None
+                if task and task.wbs:
+                    level = task.wbs.count('.')
+                    indent_offset = level * 20
+                    editor.setGeometry(option.rect.adjusted(5 + indent_offset, 0, 0, 0))
+                    return
+            editor.setGeometry(option.rect)
     
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
-        """Paint cell with custom font styling"""
+    def paint(self, painter: Optional[QPainter], option: QStyleOptionViewItem, index: QModelIndex):
+        """Paint cell with custom font styling and hierarchy indentation"""
+        if not painter:
+            return
         # Get the tree widget item
         tree_widget = self.parent()
-        if hasattr(tree_widget, 'itemFromIndex'):
+        item = None
+        if tree_widget and hasattr(tree_widget, 'itemFromIndex'):
             item = tree_widget.itemFromIndex(index)
         else:
             # Fallback to default painting
@@ -333,13 +415,10 @@ class TaskNameDelegate(QStyledItemDelegate):
         # Draw background
         painter.save()
         
-        if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(option.rect, option.palette.highlight())
-        else:
-            if bg_color and bg_color.lower() != '#ffffff':
-                 painter.fillRect(option.rect, QColor(bg_color))
-            else:
-                 painter.fillRect(option.rect, Qt.BrushStyle.NoBrush) 
+        if QStyle.StateFlag(option.state) & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())  # type: ignore
+        elif bg_color and bg_color.lower() != '#ffffff':
+            painter.fillRect(option.rect, QColor(bg_color))  # type: ignore
         
         # Create and set font
         font = QFont(font_family, font_size)
@@ -349,7 +428,7 @@ class TaskNameDelegate(QStyledItemDelegate):
         painter.setFont(font)
         
         # Set text color
-        if option.state & QStyle.StateFlag.State_Selected:
+        if QStyle.StateFlag(option.state) & QStyle.StateFlag.State_Selected:
             painter.setPen(option.palette.highlightedText().color())
         else:
             default_colors = ['#000000', '#00000000', 'black']
@@ -358,10 +437,14 @@ class TaskNameDelegate(QStyledItemDelegate):
             else:
                  painter.setPen(QColor(font_color))
         
+        # Calculate hierarchy indentation offset
+        level = task.wbs.count('.') if getattr(task, 'wbs', None) else 0
+        indent_offset = level * 20
+
         # Draw text
         text = index.data(Qt.ItemDataRole.DisplayRole)
         if text:
-            painter.drawText(option.rect.adjusted(5, 0, -5, 0), 
+            painter.drawText(option.rect.adjusted(5 + indent_offset, 0, -5, 0), 
                            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, 
                            text)
         
@@ -400,10 +483,10 @@ def create_task_tree(main_window):
     tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
     tree.setIndentation(0)
-    tree.setRootIsDecorated(True)
+    tree.setRootIsDecorated(False)
     tree.setSortingEnabled(False)
     header = tree.header()
-    header.setSortIndicator(2, Qt.SortOrder.AscendingOrder)
+    header.setSortIndicator(3, Qt.SortOrder.AscendingOrder)
     
     # First, resize all sections to their content
     for i in range(tree.columnCount()):
@@ -457,6 +540,5 @@ def create_task_tree(main_window):
     collapse_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Minus), tree)
     collapse_shortcut.activated.connect(main_window._collapse_selected)
 
-    return tree
-
     tree.main_window = main_window
+    return tree

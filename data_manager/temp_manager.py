@@ -71,7 +71,7 @@ class TempFileManager:
                 try:
                     os.remove(update_msi)
                     logging.info("Cleaned up leftover update installer.")
-                except:
+                except Exception:
                     pass # May be in use or locked
             
             # 2. Cleanup session directories
@@ -85,7 +85,7 @@ class TempFileManager:
                             import shutil
                             shutil.rmtree(item_path)
                             logging.info(f"Cleaned up stale temp session: {item}")
-                        except:
+                        except Exception:
                             pass
         except Exception as e:
             logging.debug(f"Error scanning for old sessions: {e}")

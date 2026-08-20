@@ -1,9 +1,10 @@
 """
 Exporter - Handles Excel and JSON import/export
 """
+import os
 import json
 import re
-from typing import Tuple
+from typing import Tuple, Dict, Any
 from datetime import datetime
 import pandas as pd
 from data_manager.manager import DataManager
@@ -25,76 +26,59 @@ class Exporter:
             return '%Y-%m-%dT%H:%M:%S'
 
     @staticmethod
+    def _build_excel_task_row(task: Task, level: int, data_manager: DataManager, date_format_str: str, duration_label: str) -> Dict[str, Any]:
+        pred_text = ', '.join([
+            f"{pred_id} ({DependencyType[dep_type].value}{f'{lag_days:+d}d' if lag_days != 0 else ''})" 
+            for pred_id, dep_type, lag_days in task.predecessors
+        ])
+        resources_text = ', '.join([f"{name} ({alloc}%)" for name, alloc in task.assigned_resources])
+        display_name = ProjectValidator.sanitize_string(task.name)
+        duration = task.get_duration(data_manager.settings.duration_unit, data_manager.calendar_manager)
+        dur_val = 0 if task.is_milestone else (f"{duration:.1f}" if data_manager.settings.duration_unit == DurationUnit.HOURS else int(duration))
+
+        return {
+            'Task ID': task.id,
+            'WBS': task.wbs,
+            'Task Name': display_name,
+            'Type': 'Milestone' if task.is_milestone else ('Summary' if task.is_summary else 'Task'),
+            'Schedule Mode': task.schedule_type.value,
+            'Level': level,
+            'Parent ID': task.parent_id if task.parent_id else '',
+            'Is Summary': 'Yes' if task.is_summary else 'No',
+            'Is Milestone': 'Yes' if task.is_milestone else 'No',
+            'Start Date': task.start_date.strftime(date_format_str),
+            'End Date': task.end_date.strftime(date_format_str) if not task.is_milestone else task.start_date.strftime(date_format_str),
+            duration_label: dur_val,
+            '% Complete': task.percent_complete,
+            'Status': task.get_status_text(),
+            'Status Color': task.get_status_color(),
+            'Predecessors': pred_text,
+            'Assigned Resources': resources_text,
+            'Notes': ProjectValidator.sanitize_string(task.notes),
+            'Font Family': getattr(task, 'font_family', 'Arial'),
+            'Font Size': getattr(task, 'font_size', 10),
+            'Font Color': getattr(task, 'font_color', '#000000'),
+            'Background Color': getattr(task, 'background_color', '#FFFFFF'),
+            'Font Bold': 'Yes' if getattr(task, 'font_bold', False) else 'No',
+            'Font Italic': 'Yes' if getattr(task, 'font_italic', False) else 'No',
+            'Font Underline': 'Yes' if getattr(task, 'font_underline', False) else 'No'
+        }
+
+    @staticmethod
     def export_to_excel(data_manager: DataManager, filepath: str) -> bool:
         """Export project to Excel file with hierarchy and dependency types"""
         try:
-            # Get duration unit label
             duration_label = data_manager.settings.get_duration_label()
             date_format_enum = data_manager.settings.default_date_format
             date_format_str = Exporter._get_date_format_string(date_format_enum)
             
-            # Prepare tasks dataframe with hierarchy
             tasks_data = []
-            
-            # Helper function to add tasks in hierarchical order
             def add_task_and_children(task: Task, level: int = 0):
-                # Calculate status
-                status = task.get_status_text()
-                status_color = task.get_status_color()
-                
-                pred_text = ', '.join([
-                    f"{pred_id} ({DependencyType[dep_type].value}{f'{lag_days:+d}d' if lag_days != 0 else ''})" 
-                    for pred_id, dep_type, lag_days in task.predecessors
-                ])
-
-                # Format assigned resources with allocation
-                resources_text = ', '.join([f"{name} ({alloc}%)" for name, alloc in task.assigned_resources])
-                
-                # Task name without indentation
-                display_name = ProjectValidator.sanitize_string(task.name)
-                
-                duration = task.get_duration(
-                    data_manager.settings.duration_unit,
-                    data_manager.calendar_manager
-                )
-                
-                tasks_data.append({
-                    'Task ID': task.id,
-                    'WBS': task.wbs,
-                    'Task Name': display_name,
-                    'Type': 'Milestone' if task.is_milestone else ('Summary' if task.is_summary else 'Task'),
-                    'Schedule Mode': task.schedule_type.value,
-                    'Level': level,
-                    'Parent ID': task.parent_id if task.parent_id else '',
-                    'Is Summary': 'Yes' if task.is_summary else 'No',
-                    'Is Milestone': 'Yes' if task.is_milestone else 'No',
-                    'Start Date': task.start_date.strftime(date_format_str),
-                    'End Date': task.end_date.strftime(date_format_str) if not task.is_milestone else task.start_date.strftime(date_format_str),
-                    duration_label: 0 if task.is_milestone else (f"{duration:.1f}" if data_manager.settings.duration_unit == DurationUnit.HOURS else int(duration)),
-                    '% Complete': task.percent_complete,
-                    'Status': status,
-                    'Status Color': status_color,
-                    'Predecessors': pred_text,
-                    'Assigned Resources': ', '.join([f"{ProjectValidator.sanitize_string(name)} ({alloc}%)" for name, alloc in task.assigned_resources]),
-                    'Notes': ProjectValidator.sanitize_string(task.notes),
-                    # Font styling properties
-                    'Font Family': getattr(task, 'font_family', 'Arial'),
-                    'Font Size': getattr(task, 'font_size', 10),
-                    'Font Color': getattr(task, 'font_color', '#000000'),
-                    'Background Color': getattr(task, 'background_color', '#FFFFFF'),
-                    'Font Bold': 'Yes' if getattr(task, 'font_bold', False) else 'No',
-                    'Font Italic': 'Yes' if getattr(task, 'font_italic', False) else 'No',
-                    'Font Underline': 'Yes' if getattr(task, 'font_underline', False) else 'No'
-                })
-                
-                # Add children
-                children = data_manager.get_child_tasks(task.id)
-                for child in sorted(children, key=lambda t: t.start_date):
+                tasks_data.append(Exporter._build_excel_task_row(task, level, data_manager, date_format_str, duration_label))
+                for child in sorted(data_manager.get_child_tasks(task.id), key=lambda t: t.start_date):
                     add_task_and_children(child, level + 1)
             
-            # Add all top-level tasks
-            top_level = data_manager.get_top_level_tasks()
-            for task in sorted(top_level, key=lambda t: t.start_date):
+            for task in sorted(data_manager.get_top_level_tasks(), key=lambda t: t.start_date):
                 add_task_and_children(task, 0)
             
             # Prepare resources dataframe
@@ -114,31 +98,32 @@ class Exporter:
                 })
             
             # Prepare summary dataframe
+            proj_start = data_manager.get_project_start_date()
+            proj_end = data_manager.get_project_end_date()
+
             summary_data = {
                 'Metric': [
                     'Project Name',
-                    'Project Start Date',
-                    'Project End Date',
+                    'Start Date',
+                    'End Date',
                     'Working Hours Start',
                     'Working Hours End',
                     'Total Tasks',
                     'Summary Tasks',
                     'Work Tasks',
-                    'Total Resources',
-                    'Overall % Complete',
-                    'Total Project Duration (days)',
-                    'Export Date',
-                    'File Version',
+                    'Resources',
+                    'Overall Completion',
+                    'Duration (Days)',
+                    'Report Date',
+                    'Schema Version',
                     'Date Format',
                     'Currency',
                     'Total Project Cost'
                 ],
                 'Value': [
                     ProjectValidator.sanitize_string(data_manager.project_name),
-                    data_manager.get_project_start_date().strftime(date_format_str) 
-                        if data_manager.get_project_start_date() else 'N/A',
-                    data_manager.get_project_end_date().strftime(date_format_str)
-                        if data_manager.get_project_end_date() else 'N/A',
+                    proj_start.strftime(date_format_str) if proj_start else 'N/A',
+                    proj_end.strftime(date_format_str) if proj_end else 'N/A',
                     data_manager.calendar_manager.working_hours_start if data_manager.calendar_manager else '08:00',
                     data_manager.calendar_manager.working_hours_end if data_manager.calendar_manager else '16:00',
                     len(data_manager.tasks),
@@ -146,8 +131,7 @@ class Exporter:
                     sum(1 for t in data_manager.tasks if not t.is_summary),
                     len(data_manager.resources),
                     f"{data_manager.get_overall_completion():.1f}%",
-                    (data_manager.get_project_end_date() - data_manager.get_project_start_date()).days + 1
-                        if data_manager.get_project_start_date() and data_manager.get_project_end_date() else 'N/A',
+                    (proj_end - proj_start).days + 1 if (proj_start and proj_end) else 'N/A',
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     '2.3',
                     date_format_enum.value,
@@ -157,7 +141,7 @@ class Exporter:
             }
             
             # Prepare status breakdown
-            status_counts = {}
+            status_counts: Dict[str, int] = {}
             for task in data_manager.tasks:
                 if not task.is_summary:
                     status = task.get_status_text()
@@ -169,13 +153,13 @@ class Exporter:
             }
             
             # Prepare dependency types breakdown
-            dep_type_counts = {}
+            dep_type_counts: Dict[str, int] = {}
             for task in data_manager.tasks:
                 for pred_id, dep_type, lag_days in task.predecessors:
                     try:
                         dep_name = DependencyType[dep_type].value
                         dep_type_counts[dep_name] = dep_type_counts.get(dep_name, 0) + 1
-                    except:
+                    except Exception:
                         pass
             
             dep_data = {
@@ -190,7 +174,6 @@ class Exporter:
                 df_summary.to_excel(writer, sheet_name='Summary', index=False)
                 
                 # Format summary sheet
-                workbook = writer.book
                 summary_sheet = writer.sheets['Summary']
                 for col in summary_sheet.columns:
                     max_length = max(len(str(cell.value)) for cell in col)
@@ -210,7 +193,6 @@ class Exporter:
                     # Apply color coding to status column and font styling to Task Name
                     from openpyxl.styles import PatternFill, Font
                     
-                    status_col_idx = df_tasks.columns.get_loc('Status Color') + 1
                     task_name_col_idx = df_tasks.columns.get_loc('Task Name') + 1
                     
                     for row_idx, row in df_tasks.iterrows():
@@ -243,8 +225,9 @@ class Exporter:
                         else:
                             try:
                                 font_size = int(font_size_val)
-                                if font_size <= 0: font_size = 10
-                            except:
+                                if font_size <= 0:
+                                    font_size = 10
+                            except Exception:
                                 font_size = 10
                                 
                         font_color_hex = str(row.get('Font Color', '000000')).lstrip('#')
@@ -316,8 +299,8 @@ class Exporter:
                                 'Task ID': snapshot.task_id,
                                 'Task Name': snapshot.task_name,
                                 'WBS': snapshot.wbs,
-                                'Start Date': snapshot.start_date.strftime(date_format_str),
-                                'End Date': snapshot.end_date.strftime(date_format_str),
+                                'Start Date': snapshot.start_date.strftime(date_format_str) if snapshot.start_date else 'N/A',
+                                'End Date': snapshot.end_date.strftime(date_format_str) if snapshot.end_date else 'N/A',
                                 'Duration': snapshot.duration,
                                 '% Complete': snapshot.percent_complete
                             })
@@ -379,6 +362,37 @@ class Exporter:
             return False
     
     @staticmethod
+    def _import_summary_sheet(df_summary, data_manager: DataManager, calendar_manager: CalendarManager) -> DateFormat:
+        date_format_enum = DateFormat.YYYY_MM_DD
+        for _, row in df_summary.iterrows():
+            metric = row.get('Metric')
+            val = str(row.get('Value', ''))
+            if metric == 'Project Name':
+                data_manager.project_name = val
+            elif metric == 'Project Start Date' and val != 'N/A':
+                try:
+                    data_manager.settings.project_start_date = datetime.strptime(val, '%Y-%m-%d')
+                except ValueError:
+                    data_manager.settings.project_start_date = pd.to_datetime(val, dayfirst=False).to_pydatetime()
+            elif metric == 'Date Format':
+                try:
+                    date_format_enum = DateFormat(val)
+                except ValueError:
+                    date_format_enum = DateFormat.YYYY_MM_DD
+            elif metric == 'Working Hours Start' and ':' in val:
+                calendar_manager.working_hours_start = val
+            elif metric == 'Working Hours End' and ':' in val:
+                calendar_manager.working_hours_end = val
+            elif metric == 'Currency':
+                try:
+                    data_manager.settings.currency = Currency[val]
+                except Exception:
+                    data_manager.settings.currency = Currency.USD
+        calendar_manager.hours_per_day = calendar_manager._calculate_hours_from_times()
+        data_manager.calendar_manager = calendar_manager
+        return date_format_enum
+
+    @staticmethod
     def import_from_excel(filepath: str) -> Tuple[DataManager, bool, str]:
         """Import project from Excel file with backward compatibility"""
         data_manager = DataManager()
@@ -396,53 +410,11 @@ class Exporter:
                 logging.error(f"Excel validation failed for {filepath}: {error_msg}")
                 return data_manager, False, error_msg
 
-            # Try to read summary for project name, project start date and date format
+            date_format_enum = DateFormat.YYYY_MM_DD
             try:
                 df_summary = pd.read_excel(filepath, sheet_name='Summary')
-                for _, row in df_summary.iterrows():
-                    if row['Metric'] == 'Project Name':
-                        data_manager.project_name = str(row['Value'])
-                    elif row['Metric'] == 'Project Start Date':
-                        start_date_str = str(row['Value'])
-                        if start_date_str != 'N/A':
-                            # Attempt to parse with default YYYY-MM-DD first
-                            try:
-                                data_manager.settings.project_start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-                            except ValueError:
-                                # Fallback to isoformat if previous fails
-                                data_manager.settings.project_start_date = pd.to_datetime(start_date_str, dayfirst=False).to_pydatetime()
-                    elif row['Metric'] == 'Date Format':
-                        try:
-                            date_format_enum = DateFormat(str(row['Value']))
-                        except ValueError:
-                            date_format_enum = DateFormat.YYYY_MM_DD # Fallback
-                    elif row['Metric'] == 'Working Hours Start':
-                        try:
-                            wh_start = str(row['Value'])
-                            if ':' in wh_start:
-                                calendar_manager.working_hours_start = wh_start
-                        except:
-                            pass
-                    elif row['Metric'] == 'Working Hours End':
-                        try:
-                            wh_end = str(row['Value'])
-                            if ':' in wh_end:
-                                calendar_manager.working_hours_end = wh_end
-                        except:
-                            pass
-                    elif row['Metric'] == 'Currency':
-                        try:
-                            currency_str = str(row['Value'])
-                            data_manager.settings.currency = Currency[currency_str]
-                        except:
-                            data_manager.settings.currency = Currency.USD
-            
-                # Recalculate hours per day based on imported times
-                calendar_manager.hours_per_day = calendar_manager._calculate_hours_from_times()
-                
-                # Set calendar manager reference immediately so it's available
-                data_manager.calendar_manager = calendar_manager
-            except:
+                date_format_enum = Exporter._import_summary_sheet(df_summary, data_manager, calendar_manager)
+            except Exception:
                 pass
             
             date_format_str = Exporter._get_date_format_string(date_format_enum)
@@ -483,7 +455,7 @@ class Exporter:
                                 # Convert text to enum name
                                 dep_type = None
                                 for dt in DependencyType:
-                                    if dt.value == dep_type_text:
+                                    if dt.value.lower() == dep_type_text.lower() or dt.name.lower() == dep_type_text.lower():
                                         dep_type = dt.name
                                         break
                                 
@@ -496,7 +468,7 @@ class Exporter:
                                 try:
                                     pred_id = int(pred_item.strip())
                                     predecessors.append((pred_id, DependencyType.FS.name, 0))
-                                except:
+                                except Exception:
                                     pass
                     else:
                         # Old format: just IDs "1,2,3"
@@ -504,7 +476,7 @@ class Exporter:
                             try:
                                 pred_id = int(pred_id_str.strip())
                                 predecessors.append((pred_id, DependencyType.FS.name, 0))
-                            except:
+                            except Exception:
                                 pass
                 
                 # Parse resources with allocation
@@ -525,7 +497,7 @@ class Exporter:
                 if has_hierarchy and pd.notna(row.get('Parent ID', '')):
                     try:
                         parent_id = int(row['Parent ID'])
-                    except:
+                    except Exception:
                         pass
                 
                 # Get is_summary flag
@@ -641,7 +613,7 @@ class Exporter:
                     # Parse created date
                     try:
                         created_date = datetime.strptime(created_date_str, date_format_str)
-                    except:
+                    except Exception:
                         created_date = datetime.now()
                     
                     # Create baseline
@@ -707,9 +679,9 @@ class Exporter:
                     calendar_manager.custom_holidays = custom_holidays
                     calendar_manager._sync_holidays()
                     
-            except Exception as e:
+            except Exception:
                 # Holidays sheet doesn't exist - backward compatibility
-                print(f"No 'Holidays' sheet found in Excel (backward compatibility)")
+                print("No 'Holidays' sheet found in Excel (backward compatibility)")
             
             return data_manager, True, ""
             
@@ -740,9 +712,15 @@ class Exporter:
                 }
             }
             
-            with open(filepath, 'w') as f:
+            import tempfile
+            dirname = os.path.dirname(os.path.abspath(filepath)) or '.'
+            os.makedirs(dirname, exist_ok=True)
+            
+            temp_fd, temp_path = tempfile.mkstemp(dir=dirname, prefix='.tmp_planiflow_', suffix='.json')
+            with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
             
+            os.replace(temp_path, filepath)
             return True
             
         except Exception as e:
@@ -770,9 +748,6 @@ class Exporter:
                 error_msg = "; ".join(errors)
                 logging.error(f"JSON validation failed for {filepath}: {error_msg}")
                 return data_manager, calendar_manager, False, error_msg
-            
-            # Check version for backward compatibility
-            version = data.get('version', '1.0')
             
             # Load project name (new in v2.0)
             if 'project_name' in data:
@@ -836,7 +811,7 @@ class Exporter:
                     'Complete': task.percent_complete,
                     'Status': task.get_status_text(),
                     'Predecessors': pred_text,
-                    'Resources': ','.join(task.assigned_resources),
+                    'Resources': ','.join(f"{res}:{alloc}" for res, alloc in task.assigned_resources),
                     'Notes': task.notes
                 })
             
@@ -855,6 +830,9 @@ class Exporter:
         try:
             with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
                 # Project Overview
+                proj_start_rpt = data_manager.get_project_start_date()
+                proj_end_rpt = data_manager.get_project_end_date()
+
                 overview_data = {
                     'Item': [
                         'Project Name',
@@ -870,12 +848,9 @@ class Exporter:
                     ],
                     'Value': [
                         data_manager.project_name,
-                        data_manager.get_project_start_date().strftime('%Y-%m-%d') 
-                            if data_manager.get_project_start_date() else 'N/A',
-                        data_manager.get_project_end_date().strftime('%Y-%m-%d')
-                            if data_manager.get_project_end_date() else 'N/A',
-                        (data_manager.get_project_end_date() - data_manager.get_project_start_date()).days + 1
-                            if data_manager.get_project_start_date() and data_manager.get_project_end_date() else 'N/A',
+                        proj_start_rpt.strftime('%Y-%m-%d') if proj_start_rpt else 'N/A',
+                        proj_end_rpt.strftime('%Y-%m-%d') if proj_end_rpt else 'N/A',
+                        (proj_end_rpt - proj_start_rpt).days + 1 if (proj_start_rpt and proj_end_rpt) else 'N/A',
                         f"{data_manager.get_overall_completion():.1f}",
                         len(data_manager.tasks),
                         sum(1 for t in data_manager.tasks if t.is_summary),
@@ -887,7 +862,7 @@ class Exporter:
                 pd.DataFrame(overview_data).to_excel(writer, sheet_name='Overview', index=False)
                 
                 # Task Status Summary
-                status_summary = {}
+                status_summary: Dict[str, int] = {}
                 for task in data_manager.tasks:
                     if not task.is_summary:
                         status = task.get_status_text()
@@ -908,10 +883,10 @@ class Exporter:
                         critical_tasks.append({
                             'ID': task.id,
                             'Task': ProjectValidator.sanitize_string(task.name),
-                            'End Date': task.end_date.strftime('%Y-%m-%d'),
-                            'Days Overdue': (datetime.now() - task.end_date).days,
+                            'End Date': task.end_date.strftime('%Y-%m-%d') if task.end_date else 'N/A',
+                            'Days Overdue': (datetime.now() - task.end_date).days if task.end_date else 0,
                             'Complete': f"{task.percent_complete}%",
-                            'Resources': ', '.join([ProjectValidator.sanitize_string(r) for r in task.assigned_resources])
+                            'Resources': ', '.join([ProjectValidator.sanitize_string(r[0] if isinstance(r, (tuple, list)) else str(r)) for r in task.assigned_resources])
                         })
                 
                 if critical_tasks:
@@ -941,11 +916,11 @@ class Exporter:
                 }
                 
                 for task in data_manager.tasks:
-                    for _, dep_type in task.predecessors:
+                    for pred_id, dep_type, lag_days in task.predecessors:
                         try:
                             dep_name = DependencyType[dep_type].value
                             dep_analysis[dep_name] = dep_analysis.get(dep_name, 0) + 1
-                        except:
+                        except Exception:
                             pass
                 
                 dep_data = {

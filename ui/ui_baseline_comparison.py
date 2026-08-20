@@ -2,27 +2,38 @@
 Baseline Comparison Tab - Compare current project state against baselines
 """
 
+from typing import Optional
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
                              QLabel, QTreeWidget, QTreeWidgetItem, QPushButton,
-                             QGroupBox, QFormLayout, QMessageBox, QFileDialog, 
+                             QGroupBox, QMessageBox, QFileDialog, 
                              QStyledItemDelegate, QStyleOptionViewItem, QStyle)
-from PyQt6.QtGui import QColor, QBrush, QPainter
-from PyQt6.QtCore import Qt, QModelIndex
+from PyQt6.QtGui import QColor, QBrush, QPainter, QPalette
+from PyQt6.QtCore import Qt, QModelIndex, QRect
 
 import pandas as pd
 
 class BaselineStatusDelegate(QStyledItemDelegate):
     """Delegate to draw status indicator circle"""
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+    def paint(self, painter: Optional[QPainter], option: QStyleOptionViewItem, index: QModelIndex):
+        if not painter:
+            return
+        
+        rect = QRect(option.rect)
+        
+        # Determine theme state
+        is_dark = option.palette.color(QPalette.ColorRole.WindowText).lightness() > 128
+        
         # Draw background
-        painter.fillRect(option.rect, option.palette.base())
-        if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(option.rect, option.palette.highlight())
+        if QStyle.StateFlag(option.state) & QStyle.StateFlag.State_Selected:
+            painter.fillRect(rect, option.palette.highlight())
         else:
-            # Respect row background color if set
             bg_brush = index.data(Qt.ItemDataRole.BackgroundRole)
-            if bg_brush and bg_brush != QBrush():
-                 painter.fillRect(option.rect, bg_brush)
+            if bg_brush and bg_brush.style() != Qt.BrushStyle.NoBrush and bg_brush.color().isValid():
+                painter.fillRect(rect, bg_brush)
+            else:
+                default_bg = QColor(43, 43, 43) if is_dark else option.palette.color(QPalette.ColorRole.Base)
+                painter.fillRect(rect, default_bg)
+
         
         status = index.data(Qt.ItemDataRole.UserRole)
         if not status:
@@ -44,7 +55,6 @@ class BaselineStatusDelegate(QStyledItemDelegate):
         
         # Draw circle centered
         size = 12
-        rect = option.rect
         x = rect.x() + (rect.width() - size) // 2
         y = rect.y() + (rect.height() - size) // 2
         
@@ -54,6 +64,30 @@ class BaselineStatusDelegate(QStyledItemDelegate):
         
         painter.restore()
 
+def _get_comparison_palette(dark_mode: bool) -> dict:
+    if dark_mode:
+        return {
+            "group_bg":      "#252525",
+            "group_border":  "#3D3D3D",
+            "group_title":   "#FFFFFF",
+            "info_bg":       "#1E293B",
+            "card_bg":       "#2D2D2D",
+            "card_border":   "#3D3D3D",
+            "title_text":    "#94A3B8",
+            "value_text":    "#FFFFFF",
+        }
+    else:
+        return {
+            "group_bg":      "#FAFAFA",
+            "group_border":  "#D0D0D0",
+            "group_title":   "#37474F",
+            "info_bg":       "#37474F",
+            "card_bg":       "#FFFFFF",
+            "card_border":   "#E0E0E0",
+            "title_text":    "#546E7A",
+            "value_text":    "#37474F",
+        }
+
 class BaselineComparisonTab(QWidget):
     """Tab for comparing current project against baselines"""
     
@@ -61,9 +95,61 @@ class BaselineComparisonTab(QWidget):
         super().__init__(parent)
         self.data_manager = data_manager
         self.current_comparison = None
+        self.dark_mode = getattr(parent, 'dark_mode', False) if parent else False
+        self.metric_cards = []
         
         self._create_ui()
         self.refresh_baselines()
+
+    def set_dark_mode(self, dark_mode: bool):
+        """Update dark mode state and apply theme styling"""
+        self.dark_mode = dark_mode
+        self._apply_theme_styling()
+
+    def _apply_theme_styling(self):
+        dark_mode = getattr(self, 'dark_mode', getattr(self.parent(), 'dark_mode', False) if self.parent() else False)
+        pal = _get_comparison_palette(dark_mode)
+
+        if hasattr(self, 'summary_group'):
+            self.summary_group.setStyleSheet(f"""
+                QGroupBox {{
+                    font-weight: bold;
+                    font-size: 13px;
+                    border: 1px solid {pal['group_border']};
+                    border-radius: 8px;
+                    margin-top: 5px;
+                    padding-top: 8px;
+                    background-color: {pal['group_bg']};
+                    color: {pal['group_title']};
+                }}
+                QGroupBox::title {{
+                    subcontrol-origin: margin;
+                    left: 12px;
+                    padding: 0 5px;
+                    color: {pal['group_title']};
+                }}
+            """)
+
+        if hasattr(self, 'info_widget'):
+            self.info_widget.setStyleSheet(f"""
+                QWidget {{
+                    background-color: {pal['info_bg']};
+                    border-radius: 6px;
+                    padding: 4px;
+                }}
+            """)
+
+        if hasattr(self, 'metric_cards'):
+            for card, title_lbl, val_lbl in self.metric_cards:
+                card.setStyleSheet(f"""
+                    QWidget {{
+                        background-color: {pal['card_bg']};
+                        border: 1px solid {pal['card_border']};
+                        border-radius: 6px;
+                    }}
+                """)
+                title_lbl.setStyleSheet(f"font-weight: 600; color: {pal['title_text']}; font-size: 9pt; background: transparent;")
+                val_lbl.setStyleSheet(f"font-weight: bold; font-size: 20pt; color: {pal['value_text']}; background: transparent;")
     
     def showEvent(self, event):
         """Refresh baselines when tab becomes visible"""
@@ -97,36 +183,12 @@ class BaselineComparisonTab(QWidget):
         
         # Summary statistics - Professional Card Layout
         self.summary_group = QGroupBox("📊 Comparison Summary")
-        self.summary_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 13px;
-                border: 1px solid #D0D0D0;
-                border-radius: 8px;
-                margin-top: 5px;
-                padding-top: 8px;
-                background-color: #FAFAFA;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 5px;
-                color: #37474F;
-            }
-        """)
         summary_main_layout = QVBoxLayout(self.summary_group)
         summary_main_layout.setSpacing(5)
         
         # Baseline Info Header
-        info_widget = QWidget()
-        info_widget.setStyleSheet("""
-            QWidget {
-                background-color: #37474F;
-                border-radius: 6px;
-                padding: 4px;
-            }
-        """)
-        info_layout = QHBoxLayout(info_widget)
+        self.info_widget = QWidget()
+        info_layout = QHBoxLayout(self.info_widget)
         info_layout.setContentsMargins(10, 2, 10, 2)
         
         baseline_info_label = QLabel("📅 Baseline Date:")
@@ -138,7 +200,7 @@ class BaselineComparisonTab(QWidget):
         info_layout.addWidget(self.baseline_date_label)
         info_layout.addStretch()
         
-        summary_main_layout.addWidget(info_widget)
+        summary_main_layout.addWidget(self.info_widget)
         
         # Status Metrics - Consistent Card Layout
         status_container = QWidget()
@@ -147,14 +209,9 @@ class BaselineComparisonTab(QWidget):
         status_layout.setSpacing(5)
         
         # Helper function to create consistent metric cards
+        self.metric_cards = []
         def create_metric_card(title, icon):
             card = QWidget()
-            card.setStyleSheet("""
-                QWidget {
-                    background-color: white;
-                    border-radius: 6px;
-                }
-            """)
             card.setFixedHeight(60)
             
             card_layout = QVBoxLayout(card)
@@ -167,7 +224,6 @@ class BaselineComparisonTab(QWidget):
             icon_label.setStyleSheet("font-size: 12pt; background: transparent;")
             
             title_label = QLabel(title)
-            title_label.setStyleSheet("font-weight: 600; color: #546E7A; font-size: 9pt; background: transparent;")
             
             header_layout.addWidget(icon_label)
             header_layout.addWidget(title_label)
@@ -177,10 +233,10 @@ class BaselineComparisonTab(QWidget):
             
             # Value label
             value_label = QLabel("-")
-            value_label.setStyleSheet("font-weight: bold; font-size: 20pt; color: #37474F; background: transparent;")
             value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             card_layout.addWidget(value_label)
             
+            self.metric_cards.append((card, title_label, value_label))
             return card, value_label
         
         # Create metric cards with consistent styling
@@ -207,6 +263,8 @@ class BaselineComparisonTab(QWidget):
         summary_main_layout.addWidget(status_container)
         
         layout.addWidget(self.summary_group)
+        self._apply_theme_styling()
+
         
         # Comparison tree
         tree_label = QLabel("<b>Task-by-Task Comparison</b>")
@@ -589,7 +647,6 @@ class BaselineComparisonTab(QWidget):
                 df_comparison.to_excel(writer, sheet_name='Comparison', index=False)
                 
                 # Format sheets
-                workbook = writer.book
                 
                 # Format summary sheet
                 summary_sheet = writer.sheets['Summary']

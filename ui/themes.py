@@ -34,11 +34,12 @@ class ThemeManager:
         dark_palette = QPalette()
         dark_palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
         dark_palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
-        dark_palette.setColor(QPalette.ColorRole.Base, QColor(35, 35, 35))
+        dark_palette.setColor(QPalette.ColorRole.Base, QColor(50, 50, 50))
         dark_palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
         dark_palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(25, 25, 25))
         dark_palette.setColor(QPalette.ColorRole.ToolTipText, QColor(255, 255, 255))
         dark_palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
+        dark_palette.setColor(QPalette.ColorRole.PlaceholderText, QColor(170, 170, 170))
         dark_palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
         dark_palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
         dark_palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
@@ -72,6 +73,30 @@ class ThemeManager:
         
         if dark_mode:
             return base_style + """
+                QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
+                    background-color: #383838;
+                    color: #FFFFFF;
+                    border: 1px solid #555555;
+                    border-radius: 3px;
+                    padding: 3px 6px;
+                    selection-background-color: #2a82da;
+                    selection-color: #FFFFFF;
+                }
+                QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QPlainTextEdit:focus {
+                    border: 1px solid #2a82da;
+                    background-color: #424242;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                    width: 20px;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #353535;
+                    color: white;
+                    border: 1px solid #555555;
+                    selection-background-color: #2a82da;
+                    selection-color: white;
+                }
                 QTreeWidget {
                     show-decoration-selected: 1;
                     outline: 0;
@@ -155,16 +180,28 @@ class ThemeManager:
                 }
                 
                 QTabWidget::pane {
-                    border: 1px solid #6d6d6d;
+                    border: 1px solid #444444;
+                    top: -1px;
                 }
                 QTabBar::tab {
-                    background-color: #3d3d3d;
-                    color: white;
+                    background-color: #2D2D2D;
+                    color: #AAAAAA;
+                    border: 1px solid #444444;
+                    border-bottom: none;
                     padding: 8px 16px;
                     margin-right: 2px;
+                    border-top-left-radius: 4px;
+                    border-top-right-radius: 4px;
+                }
+                QTabBar::tab:hover:!selected {
+                    background-color: #383838;
+                    color: #DDDDDD;
                 }
                 QTabBar::tab:selected {
-                    background-color: #2a82da;
+                    background-color: #232323;
+                    color: #FFFFFF;
+                    border-top: 3px solid #2A82DA;
+                    font-weight: bold;
                 }
                 QPushButton {
                     background-color: #3d3d3d;
@@ -179,6 +216,7 @@ class ThemeManager:
                     background-color: #2a82da;
                 }
             """
+
         else:
             return base_style + """
                 QTreeWidget {
@@ -236,19 +274,29 @@ class ThemeManager:
                     background-color: #2a82da;
                     color: white;
                 }
-                QHeaderView::section {
-                    background-color: #e0e0e0;
-                    padding: 5px;
-                    border: 1px solid #d0d0d0;
+                QTabWidget::pane {
+                    border: 1px solid #D0D0D0;
+                    top: -1px;
                 }
                 QTabBar::tab {
-                    background-color: #e0e0e0;
+                    background-color: #EBF0F5;
+                    color: #546E7A;
+                    border: 1px solid #D0D0D0;
+                    border-bottom: none;
                     padding: 8px 16px;
                     margin-right: 2px;
+                    border-top-left-radius: 4px;
+                    border-top-right-radius: 4px;
+                }
+                QTabBar::tab:hover:!selected {
+                    background-color: #F0F4F8;
+                    color: #263238;
                 }
                 QTabBar::tab:selected {
-                    background-color: #2a82da;
-                    color: white;
+                    background-color: #FFFFFF;
+                    color: #1E88E5;
+                    border-top: 3px solid #1E88E5;
+                    font-weight: bold;
                 }
                 QPushButton {
                     background-color: #f0f0f0;
@@ -263,4 +311,4 @@ class ThemeManager:
                     background-color: #2a82da;
                     color: white;
                 }
-            """
+            """

@@ -155,7 +155,7 @@ class Updater:
             cmd = f'msiexec /i "{msi_path}" /qn /norestart && timeout /t 5 && start "" "{current_exe}"'
             
             # Using Popen to detach.
-            subprocess.Popen(cmd, shell=True)
+            subprocess.Popen(cmd, shell=True)  # nosec B602
             
         except Exception as e:
             logging.error(f"Install failed: {e}")

@@ -320,11 +320,22 @@ def create_menu_bar(window):
 
 def create_toolbar(window):
     """Create toolbar"""
+    from ui.toolbar_icons import (
+        gear_icon, save_icon, export_excel_icon, export_pdf_icon,
+        add_task_icon, bulk_add_icon, add_subtask_icon, milestone_icon,
+        edit_icon, delete_icon, insert_below_icon, expand_icon,
+        move_up_icon, move_down_icon,
+        indent_icon, outdent_icon, bulk_indent_icon, bulk_outdent_icon,
+        bold_icon, italic_icon, underline_icon, font_color_icon, bg_color_icon,
+        resource_icon, evm_icon,
+    )
+
+    ICON_SIZE = 24
 
     toolbar = QToolBar("Main Toolbar")
     toolbar.setMovable(False)
     window.addToolBar(toolbar)
-    toolbar.setIconSize(QSize(32, 32))
+    toolbar.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
     toolbar.setStyleSheet("QToolButton { padding: 5px; }")
 
     # Load logo from base64
@@ -351,155 +362,87 @@ def create_toolbar(window):
     window.project_name_label.setStyleSheet("font-weight: bold; padding: 5px;")
     toolbar.addWidget(window.project_name_label)
 
+    dark_mode = getattr(window, 'dark_mode', False)
+    window._toolbar_actions = []
+
+    def _add_action(icon_func, tooltip, slot, checkable=False):
+        if dark_mode:
+            icon = icon_func(ICON_SIZE, color="#FFFFFF")
+        else:
+            icon = icon_func(ICON_SIZE)
+        act = QAction(icon, "", window)
+        act.setToolTip(tooltip)
+        if checkable:
+            act.setCheckable(True)
+        if slot:
+            act.triggered.connect(slot)
+        toolbar.addAction(act)
+        window._toolbar_actions.append((act, icon_func))
+        return act
+
     # Project Management
-    project_settings_btn = QAction("⚙️", window)
-    project_settings_btn.setToolTip("Project Settings")
-    project_settings_btn.triggered.connect(window._show_project_settings_dialog)
-    toolbar.addAction(project_settings_btn)
-
-    save_btn = QAction("💾", window)
-    save_btn.setToolTip("Save Project")
-    save_btn.triggered.connect(window._save_project)
-    toolbar.addAction(save_btn)
-
-    export_btn = QAction("📊", window)
-    export_btn.setToolTip("Export to Excel")
-    export_btn.triggered.connect(window._export_excel)
-    toolbar.addAction(export_btn)
-
-    export_pdf_btn = QAction("📄", window)
-    export_pdf_btn.setToolTip("Export to PDF")
-    export_pdf_btn.triggered.connect(window._export_pdf)
-    toolbar.addAction(export_pdf_btn)
+    _add_action(gear_icon, "Project Settings", window._show_project_settings_dialog)
+    _add_action(save_icon, "Save Project", window._save_project)
+    _add_action(export_excel_icon, "Export to Excel", window._export_excel)
+    _add_action(export_pdf_icon, "Export to PDF", window._export_pdf)
 
     toolbar.addSeparator()
 
     # Task Management
-    add_task_btn = QAction("➕", window)
-    add_task_btn.setToolTip("Add Task")
-    add_task_btn.triggered.connect(window._add_task_dialog)
-    toolbar.addAction(add_task_btn)
-
-    bulk_add_task_btn = QAction("📑", window)
-    bulk_add_task_btn.setToolTip("Bulk Add Tasks (Ctrl+Shift+D)")
-    bulk_add_task_btn.triggered.connect(window._bulk_add_tasks_dialog)
-    toolbar.addAction(bulk_add_task_btn)
-
-    add_subtask_btn = QAction("⨁", window)
-    add_subtask_btn.setToolTip("Add Subtask")
-    add_subtask_btn.triggered.connect(window._add_subtask_dialog)
-    toolbar.addAction(add_subtask_btn)
-
-    add_milestone_btn = QAction("◆", window)
-    add_milestone_btn.setToolTip("Add Milestone (0 duration task)")
-    add_milestone_btn.triggered.connect(window._add_milestone_dialog)
-    toolbar.addAction(add_milestone_btn)
-
-    edit_task_btn = QAction("✏️", window)
-    edit_task_btn.setToolTip("Edit Task")
-    edit_task_btn.triggered.connect(window._edit_task_dialog)
-    toolbar.addAction(edit_task_btn)
-
-    delete_task_btn = QAction("🗑️", window)
-    delete_task_btn.setToolTip("Delete Task")
-    delete_task_btn.triggered.connect(window._delete_task)
-    toolbar.addAction(delete_task_btn)
-
-    insert_task_btn = QAction("⬇", window)
-    insert_task_btn.setToolTip("Insert Task Below Selected")
-    insert_task_btn.triggered.connect(window._insert_task_below)
-    toolbar.addAction(insert_task_btn)
-
-    expand_selected_btn = QAction("⊕", window)
-    expand_selected_btn.setToolTip("Expand selected summary task and all subtasks")
-    expand_selected_btn.triggered.connect(window._expand_selected)
-    toolbar.addAction(expand_selected_btn)
+    _add_action(add_task_icon, "Add Task", window._add_task_dialog)
+    _add_action(bulk_add_icon, "Bulk Add Tasks (Ctrl+Shift+D)", window._bulk_add_tasks_dialog)
+    _add_action(add_subtask_icon, "Add Subtask", window._add_subtask_dialog)
+    _add_action(milestone_icon, "Add Milestone (0 duration task)", window._add_milestone_dialog)
+    _add_action(edit_icon, "Edit Task", window._edit_task_dialog)
+    _add_action(delete_icon, "Delete Task", window._delete_task)
+    _add_action(insert_below_icon, "Insert Task Below Selected", window._insert_task_below)
+    _add_action(expand_icon, "Expand selected summary task and all subtasks", window._expand_selected)
 
     toolbar.addSeparator()
 
     # Move Options
-    move_up_btn = QAction("⬆", window)
-    move_up_btn.setToolTip("Move Task Up")
-    move_up_btn.triggered.connect(window._move_task_up)
-    toolbar.addAction(move_up_btn)
-
-    move_down_btn = QAction("⬇", window)
-    move_down_btn.setToolTip("Move Task Down")
-    move_down_btn.triggered.connect(window._move_task_down)
-    toolbar.addAction(move_down_btn)
+    _add_action(move_up_icon, "Move Task Up", window._move_task_up)
+    _add_action(move_down_icon, "Move Task Down", window._move_task_down)
 
     toolbar.addSeparator()
 
     # Hierarchy Management
-    indent_btn = QAction("→", window)
-    indent_btn.setToolTip("Indent Task")
-    indent_btn.triggered.connect(window._indent_task)
-    toolbar.addAction(indent_btn)
-
-    outdent_btn = QAction("←", window)
-    outdent_btn.setToolTip("Outdent Task")
-    outdent_btn.triggered.connect(window._outdent_task)
-    toolbar.addAction(outdent_btn)
-
-    bulk_indent_btn = QAction("⇥", window)
-    bulk_indent_btn.setToolTip("Bulk Indent Selected Tasks")
-    bulk_indent_btn.triggered.connect(window._bulk_indent_tasks)
-    toolbar.addAction(bulk_indent_btn)
-
-    bulk_outdent_btn = QAction("⇤", window)
-    bulk_outdent_btn.setToolTip("Bulk Outdent Selected Tasks")
-    bulk_outdent_btn.triggered.connect(window._bulk_outdent_tasks)
-    toolbar.addAction(bulk_outdent_btn)
+    _add_action(indent_icon, "Indent Task", window._indent_task)
+    _add_action(outdent_icon, "Outdent Task", window._outdent_task)
+    _add_action(bulk_indent_icon, "Bulk Indent Selected Tasks", window._bulk_indent_tasks)
+    _add_action(bulk_outdent_icon, "Bulk Outdent Selected Tasks", window._bulk_outdent_tasks)
 
     toolbar.addSeparator()
     
     # Formatting Tools
-    bold_btn = QAction("B", window)
-    bold_btn.setToolTip("Bold (Ctrl+B)")
-    bold_btn.setCheckable(True)
-    bold_btn.triggered.connect(window._toggle_bold)
-    bold_btn.setFont(window.font())
-    toolbar.addAction(bold_btn)
-    window.toolbar_bold_btn = bold_btn
-    
-    italic_btn = QAction("I", window)
-    italic_btn.setToolTip("Italic (Ctrl+I)")
-    italic_btn.setCheckable(True)
-    italic_btn.triggered.connect(window._toggle_italic)
-    toolbar.addAction(italic_btn)
-    window.toolbar_italic_btn = italic_btn
-    
-    underline_btn = QAction("U", window)
-    underline_btn.setToolTip("Underline (Ctrl+U)")
-    underline_btn.setCheckable(True)
-    underline_btn.triggered.connect(window._toggle_underline)
-    toolbar.addAction(underline_btn)
-    window.toolbar_underline_btn = underline_btn
-    
-    font_color_btn = QAction("🎨", window)
-    font_color_btn.setToolTip("Font Color")
-    font_color_btn.triggered.connect(window._change_font_color)
-    toolbar.addAction(font_color_btn)
-    
-    bg_color_btn = QAction("🖌️", window)
-    bg_color_btn.setToolTip("Background Color")
-    bg_color_btn.triggered.connect(window._change_background_color)
-    toolbar.addAction(bg_color_btn)
+    window.toolbar_bold_btn = _add_action(bold_icon, "Bold (Ctrl+B)", window._toggle_bold, checkable=True)
+    window.toolbar_italic_btn = _add_action(italic_icon, "Italic (Ctrl+I)", window._toggle_italic, checkable=True)
+    window.toolbar_underline_btn = _add_action(underline_icon, "Underline (Ctrl+U)", window._toggle_underline, checkable=True)
+    _add_action(font_color_icon, "Font Color", window._change_font_color)
+    _add_action(bg_color_icon, "Background Color", window._change_background_color)
 
     toolbar.addSeparator()
 
     # Resource Management
-    add_resource_btn = QAction("👤", window)
-    add_resource_btn.setToolTip("Add Resource")
-    add_resource_btn.triggered.connect(window._add_resource_dialog)
-    toolbar.addAction(add_resource_btn)
+    _add_action(resource_icon, "Add Resource", window._add_resource_dialog)
 
     toolbar.addSeparator()
 
     # EVM Analysis
-    refresh_evm_btn = QAction("📈", window)
-    refresh_evm_btn.setToolTip("Refresh EVM Analysis")
-    refresh_evm_btn.triggered.connect(lambda: window.tabs.setCurrentIndex(5) or window.evm_tab.refresh_data())
-    toolbar.addAction(refresh_evm_btn)
+    _add_action(evm_icon, "Refresh EVM Analysis", lambda: window.tabs.setCurrentIndex(5) or window.evm_tab.refresh_data())
+
+
+def update_toolbar_icons(window, dark_mode: bool):
+    """Dynamically update main toolbar icon colors for high contrast across themes."""
+    ICON_SIZE = 24
+    if hasattr(window, '_toolbar_actions'):
+        for action, icon_func in window._toolbar_actions:
+            if dark_mode:
+                action.setIcon(icon_func(ICON_SIZE, color="#FFFFFF"))
+            else:
+                action.setIcon(icon_func(ICON_SIZE))
+
+
+
 
 

@@ -3,12 +3,12 @@ Calendar Manager - Handles work hours, holidays, and working days
 """
 
 from datetime import datetime, timedelta
-from typing import List, Set, Dict, Any, Optional
+from typing import List, Set, Dict, Any, Optional, Tuple
 
 class CalendarManager:
     """Manages working calendar, holidays, and work hours"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         # Default working days (0 = Monday, 6 = Sunday)
         self.working_days: Set[int] = {0, 1, 2, 3, 4}  # Mon-Fri
         
@@ -25,11 +25,25 @@ class CalendarManager:
         # Structured holiday list (source of truth)
         # Each entry: {"name": str, "start_date": str, "end_date": str, "comment": str, "is_recurring": bool}
         self.custom_holidays: List[Dict[str, Any]] = []
+        self._compiled_recurring_holidays: List[Tuple[Tuple[int, int], Tuple[int, int]]] = []
 
         # Project timeline bounds (used for recurring holidays)
         self.project_start_date: Optional[datetime] = None
         self.project_end_date: Optional[datetime] = None
     
+    def _compile_holidays(self):
+        """Pre-parse custom holidays into fast month/day tuples to avoid datetime.strptime in inner loops"""
+        compiled = []
+        for holiday in self.custom_holidays:
+            if holiday.get('is_recurring'):
+                try:
+                    h_start = datetime.strptime(holiday['start_date'], '%Y-%m-%d')
+                    h_end = datetime.strptime(holiday.get('end_date') or holiday['start_date'], '%Y-%m-%d')
+                    compiled.append(((h_start.month, h_start.day), (h_end.month, h_end.day)))
+                except (ValueError, KeyError):
+                    continue
+        self._compiled_recurring_holidays = compiled
+
     def set_project_bounds(self, start_date: Optional[datetime], end_date: Optional[datetime]):
         """Set project timeline bounds for recurring holiday checks"""
         self.project_start_date = start_date
@@ -42,8 +56,10 @@ class CalendarManager:
         self.working_hours_end = "16:00"
         self.hours_per_day = 8.0
         self.non_working_days = set()
+        self.custom_holidays = []
+        self._compiled_recurring_holidays = []
     
-    def is_working_day(self, date: datetime, resource_exceptions: List[str] = None) -> bool:
+    def is_working_day(self, date: datetime, resource_exceptions: Optional[List[str]] = None) -> bool:
         """Check if a given date is a working day, considering resource-specific exceptions"""
         # Check if it's a weekend
         if date.weekday() not in self.working_days:
@@ -55,31 +71,23 @@ class CalendarManager:
         if date_str in self.non_working_days:
             return False
         
-        # Check if it's a recurring holiday
+        # Check if it's a recurring holiday (pre-compiled)
         curr_md = (date.month, date.day)
-        for holiday in self.custom_holidays:
-            if holiday.get('is_recurring'):
-                # According to user requirement: recurrence only within project timeline
-                if self.project_start_date and date < self.project_start_date:
-                    continue
-                if self.project_end_date and date > self.project_end_date:
-                    continue
+        if not hasattr(self, '_compiled_recurring_holidays'):
+            self._compile_holidays()
 
-                try:
-                    h_start = datetime.strptime(holiday['start_date'], '%Y-%m-%d')
-                    h_end = datetime.strptime(holiday.get('end_date') or holiday['start_date'], '%Y-%m-%d')
-                    
-                    start_md = (h_start.month, h_start.day)
-                    end_md = (h_end.month, h_end.day)
-                    
-                    if start_md <= end_md:
-                        if start_md <= curr_md <= end_md:
-                            return False
-                    else: # Crosses year boundary
-                        if curr_md >= start_md or curr_md <= end_md:
-                            return False
-                except (ValueError, KeyError):
-                    continue
+        for start_md, end_md in self._compiled_recurring_holidays:
+            if self.project_start_date and date < self.project_start_date:
+                continue
+            if self.project_end_date and date > self.project_end_date:
+                continue
+
+            if start_md <= end_md:
+                if start_md <= curr_md <= end_md:
+                    return False
+            else: # Crosses year boundary
+                if curr_md >= start_md or curr_md <= end_md:
+                    return False
         
         # Check if it's a resource-specific exception
         if resource_exceptions:
@@ -121,7 +129,7 @@ class CalendarManager:
             except (ValueError, KeyError):
                 continue
 
-    def add_custom_holiday(self, name: str, start_date: str, end_date: str = None, comment: str = "", is_recurring: bool = False):
+    def add_custom_holiday(self, name: str, start_date: str, end_date: Optional[str] = None, comment: str = "", is_recurring: bool = False):
         """Add a holiday or holiday range"""
         self.custom_holidays.append({
             "name": name,
@@ -178,8 +186,7 @@ class CalendarManager:
                 hours_diff += 24
             
             return max(0.0, hours_diff)
-            return max(0.0, hours_diff)
-        except:
+        except Exception:
             return 8.0  # Default fallback
             
     def get_working_start_time(self) -> tuple[int, int]:
@@ -187,7 +194,7 @@ class CalendarManager:
         try:
             parts = self.working_hours_start.split(':')
             return int(parts[0]), int(parts[1])
-        except:
+        except Exception:
             return 8, 0
             
     def get_working_end_time(self) -> tuple[int, int]:
@@ -195,7 +202,7 @@ class CalendarManager:
         try:
             parts = self.working_hours_end.split(':')
             return int(parts[0]), int(parts[1])
-        except:
+        except Exception:
             return 16, 0
     
     def set_hours_per_day(self, hours: float):
@@ -203,7 +210,7 @@ class CalendarManager:
         """Set default working hours per day"""
         self.hours_per_day = max(0.0, hours)
     
-    def calculate_working_days(self, start_date: datetime, end_date: datetime, resource_exceptions: List[str] = None) -> int:
+    def calculate_working_days(self, start_date: datetime, end_date: datetime, resource_exceptions: Optional[List[str]] = None) -> int:
         """Calculate number of working days between two dates, considering resource-specific exceptions"""
         working_days = 0
         current_date = start_date
@@ -215,7 +222,7 @@ class CalendarManager:
         
         return working_days
     
-    def calculate_working_hours(self, start_date: datetime, end_date: datetime, max_hours_per_day: float = None, resource_exceptions: List[str] = None) -> float:
+    def calculate_working_hours(self, start_date: datetime, end_date: datetime, max_hours_per_day: Optional[float] = None, resource_exceptions: Optional[List[str]] = None) -> float:
         """Calculate total working hours between two dates, considering resource-specific exceptions"""
         total_hours = 0.0
         

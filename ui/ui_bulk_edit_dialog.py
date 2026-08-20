@@ -1,8 +1,7 @@
 import re
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QCheckBox, QPushButton, QDoubleSpinBox, QSpinBox,
-                             QLineEdit, QTextEdit, QFormLayout, QWidget, QMessageBox)
-from PyQt6.QtCore import Qt
+                             QLineEdit, QTextEdit, QFormLayout)
 from ui.ui_tasks import CheckableComboBox
 from settings_manager.settings_manager import DurationUnit
 from data_manager.models import DependencyType

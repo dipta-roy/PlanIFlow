@@ -1,5 +1,4 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QDoubleSpinBox,
-                             QPushButton, QCheckBox, QLabel, QGroupBox, QLineEdit)
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QCheckBox, QLabel, QGroupBox, QLineEdit)
 from PyQt6.QtCore import QTime
 from calendar_manager.calendar_manager import CalendarManager
 from ui.ui_time_picker import TimePickerWidget

@@ -3,12 +3,10 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
                              QPushButton, QScrollArea, QGroupBox, QFileDialog, QMessageBox,
                              QDialog, QDialogButtonBox, QTextBrowser)
 from PyQt6.QtCore import Qt
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from data_manager.evm_calculator import EVMCalculator
 import pandas as pd
-import os
 
 class EVMHelpDialog(QDialog):
     """Help dialog explaining Earned Value Management concepts."""
@@ -439,44 +437,73 @@ class EVMAnalysisTab(QWidget):
         self.summary_labels["VAC"].setText(f"{symbol}{summary['VAC']:,.2f}")
         self.summary_labels["VAC"].setStyleSheet(f"font-size: 18px; font-weight: bold; color: {get_color(summary['VAC'], False)};")
 
+    def set_dark_mode(self, dark_mode: bool):
+        """Update dark mode state and refresh EVM charts and cards"""
+        self.dark_mode = dark_mode
+        self.refresh_data(silent=True)
+
     def update_charts_display(self, summary):
+        dark_mode = getattr(self, 'dark_mode', getattr(self.main_window, 'dark_mode', False))
+        bg_color = '#2D2D2D' if dark_mode else '#FFFFFF'
+        text_color = '#FFFFFF' if dark_mode else '#2C3E50'
+        grid_color = '#444444' if dark_mode else '#DCDDE1'
+        ref_line = '#90A4AE' if dark_mode else '#2C3E50'
+
         # 1. Budget Comparison Chart
         self.val_figure.clear()
+        self.val_figure.patch.set_facecolor(bg_color)
         ax1 = self.val_figure.add_subplot(111)
+        ax1.set_facecolor(bg_color)
         labels = ['PV', 'EV', 'AC', 'BAC']
         values = [summary['PV'], summary['EV'], summary['AC'], summary['BAC']]
         colors = ['#3498db', '#2ecc71', '#e74c3c', '#f1c40f']
         
-        bars = ax1.bar(labels, values, color=colors, alpha=0.8)
-        ax1.set_title("EVM Value Comparison", fontsize=11, fontweight='bold')
-        ax1.grid(axis='y', linestyle='--', alpha=0.6)
+        bars = ax1.bar(labels, values, color=colors, alpha=0.85)
+        ax1.set_title("EVM Value Comparison", fontsize=11, fontweight='bold', color=text_color)
+        ax1.grid(axis='y', linestyle='--', alpha=0.6, color=grid_color)
+        ax1.tick_params(colors=text_color)
+        for spine in ax1.spines.values():
+            spine.set_color(grid_color)
         
         # Add values on top of bars
         symbol = self.main_window.data_manager.settings.currency.symbol
+        max_val = max(values) if values and max(values) > 0 else 1
         for bar in bars:
             height = bar.get_height()
-            ax1.text(bar.get_x() + bar.get_width()/2., height + (max(values)*0.01),
-                    f'{symbol}{height:,.0f}', ha='center', va='bottom', fontsize=8)
+            ax1.text(bar.get_x() + bar.get_width()/2., height + (max_val * 0.01),
+                    f'{symbol}{height:,.0f}', ha='center', va='bottom', fontsize=8, color=text_color)
         
         self.val_canvas.draw()
         
         # 2. Performance Indices Chart
         self.idx_figure.clear()
+        self.idx_figure.patch.set_facecolor(bg_color)
         ax2 = self.idx_figure.add_subplot(111)
+        ax2.set_facecolor(bg_color)
         indices = ['CPI', 'SPI']
         idx_vals = [summary['CPI'], summary['SPI']]
         idx_colors = ['#27ae60' if v >= 1.0 else '#e74c3c' for v in idx_vals]
         
         ax2.bar(indices, idx_vals, color=idx_colors, width=0.5)
-        ax2.axhline(y=1.0, color='#2c3e50', linestyle='--', alpha=0.6, label='Target (1.0)')
+        ax2.axhline(y=1.0, color=ref_line, linestyle='--', alpha=0.8, label='Target (1.0)')
         ax2.set_ylim(0, max(1.5, max(idx_vals) * 1.2))
-        ax2.set_title("Performance Indices", fontsize=11, fontweight='bold')
-        ax2.legend(fontsize=8)
+        ax2.set_title("Performance Indices", fontsize=11, fontweight='bold', color=text_color)
+        ax2.tick_params(colors=text_color)
+        for spine in ax2.spines.values():
+            spine.set_color(grid_color)
+
+        leg = ax2.legend(fontsize=8)
+        if leg:
+            leg.get_frame().set_facecolor(bg_color)
+            leg.get_frame().set_edgecolor(grid_color)
+            for text in leg.get_texts():
+                text.set_color(text_color)
         
         for i, v in enumerate(idx_vals):
-            ax2.text(i, v + 0.05, f'{v:.2f}', ha='center', va='bottom', fontweight='bold')
+            ax2.text(i, v + 0.05, f'{v:.2f}', ha='center', va='bottom', fontweight='bold', color=text_color)
             
         self.idx_canvas.draw()
+
 
     def update_table_display(self, df):
         self.table.setRowCount(len(df))
@@ -605,7 +632,7 @@ class EVMAnalysisTab(QWidget):
                             try:
                                 if len(str(cell.value)) > max_length:
                                     max_length = len(str(cell.value))
-                            except:
+                            except Exception:
                                 pass
                         adjusted_width = (max_length + 2)
                         ws.column_dimensions[column_letter].width = adjusted_width

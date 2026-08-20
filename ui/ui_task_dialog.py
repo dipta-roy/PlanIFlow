@@ -1,18 +1,19 @@
 import math
 from datetime import datetime, timedelta
+from typing import Optional, Dict, List, Any
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QLineEdit, 
                              QComboBox, QDateTimeEdit, QCheckBox, QTextEdit, 
                              QLabel, QTabWidget, QWidget, QDoubleSpinBox, 
                              QSpinBox, QPushButton, QHBoxLayout, QTableWidget, 
                              QHeaderView, QMessageBox, QCompleter, QColorDialog)
-from PyQt6.QtCore import Qt, QDate, QTime
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFontDatabase
 from data_manager.manager import DataManager
 from data_manager.models import Task, DependencyType, ScheduleType
 from settings_manager.settings_manager import DurationUnit, DateFormat
 
 class TaskDialog(QDialog):
-    def __init__(self, parent=None, data_manager: DataManager = None, task: Task = None, parent_task: Task = None, is_milestone: bool = False):
+    def __init__(self, parent=None, data_manager: Optional[DataManager] = None, task: Optional[Task] = None, parent_task: Optional[Task] = None, is_milestone: bool = False):
         super().__init__(parent)
         # Set appropriate title based on task type
         if task:
@@ -27,8 +28,8 @@ class TaskDialog(QDialog):
         self.parent_task = parent_task
         self.is_milestone = is_milestone
 
-        self.task_data = {}
-        self.predecessor_rows = []
+        self.task_data: Dict[str, Any] = {}
+        self.predecessor_rows: List[Any] = []
 
         self.main_window = parent
 
@@ -320,6 +321,8 @@ class TaskDialog(QDialog):
         
     def _on_settings_changed(self, old_unit: DurationUnit, new_unit: DurationUnit):
         """Handle settings changes, specifically duration unit and date format."""
+        if not self.data_manager:
+            return
         # Update duration label
         self.duration_input.setWhatsThis(f"Duration ({self.data_manager.settings.duration_unit.value}):")
         # Update date format
@@ -333,23 +336,23 @@ class TaskDialog(QDialog):
 
     def _get_qdate_format_string(self) -> str:
         """Converts the DateFormat enum to a QDateEdit compatible format string."""
-        date_format_enum = self.data_manager.settings.default_date_format
-        if date_format_enum == DateFormat.DD_MM_YYYY:
-            return "dd-MM-yyyy HH:mm"
-        elif date_format_enum == DateFormat.DD_MMM_YYYY:
-            return "dd-MMM-yyyy HH:mm"
-        else:
-            return "yyyy-MM-dd HH:mm" # Default fallback
+        if self.data_manager:
+            date_format_enum = self.data_manager.settings.default_date_format
+            if date_format_enum == DateFormat.DD_MM_YYYY:
+                return "dd-MM-yyyy HH:mm"
+            elif date_format_enum == DateFormat.DD_MMM_YYYY:
+                return "dd-MMM-yyyy HH:mm"
+        return "yyyy-MM-dd HH:mm" # Default fallback
 
     def _get_strftime_format_string(self) -> str:
         """Converts the DateFormat enum to a strftime compatible format string."""
-        date_format_enum = self.data_manager.settings.default_date_format
-        if date_format_enum == DateFormat.DD_MM_YYYY:
-            return '%d-%m-%Y'
-        elif date_format_enum == DateFormat.DD_MMM_YYYY:
-            return '%d-%b-%Y'
-        else:
-            return '%Y-%m-%d' # Default fallback
+        if self.data_manager:
+            date_format_enum = self.data_manager.settings.default_date_format
+            if date_format_enum == DateFormat.DD_MM_YYYY:
+                return '%d-%m-%Y'
+            elif date_format_enum == DateFormat.DD_MMM_YYYY:
+                return '%d-%b-%Y'
+        return '%Y-%m-%d' # Default fallback
 
     def _add_predecessor_row(self, pred_id=None, dep_type=None, lag_days=0):
         row_widget = QWidget()
@@ -490,6 +493,8 @@ class TaskDialog(QDialog):
 
     def _on_duration_changed(self, value: float):
         """Recalculate end date or start date when duration changes."""
+        if not self.data_manager:
+            return
         # Dynamic milestone detection: if duration is 0, it acts as a milestone
         is_now_milestone = (value == 0)
         
@@ -674,7 +679,7 @@ class TaskDialog(QDialog):
         self.start_date_input.setDateTime(task.start_date)
         self.end_date_input.setDateTime(task.end_date)
         
-        if not self.is_milestone:
+        if not self.is_milestone and self.data_manager:
             duration = task.get_duration(self.data_manager.settings.duration_unit, self.data_manager.calendar_manager)
             self.duration_input.setValue(duration)
 

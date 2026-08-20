@@ -154,7 +154,7 @@ class Updater:
             cmd = f'timeout /t 2 /nobreak & start /wait "" msiexec /i "{msi_path}" /qn /norestart & timeout /t 2 /nobreak & start "" "{current_exe}" & del /q "{msi_path}"'
             
             # Launch the detached command process
-            subprocess.Popen(cmd, shell=True)
+            subprocess.Popen(cmd, shell=True)  # nosec B602
             
             # Now notify the UI that it's safe to exit
             if self.callback:

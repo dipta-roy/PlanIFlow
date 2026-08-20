@@ -1,6 +1,7 @@
 """ui_helpers.py - helper utilities extracted from ui_main.py"""
 
-import sys, os
+import sys
+import os
 import base64
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QApplication

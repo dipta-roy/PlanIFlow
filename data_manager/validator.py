@@ -1,21 +1,33 @@
 import json
+import math
 import os
 import sys
 import logging
 from typing import Dict, Any, List, Tuple
+import pandas as pd
 
 class ProjectValidator:
     """Validator for project data in JSON and Excel formats"""
     
-    if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
-        SCHEMA_PATH = os.path.join(base_dir, 'data_manager', 'project_schema.json')
-    else:
-        # Running in normal Python environment
-        SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'project_schema.json')
-
     MAX_TASKS = 10000 
     MAX_STR_LEN = 250 
+
+    @classmethod
+    def get_schema_path(cls) -> str:
+        """Resolve schema path safely across dev and frozen PyInstaller environments"""
+        if getattr(sys, 'frozen', False):
+            base_dir = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+            possible_paths = [
+                os.path.join(base_dir, 'data_manager', 'project_schema.json'),
+                os.path.join(base_dir, 'project_schema.json'),
+                os.path.join(os.path.dirname(sys.executable), 'data_manager', 'project_schema.json')
+            ]
+            for p in possible_paths:
+                if os.path.exists(p):
+                    return p
+            return possible_paths[0]
+        else:
+            return os.path.join(os.path.dirname(__file__), 'project_schema.json')
     
     @staticmethod
     def validate_json(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -30,8 +42,10 @@ class ProjectValidator:
             return True, [] # Assume valid if we can't check, to avoid blocking user
 
         try:
-            with open(ProjectValidator.SCHEMA_PATH, 'r') as f:
+            schema_path = ProjectValidator.get_schema_path()
+            with open(schema_path, 'r') as f:
                 schema = json.load(f)
+
             
             validate(instance=data, schema=schema)
             
@@ -110,7 +124,7 @@ class ProjectValidator:
             return True, []
             
         except FileNotFoundError:
-            logging.error(f"Schema file not found at {ProjectValidator.SCHEMA_PATH}")
+            logging.error(f"Schema file not found at {schema_path}")
             return False, ["Validation schema file missing."]
         except ValidationError as e:
             path = " -> ".join(map(str, e.path)) if e.path else "root"
@@ -121,35 +135,43 @@ class ProjectValidator:
 
     @staticmethod
     def _has_cycle(tasks: List[Dict[str, Any]]) -> bool:
-        """Detect circular dependencies in a list of task dicts"""
-        adj = {t['id']: [] for t in tasks}
-        for t in tasks:
-            for pred in t.get('predecessors', []):
+        """Check for cyclic dependencies in task dictionary list"""
+        adj = {}
+        for task in tasks:
+            t_id = task.get('id')
+            if t_id is None:
+                continue
+            preds = []
+            for pred in task.get('predecessors', []):
                 pred_id = pred[0] if isinstance(pred, (list, tuple)) else pred
-                if pred_id in adj:
-                    adj[t['id']].append(pred_id)
-        
+                preds.append(pred_id)
+            adj[t_id] = preds
+
         visited = set()
         stack = set()
-        
+
         def visit(u):
-            if u in stack: return True
-            if u in visited: return False
+            if u in stack:
+                return True
+            if u in visited:
+                return False
             stack.add(u)
             for v in adj.get(u, []):
-                if visit(v): return True
+                if visit(v):
+                    return True
             stack.remove(u)
             visited.add(u)
             return False
-            
+
         for t_id in adj:
-            if visit(t_id): return True
+            if visit(t_id):
+                return True
         return False
 
     @staticmethod
     def sanitize_string(s: Any) -> str:
         """Sanitize and trim string to MAX_STR_LEN"""
-        if s is None or (isinstance(s, float) and pd.isna(s)):
+        if s is None or (isinstance(s, float) and math.isnan(s)):
             return ""
         # Convert to string, trim whitespace, and truncate
         s_str = str(s).strip()
@@ -158,107 +180,87 @@ class ProjectValidator:
         return "".join(char for char in s_str if ord(char) >= 32 or char in '\n\r\t')
 
     @staticmethod
-    def validate_excel(filepath: str) -> Tuple[bool, List[str]]:
-        """
-        Validate an Excel file before import.
-        """
+    def _validate_excel_row(row, df_tasks, errors: List[str]):
         import pandas as pd
-        errors = []
+        task_name = row.get('Task Name', 'Unknown')
+        task_id = row.get('Task ID', '?')
         
+        if '% Complete' in df_tasks.columns:
+            try:
+                comp = float(row['% Complete'])
+                if not (0 <= comp <= 100):
+                    errors.append(f"Task '{task_name}' (ID {task_id}) has invalid completion %: {comp}")
+            except (ValueError, TypeError):
+                errors.append(f"Task '{task_name}' (ID {task_id}) has non-numeric completion %")
+        
+        if 'Parent ID' in df_tasks.columns:
+            parent_id = row['Parent ID']
+            if pd.notna(parent_id) and str(parent_id).strip() != '':
+                try:
+                    p_id = int(float(parent_id))
+                    if not (df_tasks['Task ID'] == p_id).any():
+                        errors.append(f"Task '{task_name}' (ID {task_id}) has non-existent parent ID {p_id}")
+                except (ValueError, TypeError):
+                    errors.append(f"Task '{task_name}' (ID {task_id}) has invalid parent ID format: {parent_id}")
+
+        if 'Schedule Mode' in df_tasks.columns:
+            mode = str(row['Schedule Mode']).strip()
+            allowed = ['Auto Scheduled', 'Manually Scheduled', 'Auto', 'Manual', 'A', 'M', '(A)', '(M)']
+            if mode not in allowed:
+                errors.append(f"Task '{task_name}' (ID {task_id}) has invalid Schedule Mode: '{mode}'")
+
+        start_date = row.get('Start Date')
+        end_date = row.get('End Date')
+        try:
+            if pd.notna(start_date) and pd.notna(end_date):
+                s_dt = pd.to_datetime(start_date) if isinstance(start_date, str) else start_date
+                e_dt = pd.to_datetime(end_date) if isinstance(end_date, str) else end_date
+                if s_dt > e_dt:
+                    errors.append(f"Task '{task_name}' (ID {task_id}) has start date after end date")
+        except Exception:
+            pass
+
+        if len(str(task_name)) > ProjectValidator.MAX_STR_LEN:
+            errors.append(f"Task name too long (ID {task_id})")
+        if 'Notes' in df_tasks.columns:
+            notes = row.get('Notes', '')
+            if pd.notna(notes) and len(str(notes)) > ProjectValidator.MAX_STR_LEN:
+                errors.append(f"Task notes too long (ID {task_id})")
+
+    @staticmethod
+    def validate_excel(filepath: str) -> Tuple[bool, List[str]]:
+        """Validate an Excel file before import."""
+        errors: List[str] = []
+        sheets: List[str] = []
         try:
             excel_file = pd.ExcelFile(filepath)
             sheets = excel_file.sheet_names
-            
             if 'Tasks' not in sheets:
                 errors.append("Missing required sheet: 'Tasks'")
-            
-            if errors:
                 return False, errors
                 
             df_tasks = pd.read_excel(filepath, sheet_name='Tasks')
-            
             if len(df_tasks) > ProjectValidator.MAX_TASKS:
                 errors.append(f"Excel file exceeds maximum allowed tasks ({ProjectValidator.MAX_TASKS})")
                 return False, errors
                 
-            # 1. Validate Tasks Dataframe Columns
             required_cols = ['Task ID', 'Task Name', 'Start Date', 'End Date']
             for col in required_cols:
                 if col not in df_tasks.columns:
                     errors.append(f"Missing required column in Tasks sheet: '{col}'")
-            
             if errors:
                 return False, errors
                 
-            # 2. Check for unique IDs
             if df_tasks['Task ID'].duplicated().any():
                 dup_ids = df_tasks[df_tasks['Task ID'].duplicated()]['Task ID'].unique()
                 errors.append(f"Duplicate Task IDs found in Excel: {list(dup_ids)}")
                 
-            # 3. Basic data integrity
             for _, row in df_tasks.iterrows():
-                task_name = row.get('Task Name', 'Unknown')
-                task_id = row.get('Task ID', '?')
-                
-                # Validate completion percentage if exists
-                if '% Complete' in df_tasks.columns:
-                    try:
-                        comp = float(row['% Complete'])
-                        if not (0 <= comp <= 100):
-                            errors.append(f"Task '{task_name}' (ID {task_id}) has invalid completion %: {comp}")
-                    except (ValueError, TypeError):
-                        errors.append(f"Task '{task_name}' (ID {task_id}) has non-numeric completion %")
-                
-                # Hierarchy validation (Parent ID exists)
-                if 'Parent ID' in df_tasks.columns:
-                    parent_id = row['Parent ID']
-                    if pd.notna(parent_id) and str(parent_id).strip() != '':
-                        try:
-                            parent_id_int = int(float(parent_id))
-                            if not (df_tasks['Task ID'] == parent_id_int).any():
-                                errors.append(f"Task '{task_name}' (ID {task_id}) has non-existent parent ID {parent_id_int}")
-                        except (ValueError, TypeError):
-                            errors.append(f"Task '{task_name}' (ID {task_id}) has invalid parent ID format: {parent_id}")
-
-                # Validate Schedule Mode if exists
-                if 'Schedule Mode' in df_tasks.columns:
-                    mode = str(row['Schedule Mode']).strip()
-                    allowed_modes = ['Auto Scheduled', 'Manually Scheduled', 'Auto', 'Manual', 'A', 'M', '(A)', '(M)']
-                    if mode not in allowed_modes:
-                        errors.append(f"Task '{task_name}' (ID {task_id}) has invalid Schedule Mode: '{mode}'")
-
-                # 4. Logical validation
-                start_date = row.get('Start Date')
-                end_date = row.get('End Date')
-                
-                # Check date logic
-                try:
-                    # In Excel, these might already be datetime objects or strings
-                    if pd.notna(start_date) and pd.notna(end_date):
-                        # Ensure they are comparable
-                        if isinstance(start_date, str):
-                            start_date = pd.to_datetime(start_date)
-                        if isinstance(end_date, str):
-                            end_date = pd.to_datetime(end_date)
-                            
-                        if start_date > end_date:
-                            errors.append(f"Task '{task_name}' (ID {task_id}) has start date after end date")
-                except:
-                    pass
-
-                # Check name length (DoS protection)
-                if len(str(task_name)) > ProjectValidator.MAX_STR_LEN:
-                    errors.append(f"Task name too long (ID {task_id})")
-                
-                # Check notes length
-                if 'Notes' in df_tasks.columns:
-                    notes = row.get('Notes', '')
-                    if pd.notna(notes) and len(str(notes)) > ProjectValidator.MAX_STR_LEN:
-                        errors.append(f"Task notes too long (ID {task_id})")
+                ProjectValidator._validate_excel_row(row, df_tasks, errors)
 
             # 5. Circular Dependency Detection and Predecessor Format Validation for Excel
-            tasks_list = []
-            valid_dep_values = ["Finish-to-Start", "Start-to-Start", "Finish-to-Finish", "Start-to-Finish", "FS", "SS", "FF", "SF"]
+            tasks_list: List[Dict[str, Any]] = []
+            valid_dep_values = ["finish-to-start", "start-to-start", "finish-to-finish", "start-to-finish", "fs", "ss", "ff", "sf"]
             
             for _, row in df_tasks.iterrows():
                 task_id = int(row['Task ID'])
@@ -268,7 +270,7 @@ class ProjectValidator:
                 
                 if pred_str and pred_str != 'nan' and pred_str != '':
                     if '(' in pred_str:
-                        # New format: "1 (FS), 2 (SS+2d)"
+                        # New format: "1 (FS), 2 (SS+2d)" or "1 (Finish-to-Start)"
                         import re
                         for item in pred_str.split(','):
                             item = item.strip()
@@ -280,9 +282,11 @@ class ProjectValidator:
                                 content = match.group(2).strip()
                                 
                                 # Extract type and lag
-                                type_match = re.match(r'^([A-Z\-]+)', content)
+                                type_match = re.match(r'^([a-zA-Z\-]+)', content)
                                 if type_match:
                                     dep_val = type_match.group(1).strip()
+                                    if dep_val.lower() not in valid_dep_values:
+                                        errors.append(f"Task '{task_name}' (ID {task_id}) has unknown dependency type: '{dep_val}'")
                                 else:
                                     errors.append(f"Task '{task_name}' (ID {task_id}) has invalid dependency type format: '{item}'")
                             else:

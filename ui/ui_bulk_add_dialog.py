@@ -1,6 +1,5 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QTextEdit, QRadioButton, QButtonGroup, QMessageBox)
-from PyQt6.QtCore import Qt
 
 class BulkAddDialog(QDialog):
     """Dialog for adding multiple tasks in bulk by pasting text lines"""

@@ -1,9 +1,7 @@
 import pandas as pd
-import numpy as np
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-from data_manager.models import Task, Resource, Baseline, TaskSnapshot
-from settings_manager.settings_manager import DurationUnit
+from typing import Dict, Optional
+from data_manager.models import Task, Resource, TaskSnapshot
 
 class EVMCalculator:
     """
@@ -13,7 +11,7 @@ class EVMCalculator:
     def __init__(self, data_manager):
         self.data_manager = data_manager
 
-    def calculate_metrics(self, baseline_name: str, status_date: datetime = None) -> pd.DataFrame:
+    def calculate_metrics(self, baseline_name: str, status_date: Optional[datetime] = None) -> pd.DataFrame:
         """
         Calculate EVM metrics for all tasks based on a specific baseline.
         
@@ -117,6 +115,8 @@ class EVMCalculator:
 
     def _calculate_pv(self, snapshot: TaskSnapshot, bac: float, status_date: datetime, calendar) -> float:
         """Calculate Planned Value (PV) at a given status date."""
+        if not snapshot.start_date or not snapshot.end_date:
+            return 0.0
         if status_date <= snapshot.start_date:
             return 0.0
         if status_date >= snapshot.end_date:

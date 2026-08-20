@@ -5,7 +5,7 @@ Enhanced with hierarchical tasks, dependency types, and status indicators
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QTabWidget, QLabel, QLineEdit, QCheckBox, 
-                             QComboBox, QScrollArea, QStatusBar, QProgressBar)
+                             QComboBox, QScrollArea, QStatusBar)
 from datetime import datetime
 from PyQt6.QtCore import Qt, QTimer, QEvent
 from data_manager.manager import DataManager
@@ -34,7 +34,7 @@ from ui.ui_formatting import FormattingMixin
 from ui.ui_baseline_manager import BaselineOperationsMixin
 
 # Constants for ColorDelegate
-from constants.constants import STATUS_ALL, STATUS_OVERDUE, STATUS_IN_PROGRESS, STATUS_UPCOMING, STATUS_COMPLETED, APP_NAME
+from constants.constants import STATUS_ALL, STATUS_OVERDUE, STATUS_IN_PROGRESS, STATUS_UPCOMING, STATUS_COMPLETED
 
 class MainWindow(QMainWindow, FileOperationsMixin, TaskOperationsMixin, GeneralViewOperationsMixin, TreeViewOperationsMixin, FormattingMixin, BaselineOperationsMixin):
     """Main application window with enhanced features"""

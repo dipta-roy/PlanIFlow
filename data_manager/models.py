@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Any, Tuple
+from typing import List, Dict, Optional, Any
 from enum import Enum
 from settings_manager.settings_manager import DurationUnit, DateFormat
 
@@ -49,14 +49,20 @@ class Task:
     
     _next_id = 1
     
+    @classmethod
+    def reset_id_counter(cls, start_id: int = 1):
+        """Reset the static task ID counter"""
+        cls._next_id = max(1, start_id)
+
+    
     def __init__(self, name: str, start_date: datetime, end_date: datetime,
-                 percent_complete: int = 0, predecessors: List[Tuple[int, str, int]] = None,
-                 assigned_resources: List[str] = None, notes: str = "",
-                 task_id: int = None, parent_id: int = None, is_summary: bool = False,
-                 is_milestone: bool = False, wbs: str = None,
+                 percent_complete: int = 0, predecessors: Optional[List[Any]] = None,
+                 assigned_resources: Optional[List[Any]] = None, notes: str = "",
+                 task_id: Optional[int] = None, parent_id: Optional[int] = None, is_summary: bool = False,
+                 is_milestone: bool = False, wbs: Optional[str] = None,
                  schedule_type: ScheduleType = ScheduleType.AUTO_SCHEDULED,
-                 font_family: str = None, font_size: int = None, font_color: str = "#000000",
-                 font_bold: bool = None, font_italic: bool = None, font_underline: bool = False,
+                 font_family: Optional[str] = None, font_size: Optional[int] = None, font_color: str = "#000000",
+                 font_bold: Optional[bool] = None, font_italic: Optional[bool] = None, font_underline: bool = False,
                  background_color: str = "#FFFFFF"):
         """
         Initialize task with hierarchy support
@@ -91,16 +97,18 @@ class Task:
         self.percent_complete = percent_complete
         
         # Convert old format to new format if needed
-        if predecessors and len(predecessors) > 0:
-            if isinstance(predecessors[0], tuple):
-                if len(predecessors[0]) == 3:
-                    self.predecessors = predecessors
+        self.predecessors = []
+        if predecessors:
+            for pred in predecessors:
+                if isinstance(pred, (list, tuple)):
+                    if len(pred) == 3:
+                        self.predecessors.append((pred[0], pred[1], pred[2]))
+                    elif len(pred) == 2:
+                        self.predecessors.append((pred[0], pred[1], 0))
+                    elif len(pred) >= 1:
+                        self.predecessors.append((pred[0], DependencyType.FS.name, 0))
                 else:
-                    self.predecessors = [(pred_id, dep_type, 0) for pred_id, dep_type in predecessors]
-            else:
-                self.predecessors = [(pred_id, DependencyType.FS.name, 0) for pred_id in predecessors]
-        else:
-            self.predecessors = predecessors or []
+                    self.predecessors.append((pred, DependencyType.FS.name, 0))
 
         # Handle assigned_resources with allocation
         if assigned_resources and len(assigned_resources) > 0 and isinstance(assigned_resources[0], str):
@@ -202,7 +210,7 @@ class Task:
         else: # DateFormat.YYYY_MM_DD
             return '%Y-%m-%dT%H:%M:%S'
 
-    def to_dict(self, date_format: DateFormat = None) -> Dict[str, Any]:
+    def to_dict(self, date_format: Optional[DateFormat] = None) -> Dict[str, Any]:
         if date_format is None:
             date_format = DateFormat.YYYY_MM_DD # Default for internal use
         format_string = self._get_date_format_string(date_format)
@@ -231,7 +239,7 @@ class Task:
         }
     
     @staticmethod
-    def from_dict(data: Dict[str, Any], date_format: DateFormat = None) -> 'Task':
+    def from_dict(data: Dict[str, Any], date_format: Optional[DateFormat] = None) -> 'Task':
         """Create task from dictionary with backward compatibility"""
         if date_format is None:
             date_format = DateFormat.YYYY_MM_DD # Default for internal use
@@ -361,7 +369,8 @@ class Task:
                 start_is_working = calendar_manager.is_working_day(self.start_date)
  
                 days_to_add = int(duration) - (1 if start_is_working else 0)
-                if days_to_add < 0: days_to_add = 0
+                if days_to_add < 0:
+                    days_to_add = 0
                 
                 end_day = calendar_manager.add_working_days(self.start_date, days_to_add)
 
@@ -431,7 +440,7 @@ class Resource:
     """Resource data model"""
     
     def __init__(self, name: str, max_hours_per_day: float = 8.0,
-                 exceptions: List[str] = None, billing_rate: float = 0.0):
+                 exceptions: Optional[List[str]] = None, billing_rate: float = 0.0):
 
         self.name = name
         self.max_hours_per_day = max_hours_per_day
@@ -459,9 +468,9 @@ class Resource:
 
 class TaskSnapshot:
     """Snapshot of a task state for baseline comparison"""
-    def __init__(self, task_id: int, task_name: str, start_date: datetime, 
-                 end_date: datetime, duration: float, percent_complete: int,
-                 wbs: str = None):
+    def __init__(self, task_id: int, task_name: str, start_date: Optional[datetime], 
+                 end_date: Optional[datetime], duration: float, percent_complete: int,
+                 wbs: Optional[str] = None):
         self.task_id = task_id
         self.task_name = task_name
         self.start_date = start_date
@@ -497,7 +506,7 @@ class TaskSnapshot:
 
 class Baseline:
     """Project baseline containing task snapshots"""
-    def __init__(self, name: str, created_date: datetime = None, snapshots: List[TaskSnapshot] = None):
+    def __init__(self, name: str, created_date: Optional[datetime] = None, snapshots: Optional[List[TaskSnapshot]] = None):
         self.name = name
         self.created_date = created_date or datetime.now()
         self.snapshots = snapshots or []
@@ -516,7 +525,7 @@ class Baseline:
                 return snapshot
         return None
 
-    def to_dict(self, date_format: DateFormat = None) -> Dict[str, Any]:
+    def to_dict(self, date_format: Optional[DateFormat] = None) -> Dict[str, Any]:
         """Convert baseline to dictionary"""
         return {
             'name': self.name,
@@ -525,7 +534,7 @@ class Baseline:
         }
 
     @staticmethod
-    def from_dict(data: Dict[str, Any], date_format: DateFormat = None) -> 'Baseline':
+    def from_dict(data: Dict[str, Any], date_format: Optional[DateFormat] = None) -> 'Baseline':
         """Create baseline from dictionary - handles both list and dict formats"""
         snapshots = []
         if 'snapshots' in data:

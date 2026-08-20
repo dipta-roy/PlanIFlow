@@ -3,6 +3,8 @@ import os
 from cx_Freeze import setup, Executable
 sys.setrecursionlimit(5000)
 sys.path.append(os.getcwd())
+from constants.constants import VERSION
+
 base = "Win32GUI" if sys.platform == "win32" else None
 icon_path = os.path.abspath("images/logo.ico")
 
@@ -43,7 +45,7 @@ build_exe_options = {
         ("images/Logo.png", "images/Logo.png"),
         ("images/logo_lg.ico", "images/logo_lg.ico"),
         ("data_manager/project_schema.json", "data_manager/project_schema.json"),
-        ("sample/", "sample/"), # Include sample data if needed
+        #("sample/", "sample/"), # Include sample data if needed
     ],
     "include_msvcr": True,  # Include Microsoft Visual C++ Redistributable
     # "zip_include_packages": ["*"],  # Optimization: Zip all packages
@@ -55,9 +57,9 @@ build_exe_options = {
 bdist_msi_options = {
     "add_to_path": True,
     "upgrade_code": UPGRADE_CODE,
-    "initial_target_dir": r"[ProgramFilesFolder]\PlaniFlow",
+    "initial_target_dir": r"[ProgramFilesFolder]\PlanIFlow",
     "install_icon": icon_path,
-    "target_name": "PlanIFlow_Setup_2.5.0.msi",
+    "target_name": f"PlanIFlow_Setup_{VERSION}.msi",
 }
 
 # Executable Configuration
@@ -72,7 +74,7 @@ target = Executable(
 
 setup(
     name="PlanIFlow",
-    version="2.5.0",
+    version=VERSION,
     description="PlanIFlow Project Planner",
     author="Dipta Roy",
     options={
@@ -81,3 +83,4 @@ setup(
     },
     executables=[target],
 )
+

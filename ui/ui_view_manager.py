@@ -7,7 +7,6 @@ from PyQt6.QtCore import Qt, QByteArray
 from PyQt6.QtGui import QPixmap, QImage
 from ui.themes import ThemeManager
 from ui.ui_dashboard import update_dashboard
-from ui.ui_dashboard import update_dashboard
 from ui.ui_settings_dialog import SettingsDialog
 from settings_manager.settings_manager import DurationUnit
 
@@ -17,6 +16,8 @@ class GeneralViewOperationsMixin:
     def _update_all_views(self):
         """Update all UI views"""
         self._apply_stylesheet() # Ensure theme/font size is consistent
+        if hasattr(self, 'gantt_chart'):
+            self.gantt_chart.mark_dirty()
         
         # Update task tree header labels based on current settings
         header_labels = [
@@ -81,7 +82,8 @@ class GeneralViewOperationsMixin:
              return
 
         tasks = self.data_manager.get_all_tasks()
-        self.gantt_chart.update_chart(tasks, self.data_manager)
+        self.gantt_chart.update_chart(tasks, self.data_manager, force=True)
+
 
     def _update_resource_summary(self):
         """Update resource summary"""
@@ -134,7 +136,7 @@ class GeneralViewOperationsMixin:
             self._update_resource_summary()
 
     def _toggle_dark_mode(self):
-        """Toggle dark/light mode"""
+        """Toggle dark/light mode across application toolbar and all tab views"""
         self.dark_mode = not self.dark_mode
         
         if self.dark_mode:
@@ -143,8 +145,48 @@ class GeneralViewOperationsMixin:
             ThemeManager.apply_light_mode()
         
         self._apply_stylesheet()
-        self.gantt_chart.set_dark_mode(self.dark_mode)
-        self._update_task_tree()  # Refresh colors
+
+        # Update main toolbar icon contrast
+        try:
+            from ui.ui_menu_toolbar import update_toolbar_icons
+            update_toolbar_icons(self, self.dark_mode)
+        except Exception as e:
+            print(f"Failed to update toolbar icons on theme toggle: {e}")
+
+        # Update Gantt Chart theme
+        if hasattr(self, 'gantt_chart'):
+            self.gantt_chart.set_dark_mode(self.dark_mode)
+
+        # Update Task Tree colors
+        self._update_task_tree()
+
+        # Update Kanban Board theme
+        if hasattr(self, 'kanban_board') and hasattr(self.kanban_board, 'set_dark_mode'):
+            self.kanban_board.set_dark_mode(self.dark_mode)
+
+        # Update EVM Analysis theme
+        if hasattr(self, 'evm_tab') and hasattr(self.evm_tab, 'set_dark_mode'):
+            self.evm_tab.set_dark_mode(self.dark_mode)
+
+        # Update Monte Carlo Risk Analysis theme
+        if hasattr(self, 'monte_carlo_tab') and hasattr(self.monte_carlo_tab, 'set_dark_mode'):
+            self.monte_carlo_tab.set_dark_mode(self.dark_mode)
+
+        # Update Baseline Comparison theme
+        if hasattr(self, 'baseline_comparison') and hasattr(self.baseline_comparison, 'set_dark_mode'):
+            self.baseline_comparison.set_dark_mode(self.dark_mode)
+
+
+        # Rebuild dashboard so card/chart themes update
+        if hasattr(self, 'tabs') and hasattr(self, 'dashboard_tab'):
+            from ui.ui_dashboard import create_dashboard, update_dashboard
+            idx = self.tabs.indexOf(self.dashboard_tab)
+            if idx >= 0:
+                self.tabs.removeTab(idx)
+                self.dashboard_tab = create_dashboard(self)
+                self.tabs.insertTab(idx, self.dashboard_tab, "📊 Dashboard")
+                update_dashboard(self)
+
 
     def _toggle_gantt_summary_tasks(self, state):
         """Toggle visibility of summary tasks in Gantt chart"""

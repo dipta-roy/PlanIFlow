@@ -5,10 +5,9 @@ Kanban Board - Interactive task management view with drag-and-drop
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QScrollArea, QFrame, QTextEdit,
                              QDialog, QComboBox, QGridLayout, QSizePolicy)
-from PyQt6.QtCore import Qt, QMimeData, QPoint, pyqtSignal
-from PyQt6.QtGui import QDrag, QPalette, QColor, QFont
+from PyQt6.QtCore import Qt, QMimeData, pyqtSignal
+from PyQt6.QtGui import QDrag, QColor, QFont
 from datetime import datetime
-from data_manager.models import TaskStatus
 
 class TaskCard(QFrame):
     """Individual task card widget"""
@@ -93,40 +92,69 @@ class TaskCard(QFrame):
         
         layout.addStretch()
     
-    def _apply_styling(self):
-        """Apply status-based styling"""
+    def _apply_styling(self, dark_mode: bool = False):
+        """Apply status-based styling with theme awareness"""
         status = self._get_task_status()
         
-        # Color coding based on status
-        colors = {
-            'To Do': '#E3F2FD',      # Light blue
-            'In Progress': '#FFF9C4', # Light yellow
-            'Delayed': '#FFCDD2',     # Light red
-            'Completed': '#C8E6C9'    # Light green
-        }
-        
-        border_colors = {
-            'To Do': '#2196F3',
-            'In Progress': '#FFC107',
-            'Delayed': '#F44336',
-            'Completed': '#4CAF50'
-        }
-        
-        bg_color = colors.get(status, '#FFFFFF')
-        border_color = border_colors.get(status, '#CCCCCC')
-        
-        self.setStyleSheet(f"""
-            TaskCard {{
-                background-color: {bg_color};
-                border: 2px solid {border_color};
-                border-radius: 8px;
-                padding: 5px;
-            }}
-            TaskCard:hover {{
-                background-color: {self._lighten_color(bg_color)};
-                border: 2px solid {border_color};
-            }}
-        """)
+        if dark_mode:
+            colors = {
+                'To Do': '#1E293B',
+                'In Progress': '#3B2D00',
+                'Delayed': '#3E191C',
+                'Completed': '#14381C'
+            }
+            border_colors = {
+                'To Do': '#38BDF8',
+                'In Progress': '#FACC15',
+                'Delayed': '#F87171',
+                'Completed': '#4ADE80'
+            }
+            bg_color = colors.get(status, '#2D2D2D')
+            border_color = border_colors.get(status, '#555555')
+            
+            self.setStyleSheet(f"""
+                TaskCard {{
+                    background-color: {bg_color};
+                    border: 2px solid {border_color};
+                    border-radius: 8px;
+                    padding: 5px;
+                    color: #E2E8F0;
+                }}
+                TaskCard QLabel {{
+                    color: #E2E8F0;
+                }}
+                TaskCard:hover {{
+                    border: 2px solid {border_color};
+                }}
+            """)
+        else:
+            colors = {
+                'To Do': '#E3F2FD',      # Light blue
+                'In Progress': '#FFF9C4', # Light yellow
+                'Delayed': '#FFCDD2',     # Light red
+                'Completed': '#C8E6C9'    # Light green
+            }
+            border_colors = {
+                'To Do': '#2196F3',
+                'In Progress': '#FFC107',
+                'Delayed': '#F44336',
+                'Completed': '#4CAF50'
+            }
+            bg_color = colors.get(status, '#FFFFFF')
+            border_color = border_colors.get(status, '#CCCCCC')
+            
+            self.setStyleSheet(f"""
+                TaskCard {{
+                    background-color: {bg_color};
+                    border: 2px solid {border_color};
+                    border-radius: 8px;
+                    padding: 5px;
+                }}
+                TaskCard:hover {{
+                    background-color: {self._lighten_color(bg_color)};
+                    border: 2px solid {border_color};
+                }}
+            """)
     
     def _lighten_color(self, hex_color):
         """Lighten a hex color slightly for hover effect"""
@@ -230,13 +258,28 @@ class KanbanColumn(QFrame):
         layout.addWidget(scroll)
         
         # Styling
-        self.setStyleSheet("""
-            KanbanColumn {
-                background-color: #F5F5F5;
-                border: 1px solid #CCCCCC;
-                border-radius: 5px;
-            }
-        """)
+        self.apply_column_style(False)
+
+    def apply_column_style(self, dark_mode: bool = False):
+        self.dark_mode = dark_mode
+        if dark_mode:
+            self.count_label.setStyleSheet("color: #AAAAAA; font-size: 9pt;")
+            self.setStyleSheet("""
+                KanbanColumn {
+                    background-color: #252525;
+                    border: 1px solid #3D3D3D;
+                    border-radius: 5px;
+                }
+            """)
+        else:
+            self.count_label.setStyleSheet("color: #666; font-size: 9pt;")
+            self.setStyleSheet("""
+                KanbanColumn {
+                    background-color: #F5F5F5;
+                    border: 1px solid #CCCCCC;
+                    border-radius: 5px;
+                }
+            """)
     
     def add_task_card(self, card):
         """Add a task card to this column"""
@@ -261,23 +304,18 @@ class KanbanColumn(QFrame):
         """Accept drag events"""
         if event.mimeData().hasText():
             event.acceptProposedAction()
-            self.setStyleSheet("""
-                KanbanColumn {
-                    background-color: #E8F5E9;
+            bg = "#1B381E" if getattr(self, 'dark_mode', False) else "#E8F5E9"
+            self.setStyleSheet(f"""
+                KanbanColumn {{
+                    background-color: {bg};
                     border: 2px dashed #4CAF50;
                     border-radius: 5px;
-                }
+                }}
             """)
     
     def dragLeaveEvent(self, event):
         """Reset styling when drag leaves"""
-        self.setStyleSheet("""
-            KanbanColumn {
-                background-color: #F5F5F5;
-                border: 1px solid #CCCCCC;
-                border-radius: 5px;
-            }
-        """)
+        self.apply_column_style(getattr(self, 'dark_mode', False))
     
     def dropEvent(self, event):
         """Handle task drop"""
@@ -299,69 +337,58 @@ class TaskDetailDialog(QDialog):
         self.setWindowTitle(f"Task Details - {task.name}")
         self.setModal(True)
         self.setMinimumSize(500, 400)
-        
         self._setup_ui()
     
     def _setup_ui(self):
-        """Setup dialog UI"""
+        """Setup detail dialog UI"""
         layout = QVBoxLayout(self)
         
         # Task info grid
-        info_grid = QGridLayout()
+        grid = QGridLayout()
+        grid.setSpacing(10)
         
-        # Task name
-        info_grid.addWidget(QLabel("<b>Task Name:</b>"), 0, 0)
-        info_grid.addWidget(QLabel(self.task.name), 0, 1)
+        grid.addWidget(QLabel("Task Name:"), 0, 0)
+        name_val = QLabel(self.task.name)
+        name_val.setStyleSheet("font-weight: bold;")
+        grid.addWidget(name_val, 0, 1)
         
-        # ID and WBS
-        info_grid.addWidget(QLabel("<b>ID:</b>"), 1, 0)
-        info_grid.addWidget(QLabel(str(self.task.id)), 1, 1)
+        grid.addWidget(QLabel("WBS:"), 1, 0)
+        grid.addWidget(QLabel(self.task.wbs), 1, 1)
         
-        info_grid.addWidget(QLabel("<b>WBS:</b>"), 2, 0)
-        info_grid.addWidget(QLabel(self.task.wbs), 2, 1)
+        grid.addWidget(QLabel("Dates:"), 2, 0)
+        start_str = self.task.start_date.strftime('%Y-%m-%d')
+        end_str = self.task.end_date.strftime('%Y-%m-%d')
+        grid.addWidget(QLabel(f"{start_str} to {end_str}"), 2, 1)
         
-        # Dates
-        info_grid.addWidget(QLabel("<b>Start Date:</b>"), 3, 0)
-        info_grid.addWidget(QLabel(self.task.start_date.strftime('%Y-%m-%d %H:%M')), 3, 1)
+        grid.addWidget(QLabel("Duration:"), 3, 0)
+        grid.addWidget(QLabel(f"{self.task.duration} days"), 3, 1)
         
-        info_grid.addWidget(QLabel("<b>End Date:</b>"), 4, 0)
-        info_grid.addWidget(QLabel(self.task.end_date.strftime('%Y-%m-%d %H:%M')), 4, 1)
+        grid.addWidget(QLabel("Progress:"), 4, 0)
+        grid.addWidget(QLabel(f"{self.task.percent_complete}%"), 4, 1)
         
-        # Duration
-        info_grid.addWidget(QLabel("<b>Duration:</b>"), 5, 0)
-        info_grid.addWidget(QLabel(f"{self.task.duration} days"), 5, 1)
-        
-        # Progress
-        info_grid.addWidget(QLabel("<b>Progress:</b>"), 6, 0)
-        info_grid.addWidget(QLabel(f"{self.task.percent_complete}%"), 6, 1)
-        
-        # Resources
         if self.task.assigned_resources:
-            resources_str = ", ".join([f"{name} ({alloc}%)" 
-                                      for name, alloc in self.task.assigned_resources])
-            info_grid.addWidget(QLabel("<b>Resources:</b>"), 7, 0)
-            info_grid.addWidget(QLabel(resources_str), 7, 1)
+            grid.addWidget(QLabel("Resources:"), 5, 0)
+            res_str = ", ".join([f"{name} ({alloc}%)" 
+                                for name, alloc in self.task.assigned_resources])
+            grid.addWidget(QLabel(res_str), 5, 1)
         
-        layout.addLayout(info_grid)
+        layout.addLayout(grid)
         
-        # Notes section
-        layout.addWidget(QLabel("<b>Notes:</b>"))
+        # Notes editor
+        layout.addWidget(QLabel("Notes:"))
         self.notes_edit = QTextEdit()
         self.notes_edit.setPlainText(self.task.notes or "")
-        self.notes_edit.setMaximumHeight(150)
         layout.addWidget(self.notes_edit)
         
         # Buttons
         button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
         save_btn = QPushButton("Save Notes")
         save_btn.clicked.connect(self._save_notes)
         button_layout.addWidget(save_btn)
         
-        close_btn = QPushButton("Close")
-        close_btn.clicked.connect(self.accept)
-        button_layout.addWidget(close_btn)
+        cancel_btn = QPushButton("Close")
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_btn)
         
         layout.addLayout(button_layout)
     
@@ -375,13 +402,26 @@ class TaskDetailDialog(QDialog):
 class KanbanBoard(QWidget):
     """Main Kanban board widget"""
     
-    def __init__(self, main_window):
-        super().__init__()
-        self.main_window = main_window
-        self.data_manager = main_window.data_manager
+    def __init__(self, main_window_or_data_manager, main_window=None, parent=None):
+        super().__init__(parent)
+        if main_window is not None:
+            self.data_manager = main_window_or_data_manager
+            self.main_window = main_window
+        else:
+            self.main_window = main_window_or_data_manager
+            self.data_manager = getattr(main_window_or_data_manager, 'data_manager', main_window_or_data_manager)
+        self.dark_mode = getattr(self.main_window, 'dark_mode', False)
         self.columns = {}
         
         self._setup_ui()
+        self.set_dark_mode(self.dark_mode)
+
+
+    def set_dark_mode(self, dark_mode: bool):
+        """Update dark mode state and refresh board theme"""
+        self.dark_mode = dark_mode
+        for column in self.columns.values():
+            column.apply_column_style(dark_mode)
         self.refresh_board()
 
     def update_data_manager(self, data_manager):
@@ -473,6 +513,7 @@ class KanbanBoard(QWidget):
         # Add tasks to appropriate columns
         for task in tasks:
             card = TaskCard(task)
+            card._apply_styling(dark_mode=getattr(self, 'dark_mode', False))
             card.clicked.connect(self._show_task_details)
             
             # Determine status
@@ -526,7 +567,7 @@ class KanbanBoard(QWidget):
         # Default to To Do
         return 'To Do'
     
-    def _handle_task_drop(self, task_id, new_status):
+    def _handle_task_drop(self, task_id, _new_status):
         """Handle task being dropped into a new column"""
         # Note: In a full implementation, you might update task status
         # For now, we just refresh the board

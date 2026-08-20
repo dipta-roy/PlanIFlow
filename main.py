@@ -13,14 +13,36 @@ import traceback
 from PyQt6.QtWidgets import QApplication, QSplashScreen, QMessageBox
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import Qt
+import logging
+from logging.handlers import RotatingFileHandler
+
 from constants.constants import (
     APP_NAME, VERSION, ERROR_TITLE, ERROR_GENERIC_MESSAGE
 )
 from data_manager.temp_manager import TempFileManager
 
+def setup_logging():
+    """Configure persistent application logging"""
+    try:
+        log_dir = os.path.join(os.path.expanduser("~"), ".planiflow", "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, "app.log")
+        
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        
+        handler = RotatingFileHandler(log_file, maxBytes=2*1024*1024, backupCount=2, encoding='utf-8')
+        formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logging.info(f"Initialized application log at {log_file}")
+    except Exception as e:
+        print(f"Failed to setup logging: {e}", file=sys.stderr)
+
 def handle_exception(type, value, tb):
     """Global exception handler to prevent app crash and show popup"""
     error_msg = "".join(traceback.format_exception(type, value, tb))
+    logging.error(f"Unhandled Exception: {error_msg}")
     print(error_msg, file=sys.stderr)
 
     # Show a generic error popup to the user
@@ -63,11 +85,12 @@ def main():
             # Try to show message box if Qt is alive
             if QApplication.instance():
                 QMessageBox.critical(None, "Startup Error", f"An error occurred during startup.\nSee {log_path}\n\n{error_msg}")
-        except:
+        except Exception:
             pass
         sys.exit(1)
 
 def _main_impl():
+    setup_logging()
     # Set global exception hook
     sys.excepthook = handle_exception
 

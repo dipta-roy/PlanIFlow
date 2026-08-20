@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QPushButton, 
-                             QProgressBar, QMessageBox, QHBoxLayout, QFrame)
+                             QProgressBar, QMessageBox, QHBoxLayout)
 from PyQt6.QtCore import Qt, pyqtSlot, QMetaObject, Q_ARG
 from constants.constants import APP_NAME, VERSION
-from updater import Updater
+from updater.updater import Updater
 import sys
 
 class UpdateDialog(QDialog):
@@ -78,8 +78,10 @@ class UpdateDialog(QDialog):
             
             self.action_btn.setText("Update Now")
             # Safe disconnect
-            try: self.action_btn.clicked.disconnect()
-            except TypeError: pass 
+            try:
+                self.action_btn.clicked.disconnect()
+            except TypeError:
+                pass
             self.action_btn.clicked.connect(lambda: self.start_update(data['url'], data.get('hash_url')))
             self.action_btn.setVisible(True)
             self.action_btn.setEnabled(True)
@@ -88,8 +90,10 @@ class UpdateDialog(QDialog):
             self.status_label.setText("You are using the latest version.")
             self.status_label.setStyleSheet("color: green;")
             self.action_btn.setText("Check Again")
-            try: self.action_btn.clicked.disconnect()
-            except TypeError: pass
+            try:
+                self.action_btn.clicked.disconnect()
+            except TypeError:
+                pass
             self.action_btn.clicked.connect(self.check_for_updates)
             self.action_btn.setVisible(True)
             self.action_btn.setEnabled(True)
@@ -101,11 +105,13 @@ class UpdateDialog(QDialog):
 
         elif status == "ERROR":
             #self.status_label.setText(f"Error: {data}")
-            self.status_label.setText(f"Error in connecting... Check your internet connection.")
+            self.status_label.setText("Error in connecting... Check your internet connection.")
             self.status_label.setStyleSheet("color: red;")
             self.action_btn.setText("Retry")
-            try: self.action_btn.clicked.disconnect()
-            except TypeError: pass
+            try:
+                self.action_btn.clicked.disconnect()
+            except TypeError:
+                pass
             self.action_btn.clicked.connect(self.check_for_updates)
             self.action_btn.setVisible(True)
             self.action_btn.setEnabled(True)

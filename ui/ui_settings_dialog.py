@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget,
 from PyQt6.QtCore import QDate, QTime, Qt
 from datetime import datetime
 from settings_manager.settings_manager import DateFormat, DurationUnit, Currency
-from calendar_manager.calendar_manager import CalendarManager
 from ui.ui_time_picker import TimePickerWidget
 
 class SettingsDialog(QDialog):
@@ -329,7 +328,7 @@ class SettingsDialog(QDialog):
         # Ensure it's an int
         try:
              current_font_size = int(current_font_size)
-        except:
+        except (ValueError, TypeError):
              current_font_size = 10
              
         self.font_size_spin.setValue(current_font_size)

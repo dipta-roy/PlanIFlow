@@ -4,13 +4,14 @@ Interactive Time Picker Widget for selecting time with sliders
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTimeEdit, 
                              QLabel, QSlider, QSpinBox)
 from PyQt6.QtCore import QTime, Qt, pyqtSignal
+from typing import Optional
 
 class TimePickerWidget(QWidget):
     """Interactive time picker with sliders"""
     
     timeChanged = pyqtSignal(QTime)
     
-    def __init__(self, initial_time: QTime = None, parent=None):
+    def __init__(self, initial_time: Optional[QTime] = None, parent=None):
         super().__init__(parent)
         self.selected_time = initial_time if initial_time else QTime(8, 0)
         self._create_ui()

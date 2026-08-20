@@ -1,14 +1,14 @@
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
-import logging
-from data_manager.models import Task, Resource, DependencyType, TaskStatus, ScheduleType, Baseline, TaskSnapshot
+from data_manager.models import Task, Resource, DependencyType, ScheduleType, Baseline, TaskSnapshot
 from settings_manager.settings_manager import ProjectSettings, DurationUnit
 from data_manager.validator import ProjectValidator
 from calendar_manager.calendar_manager import CalendarManager
 
 class DataManager:
-    def __init__(self, calendar_manager=None):
+    def __init__(self, calendar_manager: Optional[CalendarManager] = None) -> None:
         self.tasks: List[Task] = []
+        self._tasks_by_id: Dict[int, Task] = {}
         self.resources: List[Resource] = [] # Initialize as empty, load_from_dict will handle default if needed
         self.calendar_manager = calendar_manager or CalendarManager()
         self.project_name: str = "Untitled Project"
@@ -16,15 +16,16 @@ class DataManager:
         self.baselines: List[Baseline] = []  # Maximum 11 baselines
         self._sync_calendar_bounds()
     
+    def _rebuild_task_index(self):
+        """Rebuild fast O(1) task lookup dictionary"""
+        self._tasks_by_id = {t.id: t for t in self.tasks}
+    
     # Task CRUD Operations
     def _generate_wbs(self):
-        """Generate WBS for all tasks based on their hierarchy."""
-        # Sort tasks by parent_id and then by id to ensure consistent WBS generation
-        sorted_tasks = sorted(self.tasks, key=lambda t: (t.parent_id if t.parent_id is not None else -1, t.id))
-        
-        # Build a dictionary for quick lookup of children
+        """Generate WBS for all tasks based on their hierarchy and current list order."""
+        # Build a dictionary for quick lookup of children preserving list order
         children_map = {}
-        for task in sorted_tasks:
+        for task in self.tasks:
             if task.parent_id not in children_map:
                 children_map[task.parent_id] = []
             children_map[task.parent_id].append(task)
@@ -37,10 +38,11 @@ class DataManager:
                     _assign_wbs_recursive(children_map[task.id], f"{wbs_number}.")
         
         # Start WBS generation from top-level tasks (parent_id is None)
-        top_level_tasks = [t for t in sorted_tasks if t.parent_id is None]
+        top_level_tasks = children_map.get(None, [])
         _assign_wbs_recursive(top_level_tasks)
+        self._rebuild_task_index()
 
-    def add_task(self, task: Task, parent_id: int = None) -> bool:
+    def add_task(self, task: Task, parent_id: Optional[int] = None) -> bool:
         """Add a new task with validation"""
         task.parent_id = parent_id
         
@@ -174,9 +176,9 @@ class DataManager:
         """Get all tasks"""
         return self.tasks.copy()
     
-    def get_child_tasks(self, parent_id: int) -> List[Task]:
-        """Get all direct children of a task, sorted by ID"""
-        return sorted([t for t in self.tasks if t.parent_id == parent_id], key=lambda t: t.id)
+    def get_child_tasks(self, parent_id: Optional[int]) -> List[Task]:
+        """Get all direct children of a task in project list order"""
+        return [t for t in self.tasks if t.parent_id == parent_id]
     
     def get_all_descendants(self, task_id: int) -> List[Task]:
         """Get all descendants (children, grandchildren, etc.) of a task"""
@@ -190,10 +192,10 @@ class DataManager:
         return descendants
     
     def get_top_level_tasks(self) -> List[Task]:
-        """Get all tasks without parents, sorted by ID"""
-        return sorted([t for t in self.tasks if t.parent_id is None], key=lambda t: t.id)
+        """Get all tasks without parents in project list order"""
+        return [t for t in self.tasks if t.parent_id is None]
     
-    def move_task(self, task_id: int, new_parent_id: int = None) -> bool:
+    def move_task(self, task_id: int, new_parent_id: Optional[int] = None) -> bool:
         """Move a task to a new parent"""
         task = self.get_task(task_id)
         if not task:
@@ -280,8 +282,19 @@ class DataManager:
         self._generate_wbs()
         return True
 
+    def _get_task_family(self, task_id: int) -> List[Task]:
+        """Get a task and all its recursive descendants in order."""
+        family = []
+        task = self.get_task(task_id)
+        if task:
+            family.append(task)
+            children = self.get_child_tasks(task_id)
+            for child in children:
+                family.extend(self._get_task_family(child.id))
+        return family
+
     def move_task_vertically(self, task_id: int, direction: str) -> bool:
-        """Move task 'up' or 'down' among siblings by swapping IDs"""
+        """Move task 'up' or 'down' among siblings by reordering in self.tasks without modifying task IDs."""
         task = self.get_task(task_id)
         if not task:
             return False
@@ -289,7 +302,7 @@ class DataManager:
         siblings = self.get_child_tasks(task.parent_id)
         
         try:
-            curr_index = [t.id for t in siblings].index(task_id)
+            curr_index = siblings.index(task)
         except ValueError:
             return False
             
@@ -303,7 +316,21 @@ class DataManager:
         
         if target_index != -1:
             target_task = siblings[target_index]
-            return self.swap_task_ids(task.id, target_task.id)
+            task_family = self._get_task_family(task.id)
+            target_family = self._get_task_family(target_task.id)
+            
+            # Remove task_family from self.tasks while preserving relative ordering
+            self.tasks = [t for t in self.tasks if t not in task_family]
+            
+            if direction == 'up':
+                insert_idx = self.tasks.index(target_family[0])
+                self.tasks[insert_idx:insert_idx] = task_family
+            else:
+                insert_idx = self.tasks.index(target_family[-1]) + 1
+                self.tasks[insert_idx:insert_idx] = task_family
+                
+            self._generate_wbs()
+            return True
             
         return False
     
@@ -357,7 +384,7 @@ class DataManager:
 
     # Validation and Business Logic
     
-    def _validate_predecessors(self, task: Task, exclude_id: int = None) -> bool:
+    def _validate_predecessors(self, task: Task, exclude_id: Optional[int] = None) -> bool:
         for pred_id, dep_type, lag_days in task.predecessors:
             # Check for self-dependency
             if pred_id == task.id or (exclude_id is not None and pred_id == exclude_id):
@@ -395,19 +422,39 @@ class DataManager:
         
         return has_path(pred_id, task_id)
     
+    def _calculate_fs_constraint_start(self, predecessor: Task, task: Task, lag_days: int) -> datetime:
+        lag = timedelta(days=lag_days)
+        if not self.calendar_manager:
+            return predecessor.end_date + timedelta(days=1) + lag
+
+        if task.is_milestone:
+            if lag_days >= 0:
+                return self.calendar_manager.add_working_days(predecessor.end_date, lag_days)
+            return self.calendar_manager.subtract_working_days(predecessor.end_date, abs(lag_days))
+
+        start_from = predecessor.end_date
+        days_to_add = lag_days
+        work_end_hour, work_end_min = self.calendar_manager.get_working_end_time()
+        if lag_days >= 0 and (not predecessor.is_milestone or (start_from.hour > work_end_hour) or (start_from.hour == work_end_hour and start_from.minute >= work_end_min)):
+            days_to_add += 1
+        
+        constraint_start = self.calendar_manager.add_working_days(start_from, days_to_add)
+        if days_to_add > lag_days or lag_days < 0:
+            start_h, start_m = self.calendar_manager.get_working_start_time()
+            constraint_start = constraint_start.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
+        return constraint_start
+
     def _auto_calculate_dates_from_predecessors(self, task: Task):
         """Auto-calculate task dates based on predecessors and dependency types"""
         if task.schedule_type == ScheduleType.MANUALLY_SCHEDULED:
             return
         if not task.predecessors:
-            # If no predecessors, reset to original start date if available
             if hasattr(task, '_original_start') and task._original_start:
                 task.start_date = task._original_start
                 duration = task.get_duration(self.settings.duration_unit, self.calendar_manager)
                 task.set_duration_and_update_end(duration, self.settings.duration_unit, self.calendar_manager)
             return
         
-        # Find the most constraining predecessor
         latest_start = None
         latest_end = None
         
@@ -420,50 +467,16 @@ class DataManager:
             lag = timedelta(days=lag_days)
 
             if dep_type == DependencyType.FS:
-                # Finish-to-Start: task starts after predecessor ends
-                if self.calendar_manager:
-                    # Milestones start immediately after predecessor ends (plus lag)
-                    if task.is_milestone:
-                        if lag_days >= 0:
-                            constraint_start = self.calendar_manager.add_working_days(predecessor.end_date, lag_days)
-                        else:
-                            constraint_start = self.calendar_manager.subtract_working_days(predecessor.end_date, abs(lag_days))
-                    # For regular tasks
-                    else:
-                        start_from = predecessor.end_date
-                        days_to_add = lag_days
-
-                        work_end_hour, work_end_min = self.calendar_manager.get_working_end_time()
-                        if lag_days >= 0 and (not predecessor.is_milestone or (start_from.hour > work_end_hour) or (start_from.hour == work_end_hour and start_from.minute >= work_end_min)):
-                            days_to_add += 1
-                        
-                        constraint_start = self.calendar_manager.add_working_days(start_from, days_to_add)
-                        
-                        if days_to_add > lag_days or lag_days < 0:
-                           start_h, start_m = self.calendar_manager.get_working_start_time()
-                           constraint_start = constraint_start.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
-
-                else:
-                    constraint_start = predecessor.end_date + timedelta(days=1) + lag
-
+                constraint_start = self._calculate_fs_constraint_start(predecessor, task, lag_days)
                 if latest_start is None or constraint_start > latest_start:
                     latest_start = constraint_start
-            
             elif dep_type == DependencyType.SS:
-                # Start-to-Start: task starts when predecessor starts
                 constraint_start = predecessor.start_date + lag
                 if latest_start is None or constraint_start > latest_start:
                     latest_start = constraint_start
-            
-            elif dep_type == DependencyType.FF:
-                # Finish-to-Finish: task ends when predecessor ends
-                constraint_end = predecessor.end_date + lag
-                if latest_end is None or constraint_end > latest_end:
-                    latest_end = constraint_end
-            
-            elif dep_type == DependencyType.SF:
-                # Start-to-Finish: task ends when predecessor starts
-                constraint_end = predecessor.start_date + lag
+            elif dep_type in (DependencyType.FF, DependencyType.SF):
+                ref_date = predecessor.end_date if dep_type == DependencyType.FF else predecessor.start_date
+                constraint_end = ref_date + lag
                 if latest_end is None or constraint_end > latest_end:
                     latest_end = constraint_end
 
@@ -696,8 +709,8 @@ class DataManager:
     
     def check_resource_overallocation(self) -> Dict[str, List[str]]:
         """Check for resource over-allocation warnings"""
-        warnings = {}
-        resource_daily_hours = {}
+        warnings: Dict[str, List[str]] = {}
+        resource_daily_hours: Dict[str, float] = {}
         
         for task in self.tasks:
             # Skip summary tasks and milestones
@@ -727,7 +740,7 @@ class DataManager:
                         hours_per_day = self.calendar_manager.hours_per_day
                     
                     if key not in resource_daily_hours:
-                        resource_daily_hours[key] = 0
+                        resource_daily_hours[key] = 0.0
                     
                     resource_daily_hours[key] += (hours_per_day * (allocation_percent / 100.0))
                 
@@ -749,34 +762,15 @@ class DataManager:
     
     # Data Persistence
     
-    def load_from_dict(self, data: Dict[str, Any]):
-        """Import all data from dictionary with backward compatibility"""
-        version = data.get('version', '1.0')
-        
-        Task._next_id = data.get('next_task_id', 1)
-        self.project_name = data.get('project_name', 'Untitled Project')
-        
-        # Load settings first
-        if 'project_settings' in data:
-            self.settings.from_dict(data['project_settings'])
-        elif 'settings' in data: # Backward compatibility
-             self.settings.from_dict(data['settings'])
-
-        if 'calendar_settings' in data:
-            self.calendar_manager.from_dict(data['calendar_settings'])
-        
-        self.tasks = [Task.from_dict(t) for t in data.get('tasks', [])]
-        self.resources = [Resource.from_dict(r) for r in data.get('resources', [])]
-        
-        self._sync_calendar_bounds()
-    
     def clear_all(self):
         """Clear all data"""
         self.tasks.clear()
+        if hasattr(self, '_tasks_by_id'):
+            self._tasks_by_id.clear()
         self.resources.clear()
         self.baselines.clear()
         self.project_name = "Untitled Project"
-        Task._next_id = 1
+        Task.reset_id_counter(1)
         
         # Reset settings and calendar to defaults
         self.settings.reset_defaults()
@@ -786,7 +780,7 @@ class DataManager:
     def bulk_indent_tasks(self, task_ids: List[int]) -> set:
         """Indent multiple tasks at once. Returns set of new parent IDs."""
         # Sort tasks by their current position
-        tasks = [self.get_task(tid) for tid in task_ids if self.get_task(tid)]
+        tasks: List[Task] = [t for tid in task_ids if (t := self.get_task(tid)) is not None]
         if not tasks:
             return set()
         
@@ -818,40 +812,16 @@ class DataManager:
             
         self._sync_calendar_bounds()
             
-        # 1. Update all summary task dates based on children (bottom-up)
-        for task in sorted(self.tasks, key=lambda t: t.get_level(self.tasks), reverse=True):
-            if task.is_summary:
-                self._update_summary_task_dates(task.id)
-        
-        # 2. Re-calculate all auto-scheduled tasks (top-down / dependency based)
-        # We start with top-level tasks and propagate changes
-        for task in self.get_top_level_tasks():
+        # Topologically sort tasks or pass through queue to auto-calculate dates
+        top_level = self.get_top_level_tasks()
+        for task in top_level:
             self._auto_adjust_dependent_tasks(task)
             
-        # 3. Final pass for summaries
+        # Update summary tasks
         for task in sorted(self.tasks, key=lambda t: t.get_level(self.tasks), reverse=True):
             if task.is_summary:
                 self._update_summary_task_dates(task.id)
-        
-        self._sync_calendar_bounds()
-
-    def bulk_outdent_tasks(self, task_ids: List[int]) -> bool:
-        """Outdent multiple tasks at once"""
-        tasks = [self.get_task(tid) for tid in task_ids if self.get_task(tid)]
-        if not tasks:
-            return False
-        
-        success_count = 0
-        for task in tasks:
-            if task.parent_id is not None:
-                parent = self.get_task(task.parent_id)
-                if parent:
-                    new_parent_id = parent.parent_id
-                    if self.move_task(task.id, new_parent_id):
-                        success_count += 1
-        
-        return success_count > 0
-    
+                
     def convert_all_tasks_to_unit(self, new_unit: DurationUnit):
         """
         Convert all task durations when unit changes.
@@ -859,36 +829,36 @@ class DataManager:
         """
         for task in self.tasks:
             if not task.is_summary:
-                # Get current duration in the new unit
-                current_duration = task.get_duration(new_unit, self.calendar_manager)
-                # This ensures consistency - no actual change needed as calculation adapts
+                # Duration calculation adapts dynamically
                 pass
             else:
                 # Summary tasks auto-update from children
                 self._update_summary_task_dates(task.id)
     
     def save_to_dict(self) -> Dict[str, Any]:
-        """Export all data to dictionary"""
-        data = {
-            'project_name': ProjectValidator.sanitize_string(self.project_name),
-            'settings': self.settings.to_dict(), # Include settings
-            'tasks': [],
-            'resources': [],
-            'baselines': [baseline.to_dict(date_format=self.settings.default_date_format) for baseline in self.baselines], # Include baselines
-        }
-        
-        # Sanitize tasks
+        """Export all data to dictionary for JSON persistence with sanitized strings"""
+        tasks_data: List[Dict[str, Any]] = []
         for task in self.tasks:
             t_dict = task.to_dict(date_format=self.settings.default_date_format)
             t_dict['name'] = ProjectValidator.sanitize_string(t_dict.get('name', ''))
             t_dict['notes'] = ProjectValidator.sanitize_string(t_dict.get('notes', ''))
-            data['tasks'].append(t_dict)
+            tasks_data.append(t_dict)
             
-        # Sanitize resources
+        resources_data: List[Dict[str, Any]] = []
         for resource in self.resources:
             r_dict = resource.to_dict()
             r_dict['name'] = ProjectValidator.sanitize_string(r_dict.get('name', ''))
-            data['resources'].append(r_dict)
+            resources_data.append(r_dict)
+
+        data: Dict[str, Any] = {
+            'version': '2.2',
+            'project_name': ProjectValidator.sanitize_string(self.project_name),
+            'next_task_id': Task._next_id,
+            'tasks': tasks_data,
+            'resources': resources_data,
+            'project_settings': self.settings.to_dict(),
+            'baselines': [b.to_dict() for b in self.baselines]
+        }
         
         # Save calendar settings if manager exists
         if self.calendar_manager:
@@ -898,13 +868,12 @@ class DataManager:
     
     def load_from_dict(self, data: Dict[str, Any]):
         """Import all data from dictionary with backward compatibility"""
-        version = data.get('version', '1.0')
-        
-        Task._next_id = data.get('next_task_id', 1)
         self.project_name = ProjectValidator.sanitize_string(data.get('project_name', 'Untitled Project'))
         
         # Load settings (with backward compatibility)
-        if 'settings' in data:
+        if 'project_settings' in data:
+            self.settings.from_dict(data['project_settings'])
+        elif 'settings' in data:
             self.settings.from_dict(data['settings'])
         else:
             self.settings = ProjectSettings()
@@ -915,7 +884,11 @@ class DataManager:
         
         # Load tasks using the retrieved date format
         self.tasks = [Task.from_dict(t, date_format=self.settings.default_date_format) for t in data.get('tasks', [])]
-        self._generate_wbs() # Generate WBS for loaded tasks
+        
+        max_task_id = max([t.id for t in self.tasks], default=0)
+        Task.reset_id_counter(max(data.get('next_task_id', 1), max_task_id + 1))
+        
+        self._generate_wbs() # Generate WBS for loaded tasks & rebuilds task index
         
         # *** BACKWARD COMPATIBILITY: Add is_milestone to old tasks ***
         for task in self.tasks:
@@ -946,8 +919,10 @@ class DataManager:
         loaded_baselines_data = data.get('baselines')
         if loaded_baselines_data is not None:
             self.baselines = [Baseline.from_dict(b, date_format=self.settings.default_date_format) for b in loaded_baselines_data]
+            
+        self._sync_calendar_bounds()
     
-    def insert_task_at_position(self, task: Task, insert_after_id: int = None) -> bool:
+    def insert_task_at_position(self, task: Task, insert_after_id: Optional[int] = None) -> bool:
         """
         Insert a task at a specific position and renumber subsequent tasks
         
@@ -1092,67 +1067,38 @@ class DataManager:
             return 1
         return max(t.id for t in self.tasks) + 1
 
-    def calculate_critical_path(self):
-        """Calculates the critical path for all tasks in the project."""
-        if not self.tasks:
-            return
-
-        # 1. Initialize ES/EF for all tasks
-        for task in self.tasks:
-            task.early_start = None
-            task.early_finish = None
-            task.late_start = None
-            task.late_finish = None
-            task.slack = None
-            task.is_critical = False
-
-        sorted_tasks = sorted(self.tasks, key=lambda t: t.id)
-
+    def _cpm_forward_pass(self, sorted_tasks: List[Task]):
         for task in sorted_tasks:
             if not task.predecessors:
-                task.early_start = task.start_date  # Use its own start date if no predecessors
+                task.early_start = task.start_date
             else:
                 max_pred_ef = None
                 for pred_id, dep_type_str, lag_days in task.predecessors:
                     predecessor = self.get_task(pred_id)
                     if not predecessor or not predecessor.early_finish:
-                        continue # Skip if predecessor not found or not processed yet
-
+                        continue
                     dep_type = DependencyType[dep_type_str]
                     lag = timedelta(days=lag_days)
-
                     if dep_type == DependencyType.FS:
-                        # FS: Successor starts after predecessor finishes
                         if self.calendar_manager:
                             if lag_days >= 0:
-                                pred_constraint_date = self.calendar_manager.add_working_days(predecessor.early_finish, lag_days + 1)
+                                pred_date = self.calendar_manager.add_working_days(predecessor.early_finish, lag_days + 1)
                             else:
-                                pred_constraint_date = self.calendar_manager.subtract_working_days(predecessor.early_finish, abs(lag_days) - 1)
+                                pred_date = self.calendar_manager.subtract_working_days(predecessor.early_finish, abs(lag_days) - 1)
                         else:
-                            pred_constraint_date = predecessor.early_finish + timedelta(days=1) + lag
+                            pred_date = predecessor.early_finish + timedelta(days=1) + lag
                     elif dep_type == DependencyType.SS:
-                        # SS: Successor starts when predecessor starts
-                        pred_constraint_date = predecessor.early_start + lag
-                    elif dep_type == DependencyType.FF:
-                        # FF: Successor finishes when predecessor finishes (this affects EF, not ES directly)
-                        # We'll handle this by calculating ES from EF later
-                        pred_constraint_date = predecessor.early_finish + lag
-                    elif dep_type == DependencyType.SF:
-                        # SF: Successor finishes when predecessor starts (this affects EF, not ES directly)
-                        # We'll handle this by calculating ES from EF later
-                        pred_constraint_date = predecessor.early_start + lag
+                        pred_date = predecessor.early_start + lag
+                    elif dep_type in (DependencyType.FF, DependencyType.SF):
+                        pred_date = (predecessor.early_finish if dep_type == DependencyType.FF else predecessor.early_start) + lag
                     else:
-                        pred_constraint_date = predecessor.early_finish + timedelta(days=1) + lag # Default to FS
+                        pred_date = predecessor.early_finish + timedelta(days=1) + lag
 
-                    if max_pred_ef is None or pred_constraint_date > max_pred_ef:
-                        max_pred_ef = pred_constraint_date
+                    if max_pred_ef is None or pred_date > max_pred_ef:
+                        max_pred_ef = pred_date
 
-                if max_pred_ef: # If there were valid predecessors
-                    task.early_start = max_pred_ef
-                else:
-                    task.early_start = task.start_date # Fallback if no valid predecessors or first task
+                task.early_start = max_pred_ef if max_pred_ef else task.start_date
 
-            # Calculate Early Finish
             if task.early_start:
                 if task.is_milestone:
                     task.early_finish = task.early_start
@@ -1163,30 +1109,22 @@ class DataManager:
                     else:
                         task.early_finish = task.early_start + timedelta(days=duration_days - 1)
 
-        project_finish_date = max(t.early_finish for t in self.tasks if t.early_finish) if self.tasks else datetime.now()
-
-        # Initialize LF for tasks with no successors to project_finish_date
+    def _cpm_backward_pass(self, sorted_tasks_reverse: List[Task], project_finish_date: datetime):
         for task in self.tasks:
             if not self.get_successors(task.id):
                 task.late_finish = project_finish_date
             else:
-                task.late_finish = None # Will be calculated from successors
-
-        # Process tasks in reverse topological order (or by ID descending)
-        sorted_tasks_reverse = sorted(self.tasks, key=lambda t: t.id, reverse=True)
+                task.late_finish = None
 
         for task in sorted_tasks_reverse:
             if not self.get_successors(task.id):
-                # Already set to project_finish_date or its own EF if it's the last task
                 if not task.late_finish:
-                    task.late_finish = task.early_finish # Fallback if no successors and not project end
+                    task.late_finish = task.early_finish
             else:
                 min_succ_ls = None
                 for successor in self.get_successors(task.id):
                     if not successor.late_start:
-                        continue # Successor not processed yet
-
-                    # Find the dependency type from task to successor
+                        continue
                     dep_info = next(((pid, dt, ld) for pid, dt, ld in successor.predecessors if pid == task.id), None)
                     if not dep_info:
                         continue
@@ -1196,35 +1134,25 @@ class DataManager:
                     lag = timedelta(days=lag_days)
 
                     if dep_type == DependencyType.FS:
-                        # FS: Successor starts after predecessor finishes
                         if self.calendar_manager:
                             if lag_days >= 0:
-                                succ_constraint_date = self.calendar_manager.subtract_working_days(successor.late_start, lag_days + 1)
+                                succ_date = self.calendar_manager.subtract_working_days(successor.late_start, lag_days + 1)
                             else:
-                                succ_constraint_date = self.calendar_manager.add_working_days(successor.late_start, abs(lag_days) - 1)
+                                succ_date = self.calendar_manager.add_working_days(successor.late_start, abs(lag_days) - 1)
                         else:
-                            succ_constraint_date = successor.late_start - timedelta(days=1) - lag
+                            succ_date = successor.late_start - timedelta(days=1) - lag
                     elif dep_type == DependencyType.SS:
-                        # SS: Successor starts when predecessor starts
-                        succ_constraint_date = successor.late_start - lag
-                    elif dep_type == DependencyType.FF:
-                        # FF: Successor finishes when predecessor finishes
-                        succ_constraint_date = successor.late_finish - lag
-                    elif dep_type == DependencyType.SF:
-                        # SF: Successor finishes when predecessor starts
-                        succ_constraint_date = successor.late_finish - lag
+                        succ_date = successor.late_start - lag
+                    elif dep_type in (DependencyType.FF, DependencyType.SF):
+                        succ_date = successor.late_finish - lag
                     else:
-                        succ_constraint_date = successor.late_start - timedelta(days=1) - lag # Default to FS
+                        succ_date = successor.late_start - timedelta(days=1) - lag
 
-                    if min_succ_ls is None or succ_constraint_date < min_succ_ls:
-                        min_succ_ls = succ_constraint_date
+                    if min_succ_ls is None or succ_date < min_succ_ls:
+                        min_succ_ls = succ_date
 
-                if min_succ_ls: # If there were valid successors
-                    task.late_finish = min_succ_ls
-                else:
-                    task.late_finish = task.early_finish # Fallback if no valid successors
+                task.late_finish = min_succ_ls if min_succ_ls else task.early_finish
 
-            # Calculate Late Start
             if task.late_finish:
                 if task.is_milestone:
                     task.late_start = task.late_finish
@@ -1235,11 +1163,25 @@ class DataManager:
                     else:
                         task.late_start = task.late_finish - timedelta(days=duration_days - 1)
 
-        # 4. Calculate Slack and Identify Critical Tasks
+    def calculate_critical_path(self):
+        """Calculates the critical path for all tasks in the project."""
+        if not self.tasks:
+            return
+
+        for task in self.tasks:
+            task.early_start = task.early_finish = task.late_start = task.late_finish = task.slack = None
+            task.is_critical = False
+
+        sorted_tasks = sorted(self.tasks, key=lambda t: t.id)
+        self._cpm_forward_pass(sorted_tasks)
+
+        project_finish_date = max((t.early_finish for t in self.tasks if t.early_finish), default=datetime.now())
+        sorted_tasks_reverse = sorted(self.tasks, key=lambda t: t.id, reverse=True)
+        self._cpm_backward_pass(sorted_tasks_reverse, project_finish_date)
+
         for task in self.tasks:
             if task.early_start and task.late_start:
                 task.slack = task.late_start - task.early_start
-                # A task is critical if its slack is zero or negative (due to lag)
                 task.is_critical = (task.slack <= timedelta(days=0))
 
     def get_cost_breakdown_data(self) -> Dict[str, Any]:
@@ -1247,11 +1189,11 @@ class DataManager:
         Calculates and returns monthly/daily cost breakdown data.
         Returns a dictionary with 'headers' (list of strings) and 'rows' (list of lists of strings).
         """
-        if not self.get_project_start_date() or not self.get_project_end_date():
-            return {'headers': ["Period", "Total"], 'rows': []}
-
         start_date = self.get_project_start_date()
         end_date = self.get_project_end_date()
+
+        if not start_date or not end_date:
+            return {'headers': ["Period", "Total"], 'rows': []}
 
         headers = []
         period_type = ""
@@ -1277,8 +1219,8 @@ class DataManager:
         for i, period_str in enumerate(headers):
             row_data = [period_str]
             
-            period_start_dt = None
-            period_end_dt = None
+            period_start_dt: Optional[datetime] = None
+            period_end_dt: Optional[datetime] = None
 
             if period_type == "Daily":
                 period_start_dt = start_date + timedelta(days=i)
@@ -1290,11 +1232,13 @@ class DataManager:
                 if period_end_dt > end_date:
                     period_end_dt = end_date
 
-            period_total_cost = 0
-            resource_costs_in_period = {res.name: 0.0 for res in self.resources}
+            period_total_cost: float = 0.0
+            resource_costs_in_period: Dict[str, float] = {res.name: 0.0 for res in self.resources}
 
             for task in self.tasks:
                 if task.is_summary or task.is_milestone: # Skip summary tasks and milestones
+                    continue
+                if not task.start_date or not task.end_date or not period_start_dt or not period_end_dt:
                     continue
 
                 # Determine overlap between task and current period
@@ -1450,8 +1394,8 @@ class DataManager:
             
             if snapshot:
                 # Task exists in baseline - calculate variances
-                start_variance_days = (task.start_date - snapshot.start_date).days
-                end_variance_days = (task.end_date - snapshot.end_date).days
+                start_variance_days = (task.start_date - snapshot.start_date).days if (task.start_date and snapshot.start_date) else 0
+                end_variance_days = (task.end_date - snapshot.end_date).days if (task.end_date and snapshot.end_date) else 0
                 duration_variance = current_duration - snapshot.duration
                 completion_variance = task.percent_complete - snapshot.percent_complete
                 
@@ -1531,11 +1475,21 @@ class DataManager:
                 })
         
         # Sort comparisons by task ID
-        comparisons.sort(key=lambda x: x['task_id'])
+        comparisons.sort(key=lambda x: int(x['task_id']) if isinstance(x['task_id'], (int, str)) and str(x['task_id']).isdigit() else 0)
         
         # Calculate summary statistics
         active_comparisons = [c for c in comparisons if c['start_status'] not in ['new', 'deleted']]
         
+        dur_vars: List[float] = []
+        comp_vars: List[float] = []
+        for c in active_comparisons:
+            d_val = c.get('duration_variance')
+            if isinstance(d_val, (int, float)):
+                dur_vars.append(float(d_val))
+            c_val = c.get('completion_variance')
+            if isinstance(c_val, (int, float)):
+                comp_vars.append(float(c_val))
+
         summary = {
             'total_tasks': len(comparisons),
             'tasks_on_track': sum(1 for c in active_comparisons if c['end_status'] == 'on-track'),
@@ -1543,8 +1497,8 @@ class DataManager:
             'tasks_early': sum(1 for c in active_comparisons if c['end_status'] == 'early'),
             'tasks_new': sum(1 for c in comparisons if c['start_status'] == 'new'),
             'tasks_deleted': sum(1 for c in comparisons if c['start_status'] == 'deleted'),
-            'avg_duration_variance': sum(c['duration_variance'] for c in active_comparisons if c['duration_variance'] is not None) / len(active_comparisons) if active_comparisons else 0,
-            'avg_completion_variance': sum(c['completion_variance'] for c in active_comparisons if c['completion_variance'] is not None) / len(active_comparisons) if active_comparisons else 0,
+            'avg_duration_variance': sum(dur_vars) / len(dur_vars) if dur_vars else 0.0,
+            'avg_completion_variance': sum(comp_vars) / len(comp_vars) if comp_vars else 0.0,
         }
         
         return {

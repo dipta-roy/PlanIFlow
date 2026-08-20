@@ -6,7 +6,6 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from ui.gantt_chart import GanttChart
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QSize
@@ -115,7 +114,7 @@ class PDFExporter:
             try:
                 if os.path.exists(path):
                     os.remove(path)
-            except:
+            except Exception:
                 pass
 
     def _render_gantt_chart_to_image(self, show_critical_path: bool, filename: str) -> str:
@@ -154,9 +153,8 @@ class PDFExporter:
         
         # Render Gantt chart with critical path
         critical_path_image_path = self._render_gantt_chart_to_image(True, "gantt_critical_path.png")
-        pil_image = PILImage.open(critical_path_image_path)
-        img_width, img_height = pil_image.size
-        pil_image.close()
+        with PILImage.open(critical_path_image_path) as pil_image:
+            img_width, img_height = pil_image.size
 
         img = Image(critical_path_image_path)
         # Use landscape width with 0.5" margins for maximum chart size
@@ -172,9 +170,8 @@ class PDFExporter:
 
         # Render Gantt chart without critical path
         non_critical_path_image_path = self._render_gantt_chart_to_image(False, "gantt_non_critical_path.png")
-        pil_image = PILImage.open(non_critical_path_image_path)
-        img_width, img_height = pil_image.size
-        pil_image.close()
+        with PILImage.open(non_critical_path_image_path) as pil_image:
+            img_width, img_height = pil_image.size
 
         img = Image(non_critical_path_image_path)
         # Use landscape width with 0.5" margins for maximum chart size
@@ -701,7 +698,7 @@ class PDFExporter:
                 try:
                     hex_color = rl_colors.HexColor(bg_color)
                     style.add('BACKGROUND', (2, row_idx), (2, row_idx), hex_color)
-                except:
+                except Exception:
                     pass  # Skip if color is invalid
         
         table.setStyle(style)
@@ -729,7 +726,7 @@ class PDFExporter:
         total_project_cost = sum(data.get('total_amount', 0.0) for data in allocation.values())
 
         symbol = self.currency_symbol
-        data = [[f"Resource Name", "Max Hours/Day", f"Billing Rate ({symbol})", "Total Hours Allocated", f"Total Cost ({symbol})"]]
+        data = [["Resource Name", "Max Hours/Day", f"Billing Rate ({symbol})", "Total Hours Allocated", f"Total Cost ({symbol})"]]
         for resource in self.project_data.resources:
             resource_name = resource.name
             details = allocation.get(resource_name, {})

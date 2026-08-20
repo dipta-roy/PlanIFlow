@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTableWidget, QTableWidgetIte
                              QHeaderView, QMessageBox, QMenu, QTextEdit, QLabel, QDialog)
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt
-from data_manager.models import Resource
 from ui.ui_resource_dialog import ResourceDialog
 from command_manager.commands import AddResourceCommand, EditResourceCommand
 
@@ -85,7 +84,7 @@ class ResourceSheet(QWidget):
             return
         
         row = item.row()
-        resource_name = self.resource_table.item(row, 0).text()
+        self.resource_table.selectRow(row)
         menu = QMenu(self)
         edit_action = QAction("✏️ Edit Resource", self)
         edit_action.triggered.connect(self._edit_resource_dialog)
@@ -205,8 +204,10 @@ class ResourceSheet(QWidget):
         
         # Update warnings
         warnings = self.data_manager.check_resource_overallocation()
+        dark_mode = getattr(self.parent_window, 'dark_mode', False) if self.parent_window else False
+        text_color = "#E0E0E0" if dark_mode else "#37474F"
         if warnings:
-            warning_text = "<h4 style='color: orange;'>Over-Allocation Detected:</h4>"
+            warning_text = f"<h4 style='color: #FFA726;'>Over-Allocation Detected:</h4><div style='color: {text_color};'>"
             for resource_name, warning_list in warnings.items():
                 warning_text += f"<b>{resource_name}:</b><ul>"
                 for warning in warning_list[:5]:
@@ -214,6 +215,7 @@ class ResourceSheet(QWidget):
                 if len(warning_list) > 5:
                     warning_text += f"<li><i>...and {len(warning_list) - 5} more</i></li>"
                 warning_text += "</ul>"
+            warning_text += "</div>"
             self.resource_warnings.setHtml(warning_text)
         else:
-            self.resource_warnings.setHtml("<p style='color: green;'>✓ No over-allocation issues detected.</p>")
+            self.resource_warnings.setHtml("<p style='color: #66BB6A;'>✓ No over-allocation issues detected.</p>")

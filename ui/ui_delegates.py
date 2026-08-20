@@ -1,6 +1,7 @@
 """ui_delegates.py
 Extracted delegates and sortable item from ui_main.py
 """
+from typing import Optional
 from PyQt6.QtWidgets import QTreeWidgetItem, QComboBox, QCompleter, QStyledItemDelegate, QDateEdit, QWidget, QStyleOptionViewItem, QStyle
 from PyQt6.QtCore import Qt, QModelIndex, QDate, QAbstractItemModel
 from PyQt6.QtGui import QColor, QBrush, QPainter, QFont
@@ -26,6 +27,56 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
         except (ValueError, TypeError):
             return 0
 
+    def _compare_status(self, other) -> bool:
+        status_order = {'red': 0, 'green': 1, 'grey': 2, 'blue': 3}
+        s1 = status_order.get(self.data(1, Qt.ItemDataRole.UserRole), 99)
+        s2 = status_order.get(other.data(1, Qt.ItemDataRole.UserRole), 99)
+        if s1 != s2:
+            return s1 < s2
+        return self._get_id() < other._get_id()
+
+    def _compare_wbs(self, other) -> bool:
+        try:
+            p1 = [int(x) for x in self.text(3).split('.') if x.isdigit()]
+            p2 = [int(x) for x in other.text(3).split('.') if x.isdigit()]
+            if p1 != p2:
+                return p1 < p2
+        except Exception:
+            if self.text(3).lower() != other.text(3).lower():
+                return self.text(3).lower() < other.text(3).lower()
+        return self._get_id() < other._get_id()
+
+    def _compare_date(self, other, col: int) -> bool:
+        try:
+            mw = self.main_window
+            if mw:
+                fmt = mw._get_strftime_format_string()
+                txt1 = self.text(col) if (col != 6 or self.text(6) != "Milestone") else self.text(5)
+                txt2 = other.text(col) if (col != 6 or other.text(6) != "Milestone") else other.text(5)
+                d1 = datetime.strptime(txt1, fmt)
+                d2 = datetime.strptime(txt2, fmt)
+                if d1 != d2:
+                    return d1 < d2
+            elif self.text(col) != other.text(col):
+                return self.text(col) < other.text(col)
+        except ValueError:
+            if self.text(col) != other.text(col):
+                return self.text(col) < other.text(col)
+        return self._get_id() < other._get_id()
+
+    def _compare_float(self, other, col: int, strip_char: str = "") -> bool:
+        try:
+            t1 = self.text(col).replace(strip_char, '').strip() if strip_char else self.text(col)
+            t2 = other.text(col).replace(strip_char, '').strip() if strip_char else other.text(col)
+            v1 = float(t1) if t1 else 0.0
+            v2 = float(t2) if t2 else 0.0
+            if v1 != v2:
+                return v1 < v2
+        except ValueError:
+            if self.text(col) != other.text(col):
+                return self.text(col) < other.text(col)
+        return self._get_id() < other._get_id()
+
     def __lt__(self, other):
         """Custom less-than comparison for sorting"""
         tree = self.treeWidget()
@@ -33,146 +84,46 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
             return False
 
         column = tree.sortColumn()
-       
-        # Helper for secondary sort by ID
-        def sort_by_id_secondary():
-            return self._get_id() < other._get_id()
-
-        # Column 0: Schedule Type (text)
         if column == 0:
-            t1 = self.text(0).lower()
-            t2 = other.text(0).lower()
-            if t1 != t2:
-                return t1 < t2
-            return sort_by_id_secondary()
-
-        # Column 1: Status (custom sort by color/priority)
+            if self.text(0).lower() != other.text(0).lower():
+                return self.text(0).lower() < other.text(0).lower()
+            return self._get_id() < other._get_id()
         elif column == 1:
-            status_order = {
-                'red': 0,    # Overdue
-                'green': 1,  # In Progress
-                'grey': 2,   # Upcoming
-                'blue': 3    # Completed
-            }
-            self_status_color = self.data(1, Qt.ItemDataRole.UserRole)
-            other_status_color = other.data(1, Qt.ItemDataRole.UserRole)
-            
-            self_order = status_order.get(self_status_color, 99)
-            other_order = status_order.get(other_status_color, 99)
-            
-            if self_order != other_order:
-                return self_order < other_order
-            return sort_by_id_secondary()
-
-        # Column 2: ID (integer)
+            return self._compare_status(other)
         elif column == 2:
-            id1 = self._get_id()
-            id2 = other._get_id()
-            return id1 < id2
-
-        # Column 3: WBS (text)
+            return self._get_id() < other._get_id()
         elif column == 3:
-            try:
-                parts1 = [int(x) for x in self.text(3).split('.') if x.isdigit()]
-                parts2 = [int(x) for x in other.text(3).split('.') if x.isdigit()]
-                if parts1 != parts2:
-                    return parts1 < parts2
-            except:
-                t1 = self.text(3).lower()
-                t2 = other.text(3).lower()
-                if t1 != t2:
-                    return t1 < t2
-            return sort_by_id_secondary()
-
-        # Column 4: Task Name (text, ignore symbols and spaces)
+            return self._compare_wbs(other)
         elif column == 4:
-            text1 = self.text(4).replace('▶', '').replace('◆', '').strip().lstrip()
-            text2 = other.text(4).replace('▶', '').replace('◆', '').strip().lstrip()
-            if text1.lower() != text2.lower():
-                return text1.lower() < text2.lower()
-            return sort_by_id_secondary()
-
-        # Column 5: Start Date
-        elif column == 5:
-            try:
-                main_window = self.main_window
-                if main_window:
-                    date_format_str = main_window._get_strftime_format_string()
-                    date1 = datetime.strptime(self.text(5), date_format_str)
-                    date2 = datetime.strptime(other.text(5), date_format_str)
-                    if date1 != date2:
-                        return date1 < date2
-                else:
-                    if self.text(5) != other.text(5):
-                        return self.text(5) < other.text(5)
-            except ValueError:
-                if self.text(5) != other.text(5):
-                    return self.text(5) < other.text(5)
-            return sort_by_id_secondary()
-
-        # Column 6: End Date
-        elif column == 6:
-            try:
-                main_window = self.main_window
-                if main_window:
-                    date_format_str = main_window._get_strftime_format_string()
-                    text1 = self.text(6) if self.text(6) != "Milestone" else self.text(5)
-                    text2 = other.text(6) if other.text(6) != "Milestone" else other.text(5)
-                    date1 = datetime.strptime(text1, date_format_str)
-                    date2 = datetime.strptime(text2, date_format_str)
-                    if date1 != date2:
-                        return date1 < date2
-                else:
-                    if self.text(6) != other.text(6):
-                        return self.text(6) < other.text(6)
-            except ValueError:
-                if self.text(6) != other.text(6):
-                    return self.text(6) < other.text(6)
-            return sort_by_id_secondary()
-
-        # Column 7: Duration (numeric)
-        elif column == 7:
-            try:
-                val1 = float(self.text(7)) if self.text(7) else 0
-                val2 = float(other.text(7)) if other.text(7) else 0
-                if val1 != val2:
-                    return val1 < val2
-            except ValueError:
-                if self.text(7) != other.text(7):
-                    return self.text(7) < other.text(7)
-            return sort_by_id_secondary()
-
-        # Column 8: % Complete (numeric)
-        elif column == 8:
-            try:
-                val1 = float(self.text(8).replace('%', '').strip())
-                val2 = float(other.text(8).replace('%', '').strip())
-                if val1 != val2:
-                    return val1 < val2
-            except ValueError:
-                if self.text(8) != other.text(8):
-                    return self.text(8) < other.text(8)
-            return sort_by_id_secondary()
-
-        # Default: text comparison
-        else:
-            t1 = self.text(column).lower()
-            t2 = other.text(column).lower()
+            t1 = self.text(4).replace('▶', '').replace('◆', '').strip().lower()
+            t2 = other.text(4).replace('▶', '').replace('◆', '').strip().lower()
             if t1 != t2:
                 return t1 < t2
-            return sort_by_id_secondary()
+            return self._get_id() < other._get_id()
+        elif column in (5, 6):
+            return self._compare_date(other, column)
+        elif column == 7:
+            return self._compare_float(other, 7)
+        elif column == 8:
+            return self._compare_float(other, 8, '%')
+        else:
+            if self.text(column).lower() != other.text(column).lower():
+                return self.text(column).lower() < other.text(column).lower()
+            return self._get_id() < other._get_id()
 
 class ColorDelegate(QStyledItemDelegate):
     """Custom delegate to show colored status indicators"""
     
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+    def paint(self, painter: Optional[QPainter], option: QStyleOptionViewItem, index: QModelIndex):
         """Paint cell with color indicator and text"""
+        if not painter:
+            return
         # Get status color from item data
         color_name = index.data(Qt.ItemDataRole.UserRole)
         status_text = index.data(Qt.ItemDataRole.DisplayRole)
         
         # Draw background
-        if option.state & QStyle.StateFlag.State_Selected:
+        if QStyle.StateFlag(option.state) & QStyle.StateFlag.State_Selected:
             painter.fillRect(option.rect, option.palette.highlight())
             text_color = option.palette.highlightedText().color()
         else:
@@ -226,13 +177,15 @@ class ColorDelegate(QStyledItemDelegate):
 
 class DateDelegate(QStyledItemDelegate):
     """Custom delegate for date editing with a QDateEdit calendar popup"""
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+    def createEditor(self, parent: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         editor = QDateEdit(parent)
         editor.setCalendarPopup(True)
         editor.setDisplayFormat("yyyy-MM-dd")
         return editor
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex):
+    def setEditorData(self, editor: Optional[QWidget], index: QModelIndex):
+        if not editor or not isinstance(editor, QDateEdit):
+            return
         date_str = index.data(Qt.ItemDataRole.DisplayRole)
         if date_str and date_str != "Milestone":
             date = QDate.fromString(date_str, "yyyy-MM-dd")
@@ -240,14 +193,17 @@ class DateDelegate(QStyledItemDelegate):
         else:
             editor.setDate(QDate.currentDate())
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
+    def setModelData(self, editor: Optional[QWidget], model: Optional[QAbstractItemModel], index: QModelIndex):
+        if not model:
+            return
         if isinstance(editor, QDateEdit):
             model.setData(index, editor.date().toString("yyyy-MM-dd"), Qt.ItemDataRole.EditRole)
         else:
             super().setModelData(editor, model, index)
 
-    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
-        editor.setGeometry(option.rect)
+    def updateEditorGeometry(self, editor: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex):
+        if editor:
+            editor.setGeometry(option.rect)
 
 
 class ResourceDelegate(QStyledItemDelegate):
@@ -261,7 +217,7 @@ class ResourceDelegate(QStyledItemDelegate):
         """Update the internal list of resource names"""
         self._resource_names = resource_names
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+    def createEditor(self, parent: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         if index.column() == 10:  # Resources column
             editor = QComboBox(parent)
             editor.setEditable(True) # Allow typing for multiple resources or new ones
@@ -276,9 +232,10 @@ class ResourceDelegate(QStyledItemDelegate):
             editor.setCompleter(completer)
             
             return editor
-        return super().createEditor(parent, option, index)
+        res = super().createEditor(parent, option, index)
+        return res if res is not None else QWidget(parent)
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex):
+    def setEditorData(self, editor: Optional[QWidget], index: QModelIndex):
         if index.column() == 10:  # Resources column
             current_resources_str = index.data(Qt.ItemDataRole.DisplayRole)
             if isinstance(editor, QComboBox):
@@ -286,17 +243,22 @@ class ResourceDelegate(QStyledItemDelegate):
         else:
             super().setEditorData(editor, index)
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
+    def setModelData(self, editor: Optional[QWidget], model: Optional[QAbstractItemModel], index: QModelIndex):
+        if not model:
+            return
         if index.column() == 10:  # Resources column
             if isinstance(editor, QComboBox):
                 # Get text from line edit, as it can be multiple comma-separated resources
-                new_resources_str = editor.lineEdit().text()
-                model.setData(index, new_resources_str, Qt.ItemDataRole.EditRole)
+                line_edit = editor.lineEdit()
+                if line_edit:
+                    new_resources_str = line_edit.text()
+                    model.setData(index, new_resources_str, Qt.ItemDataRole.EditRole)
         else:
             super().setModelData(editor, model, index)
 
-    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
-        editor.setGeometry(option.rect)
+    def updateEditorGeometry(self, editor: Optional[QWidget], option: QStyleOptionViewItem, index: QModelIndex):
+        if editor:
+            editor.setGeometry(option.rect)
 
 
 def get_resource_path(relative_path):
@@ -318,11 +280,13 @@ class ExpandCollapseDelegate(QStyledItemDelegate):
         super().__init__()
         self.tree_widget = tree_widget
     
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+    def paint(self, painter: Optional[QPainter], option: QStyleOptionViewItem, index: QModelIndex):
         """Paint expand/collapse icon"""
+        if not painter:
+            return
         # Manually paint background to respect theme
         painter.fillRect(option.rect, option.palette.base())
-        if option.state & QStyle.StateFlag.State_Selected:
+        if QStyle.StateFlag(option.state) & QStyle.StateFlag.State_Selected:
              painter.fillRect(option.rect, option.palette.highlight())
 
         # Get the tree widget item

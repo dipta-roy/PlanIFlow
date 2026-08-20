@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from typing import Optional, Tuple
 from PyQt6.QtWidgets import QTreeWidgetItem, QMessageBox, QMenu, QDialog
 from PyQt6.QtGui import QAction, QColor, QBrush
 from PyQt6.QtCore import Qt, QTimer
@@ -79,7 +80,7 @@ class TreeViewOperationsMixin:
 
         added_items = {}
 
-        def add_task_to_tree_filtered(task: Task, parent_item: QTreeWidgetItem = None, level: int = 0):
+        def add_task_to_tree_filtered(task: Task, parent_item: Optional[QTreeWidgetItem] = None, level: int = 0):
             if task.id not in tasks_to_display:
                 return None
 
@@ -111,18 +112,16 @@ class TreeViewOperationsMixin:
             # COLUMN 3: WBS (not editable)
             item.setText(3, task.wbs if task.wbs else "")
 
-            # COLUMN 4: Task Name WITH MANUAL INDENTATION
+            # COLUMN 4: Task Name
             is_milestone = getattr(task, 'is_milestone', False)
             is_summary = getattr(task, 'is_summary', False)
             
-            indent = "    " * level
-            
             if is_milestone:
-                display_name = f"{indent}◆ {task.name}"
+                display_name = f"◆ {task.name}"
             elif is_summary:
-                display_name = f"{indent}▶ {task.name}"
+                display_name = f"▶ {task.name}"
             else:
-                display_name = f"{indent}{task.name}"
+                display_name = task.name
             
             item.setText(4, display_name)
             
@@ -236,13 +235,13 @@ class TreeViewOperationsMixin:
         # Enable sorting first
         self.task_tree.setSortingEnabled(True)
         
-        # Restore sort state or apply default ID sort
+        # Restore sort state or apply default WBS sort
         if current_sort_col != -1:
             # Restore previous sort
             self.task_tree.sortByColumn(current_sort_col, current_sort_order)
         else:
-            # Default to ID ascending sort
-            self.task_tree.sortByColumn(2, Qt.SortOrder.AscendingOrder)
+            # Default to WBS ascending sort
+            self.task_tree.sortByColumn(3, Qt.SortOrder.AscendingOrder)
 
     def _filter_tasks(self):
         """Apply filters to task tree"""
@@ -412,6 +411,26 @@ class TreeViewOperationsMixin:
                 else:
                     self.expanded_tasks.discard(task_id)
     
+    def _select_task_by_id(self, task_id: int):
+        """Find and select item by task_id"""
+        def find_item_recursive(parent_item=None):
+            count = parent_item.childCount() if parent_item else self.task_tree.topLevelItemCount()
+            for i in range(count):
+                item = parent_item.child(i) if parent_item else self.task_tree.topLevelItem(i)
+                if item and item.data(2, Qt.ItemDataRole.UserRole) == task_id:
+                    return item
+                if item and item.childCount() > 0:
+                    found = find_item_recursive(item)
+                    if found:
+                        return found
+            return None
+
+        target_item = find_item_recursive()
+        if target_item:
+            self.task_tree.clearSelection()
+            target_item.setSelected(True)
+            self.task_tree.setCurrentItem(target_item)
+
     def _move_task_up(self):
         """Move selected task up"""
         selected_items = self.task_tree.selectedItems()
@@ -422,18 +441,9 @@ class TreeViewOperationsMixin:
         task_id = item.data(2, Qt.ItemDataRole.UserRole)
         
         if self.data_manager.move_task_vertically(task_id, 'up'):
+            self.task_tree.header().setSortIndicator(3, Qt.SortOrder.AscendingOrder)
             self._update_all_views()
-            # Restore selection - ID might be swapped but object is same in memory?
-            # Wait, IDs are swapped. The task physically moved up.
-            # We want to select the NEW ID at the NEW position (which is the old ID at the old position... wait).
-            # If I move Task A (ID 2) up to where Task B (ID 1) was.
-            # Task A becomes ID 1. Task B becomes ID 2.
-            # I want to select ID 1 (Move target).
-            
-            # Simple approach: Find the item with ID 1 (if we knew it became 1).
-            # But swapping IDs is complex to track here without re-finding.
-            # Just refreshing view is enough for now. User can re-select if needed or I can try to re-select based on index.
-            pass
+            self._select_task_by_id(task_id)
 
     def _move_task_down(self):
         """Move selected task down"""
@@ -445,7 +455,9 @@ class TreeViewOperationsMixin:
         task_id = item.data(2, Qt.ItemDataRole.UserRole)
         
         if self.data_manager.move_task_vertically(task_id, 'down'):
+            self.task_tree.header().setSortIndicator(3, Qt.SortOrder.AscendingOrder)
             self._update_all_views()
+            self._select_task_by_id(task_id)
 
     def _show_task_context_menu(self, position):
         """Show context menu on task right-click"""
@@ -457,44 +469,44 @@ class TreeViewOperationsMixin:
         task_id = item.data(2, Qt.ItemDataRole.UserRole)
         task = self.data_manager.get_task(task_id) if task_id else None
         
-        menu = QMenu(self)
+        menu = QMenu(self.task_tree)
         
         # *** ADD MOVE OPTIONS ***
-        move_up_action = QAction("⬆ Move Up", self)
+        move_up_action = QAction("⬆ Move Up", menu)
         move_up_action.triggered.connect(self._move_task_up)
         menu.addAction(move_up_action)
         
-        move_down_action = QAction("⬇ Move Down", self)
+        move_down_action = QAction("⬇ Move Down", menu)
         move_down_action.triggered.connect(self._move_task_down)
         menu.addAction(move_down_action)
         
         menu.addSeparator()
 
         # *** ADD INSERT OPTIONS ***
-        insert_above_action = QAction("➕ Insert Task Above", self)
+        insert_above_action = QAction("➕ Insert Task Above", menu)
         insert_above_action.triggered.connect(self._insert_task_above)
         menu.addAction(insert_above_action)
         
-        insert_below_action = QAction("➕ Insert Task Below", self)
+        insert_below_action = QAction("➕ Insert Task Below", menu)
         insert_below_action.triggered.connect(self._insert_task_below)
         menu.addAction(insert_below_action)
         
         menu.addSeparator()
         
         # Edit action
-        edit_action = QAction("✏️ Edit Task", self)
+        edit_action = QAction("✏️ Edit Task", menu)
         edit_action.triggered.connect(self._edit_task_dialog)
         menu.addAction(edit_action)
         
         # Bulk edit action (if multiple tasks selected)
         selected_items = self.task_tree.selectedItems()
         if len(selected_items) > 1:
-            bulk_edit_action = QAction("✏️ Bulk Edit Selected Tasks...", self)
+            bulk_edit_action = QAction("✏️ Bulk Edit Selected Tasks...", menu)
             bulk_edit_action.triggered.connect(self._bulk_edit_tasks)
             menu.addAction(bulk_edit_action)
         
         # Delete action
-        delete_action = QAction("🗑️ Delete Task", self)
+        delete_action = QAction("🗑️ Delete Task", menu)
         delete_action.triggered.connect(self._delete_task)
         menu.addAction(delete_action)
         
@@ -505,11 +517,11 @@ class TreeViewOperationsMixin:
             is_milestone = getattr(task, 'is_milestone', False)
             
             if is_milestone:
-                convert_action = QAction("🔄 Convert to Task", self)
+                convert_action = QAction("🔄 Convert to Task", menu)
                 convert_action.triggered.connect(self._convert_to_milestone)
                 menu.addAction(convert_action)
             else:
-                convert_action = QAction("🔄 Convert to Milestone", self)
+                convert_action = QAction("🔄 Convert to Milestone", menu)
                 convert_action.triggered.connect(self._convert_to_milestone)
                 menu.addAction(convert_action)
             
@@ -518,38 +530,38 @@ class TreeViewOperationsMixin:
         # Expand/Collapse actions for summary tasks
         if task and task.is_summary:
             if item.isExpanded():
-                collapse_action = QAction("⊖ Collapse", self)
+                collapse_action = QAction("⊖ Collapse", menu)
                 collapse_action.triggered.connect(self._collapse_selected)
                 menu.addAction(collapse_action)
                 
-                collapse_all_action = QAction("⊟ Collapse All Children", self)
+                collapse_all_action = QAction("⊟ Collapse All Children", menu)
                 collapse_all_action.triggered.connect(lambda: self._collapse_item_recursively(item))
                 menu.addAction(collapse_all_action)
             else:
-                expand_action = QAction("⊕ Expand", self)
+                expand_action = QAction("⊕ Expand", menu)
                 expand_action.triggered.connect(self._expand_selected)
                 menu.addAction(expand_action)
                 
-                expand_all_action = QAction("⊞ Expand All Children", self)
+                expand_all_action = QAction("⊞ Expand All Children", menu)
                 expand_all_action.triggered.connect(self._expand_all_children_of_selected)
                 menu.addAction(expand_all_action)
             
             menu.addSeparator()
         
         # Indent/Outdent
-        indent_action = QAction("→ Indent", self)
+        indent_action = QAction("→ Indent", menu)
         indent_action.triggered.connect(self._indent_task)
         menu.addAction(indent_action)
         
         if task and task.parent_id is not None:
-            outdent_action = QAction("← Outdent", self)
+            outdent_action = QAction("← Outdent", menu)
             outdent_action.triggered.connect(self._outdent_task)
             menu.addAction(outdent_action)
         
         menu.addSeparator()
         
         # Add subtask
-        add_subtask_action = QAction("➕ Add Subtask", self)
+        add_subtask_action = QAction("➕ Add Subtask", menu)
         add_subtask_action.triggered.connect(self._add_subtask_dialog)
         menu.addAction(add_subtask_action)
         
@@ -560,22 +572,22 @@ class TreeViewOperationsMixin:
         header = self.task_tree.header()
         column = header.logicalIndexAt(position)
         
-        menu = QMenu(self)
+        menu = QMenu(self.task_tree)
         
         # Sort ascending
-        sort_asc_action = QAction(f"Sort Ascending", self)
+        sort_asc_action = QAction("Sort Ascending", menu)
         sort_asc_action.triggered.connect(lambda: self.task_tree.sortByColumn(column, Qt.SortOrder.AscendingOrder))
         menu.addAction(sort_asc_action)
         
         # Sort descending
-        sort_desc_action = QAction(f"Sort Descending", self)
+        sort_desc_action = QAction("Sort Descending", menu)
         sort_desc_action.triggered.connect(lambda: self.task_tree.sortByColumn(column, Qt.SortOrder.DescendingOrder))
         menu.addAction(sort_desc_action)
         
         menu.addSeparator()
         
         # Reset to default (ID ascending)
-        reset_action = QAction("Reset to Default (ID)", self)
+        reset_action = QAction("Reset to Default (ID)", menu)
         reset_action.triggered.connect(lambda: self.task_tree.sortByColumn(2, Qt.SortOrder.AscendingOrder))
         menu.addAction(reset_action)
         
@@ -619,176 +631,143 @@ class TreeViewOperationsMixin:
         if hasattr(self, '_update_formatting_buttons'):
             self._update_formatting_buttons()
     
+    def _handle_col_schedule_type(self, item, task_clone, new_value, model) -> Tuple[bool, bool]:
+        try:
+            nst = ScheduleType.from_string(new_value)
+            if task_clone.is_summary and nst == ScheduleType.MANUALLY_SCHEDULED:
+                QMessageBox.warning(self, "Validation Error", "Summary tasks must always be 'Auto Scheduled'. Reverting change.")
+                item.setText(0, task_clone.schedule_type.value)
+                return False, False
+            if task_clone.schedule_type != nst:
+                task_clone.schedule_type = nst
+                return True, True
+            return True, False
+        except ValueError:
+            QMessageBox.critical(self, "Input Error", f"Invalid Schedule Type: {new_value}")
+            self._revert_task_item_in_ui(item, model)
+            return False, False
+
+    def _handle_col_date(self, item, task_clone, new_value, is_start, model) -> Tuple[bool, bool]:
+        if task_clone.is_summary or task_clone.schedule_type == ScheduleType.AUTO_SCHEDULED:
+            QMessageBox.warning(self, "Edit Restricted", "Task dates are calculated automatically.")
+            self._revert_task_item_in_ui(item, model)
+            return False, False
+        if not is_start and task_clone.is_milestone:
+            return True, False
+        try:
+            ndt = datetime.strptime(new_value, self._get_strftime_format_string())
+            if is_start:
+                if task_clone.start_date.date() != ndt.date():
+                    task_clone.start_date = ndt
+                    return True, True
+            else:
+                if task_clone.end_date.date() != ndt.date():
+                    task_clone.end_date = ndt
+                    return True, True
+            return True, False
+        except ValueError:
+            self._revert_task_item_in_ui(item, model)
+            return False, False
+
+    def _handle_col_duration(self, item, task_clone, new_value, model) -> Tuple[bool, bool]:
+        if task_clone.is_summary:
+            QMessageBox.warning(self, "Edit Restricted", "Summary task duration is calculated automatically.")
+            self._revert_task_item_in_ui(item, model)
+            return False, False
+        try:
+            ndur = float(new_value)
+        except ValueError:
+            QMessageBox.critical(self, "Input Error", "Duration should be in numbers only")
+            self._revert_task_item_in_ui(item, model)
+            return False, False
+
+        if task_clone.is_milestone and ndur > 0:
+            task_clone.is_milestone = False
+            task_clone.font_italic = False
+            task_clone.set_duration_and_update_end(ndur, self.data_manager.settings.duration_unit, self.calendar_manager)
+            return True, True
+        elif not task_clone.is_milestone and ndur == 0:
+            task_clone.is_milestone = True
+            task_clone.end_date = task_clone.start_date
+            task_clone.font_italic = True
+            return True, True
+        elif not task_clone.is_milestone:
+            unit = self.data_manager.settings.duration_unit
+            if abs(task_clone.get_duration(unit, self.calendar_manager) - ndur) > 0.01:
+                task_clone.set_duration_and_update_end(ndur, unit, self.calendar_manager)
+                return True, True
+        return True, False
+
     def _on_task_item_changed(self, item: QTreeWidgetItem, column: int):
         """Handle inline editing of task properties using Commands"""
         self.task_tree.blockSignals(True)
-
         task_id = item.data(2, Qt.ItemDataRole.UserRole)
         current_task_model = self.data_manager.get_task(task_id)
-
         if not current_task_model:
             self.task_tree.blockSignals(False)
             return
 
         old_task_data = current_task_model.to_dict()
         task_clone = Task.from_dict(old_task_data)
+        item_text_0 = item.text(0)
+        new_value = item.text(column)
+        changed = False
 
         try:
-            item_text_0 = item.text(0)          
-            new_value = item.text(column)
-            changed = False
-
-            if column == 0: # Schedule Type
+            valid = True
+            if column == 0:
+                valid, changed = self._handle_col_schedule_type(item, task_clone, new_value, current_task_model)
+            elif column == 4:
+                cleaned = new_value.lstrip(' ▶◆')
+                if task_clone.name != cleaned:
+                    task_clone.name = cleaned
+                    changed = True
+            elif column in (5, 6):
+                valid, changed = self._handle_col_date(item, task_clone, new_value, column == 5, current_task_model)
+            elif column == 7:
+                valid, changed = self._handle_col_duration(item, task_clone, new_value, current_task_model)
+            elif column == 8:
                 try:
-                    new_schedule_type = ScheduleType.from_string(new_value)
-                    # Validation: Summary tasks must always be Auto Scheduled
-                    if task_clone.is_summary and new_schedule_type == ScheduleType.MANUALLY_SCHEDULED:
-                        QMessageBox.warning(self, "Validation Error",
-                                            "Summary tasks must always be 'Auto Scheduled'. Reverting change.")
-                        item.setText(0, task_clone.schedule_type.value) # Revert UI
-                        self.task_tree.blockSignals(False)
-                        return
-                    
-                    if task_clone.schedule_type != new_schedule_type:
-                        task_clone.schedule_type = new_schedule_type
+                    np = int(new_value.strip('%'))
+                    if not (0 <= np <= 100):
+                        raise ValueError
+                    if task_clone.percent_complete != np:
+                        task_clone.percent_complete = np
                         changed = True
                 except ValueError:
-                    QMessageBox.critical(self, "Input Error", f"Invalid Schedule Type: {new_value}")
+                    QMessageBox.critical(self, "Input Error", "% complete must be numbers from 0 to 100")
                     self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-            elif column == 4:  # Task Name
-                # Clean up display markers before saving to actual task name
-                cleaned_name = new_value.lstrip(' ▶◆')
-                if task_clone.name != cleaned_name:
-                    task_clone.name = cleaned_name
-                    changed = True
-            elif column == 5:  # Start Date
-                # Validate restrictions
-                if task_clone.is_summary:
-                    QMessageBox.warning(self, "Edit Restricted", "Summary task dates are calculated automatically.")
-                    self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-                if task_clone.schedule_type == ScheduleType.AUTO_SCHEDULED:
-                    QMessageBox.warning(self, "Edit Restricted", "Auto Scheduled task dates are calculated automatically.")
-                    self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-
-                new_start_date = datetime.strptime(new_value, self._get_strftime_format_string())
-                if task_clone.start_date.date() != new_start_date.date():
-                    task_clone.start_date = new_start_date
-                    changed = True
-            elif column == 6:  # End Date
-                # Validate restrictions
-                if task_clone.is_summary:
-                    QMessageBox.warning(self, "Edit Restricted", "Summary task dates are calculated automatically.")
-                    self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-                if task_clone.schedule_type == ScheduleType.AUTO_SCHEDULED:
-                    QMessageBox.warning(self, "Edit Restricted", "Auto Scheduled task dates are calculated automatically.")
-                    self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-
-                if not task_clone.is_milestone: # Milestones have fixed end date
-                    new_end_date = datetime.strptime(new_value, self._get_strftime_format_string())
-                    if task_clone.end_date.date() != new_end_date.date():
-                        task_clone.end_date = new_end_date
-                        changed = True
-            elif column == 7:  # Duration
-                # Validate restrictions
-                if task_clone.is_summary:
-                    QMessageBox.warning(self, "Edit Restricted", "Summary task duration is calculated automatically.")
-                    self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-
-                try:
-                    new_duration = float(new_value)
-                except ValueError:
-                    QMessageBox.critical(self, "Input Error", "Duration should be in numbers only")
-                    self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-
-                if task_clone.is_milestone and new_duration > 0:
-                    task_clone.is_milestone = False
-                    task_clone.font_italic = False  # Remove italic when converting to task
-                    task_clone.set_duration_and_update_end(new_duration, self.data_manager.settings.duration_unit, self.calendar_manager)
-                    changed = True
-                elif not task_clone.is_milestone and new_duration == 0:
-                    task_clone.is_milestone = True
-                    task_clone.end_date = task_clone.start_date
-                    task_clone.font_italic = True  # Add italic when converting to milestone
-                    changed = True
-                elif not task_clone.is_milestone:
-                    current_duration_unit = self.data_manager.settings.duration_unit
-                    if abs(task_clone.get_duration(current_duration_unit, self.calendar_manager) - new_duration) > 0.01:
-                        task_clone.set_duration_and_update_end(new_duration, current_duration_unit, self.calendar_manager)
-                        changed = True
-            elif column == 8:  # % Complete
-                try:
-                    new_percent_complete = int(new_value.strip('%'))
-                except ValueError:
-                    QMessageBox.critical(self, "Input Error", "% complete should be numbers only")
-                    self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-
-                if not (0 <= new_percent_complete <= 100):
-                    QMessageBox.critical(self, "Input Error", "% complete must be within the range of 0 to 100")
-                    self._revert_task_item_in_ui(item, current_task_model)
-                    self.task_tree.blockSignals(False)
-                    return
-
-                if task_clone.percent_complete != new_percent_complete:
-                    task_clone.percent_complete = new_percent_complete
-                    changed = True
-                item.setText(8, f"{task_clone.percent_complete}%")
-            elif column == 9:  # Dependencies
+                    valid = False
+            elif column == 9:
                 new_predecessors = []
                 if new_value.strip():
                     for pred_str in new_value.split(','):
                         pred_str = pred_str.strip()
                         if not pred_str:
                             continue
-
                         lag_days = 0
                         dep_type = DependencyType.FS.name
-
-                        # Regex to handle formats like "1", "1 FS", "1FS+2d", "1 (FS-1d)", "1 FS + 2d"
                         match = re.match(r'(\d+)\s*([A-Z]{2})?\s*(?:([+-])\s*(\d+)\s*(d)?)?', pred_str)
                         if match:
                             pred_id = int(match.group(1))
                             if match.group(2):
                                 dep_type = match.group(2)
-                            
-                            # Check if lag part was matched
                             if match.group(3) and match.group(4):
                                 lag_days = int(match.group(4))
                                 if match.group(3) == '-':
                                     lag_days = -lag_days
-                            
                             new_predecessors.append((pred_id, dep_type, lag_days))
 
                 if task_clone.predecessors != new_predecessors:
                     task_clone.predecessors = new_predecessors
                     changed = True
                 
-                # Explicitly update the item's text with the formatted predecessors
                 formatted_predecessors = []
                 for pred_id, dep_type, lag_days in new_predecessors:
-                    lag_str = ""
-                    if lag_days > 0:
-                        lag_str = f"+{lag_days}d"
-                    elif lag_days < 0:
-                        lag_str = f"{lag_days}d"
+                    lag_str = f"+{lag_days}d" if lag_days > 0 else (f"{lag_days}d" if lag_days < 0 else "")
                     formatted_predecessors.append(f"{pred_id}{dep_type}{lag_str}")
                 item.setText(9, ", ".join(formatted_predecessors))
-            elif column == 10:  # Resources
+            elif column == 10:
                 new_resources = []
                 if new_value.strip():
                     for r_str in new_value.split(','):
@@ -796,24 +775,22 @@ class TreeViewOperationsMixin:
                         if match:
                             new_resources.append((match.group(1).strip(), int(match.group(2))))
                         else:
-                            # For backward compatibility, if no percentage is specified, assume 100%
                             new_resources.append((r_str.strip(), 100))
                 if task_clone.assigned_resources != new_resources:
                     task_clone.assigned_resources = new_resources
                     changed = True
-            elif column == 11:  # Notes
+            elif column == 11:
                 if task_clone.notes != new_value:
                     task_clone.notes = new_value
                     changed = True
 
+            if not valid:
+                self.task_tree.blockSignals(False)
+                return
+
             if changed:
-                # Prepare new data
                 new_task_data = task_clone.to_dict()
-                
-                # Create and execute command
-                # Use a callback to update views only on success
                 def on_success():
-                    # Defer the update to avoid destroying the item while signal is being processed
                     def deferred_update():
                         self._update_all_views()
                         self.status_label.setText(f"✓ Task '{task_clone.name}' updated successfully")
@@ -830,13 +807,10 @@ class TreeViewOperationsMixin:
                 if not self.command_manager.execute_command(command):
                     QMessageBox.warning(self, "Validation Error",
                                       "Task update failed (e.g., circular dependency, invalid date).")
-                    # Revert changes in UI if update failed
                     self._revert_task_item_in_ui(item, current_task_model)
 
         except Exception as e:
             QMessageBox.critical(self, "Input Error", f"Invalid input for {item_text_0}: {e}")
-            if self.task_tree.itemWidget(item, column): # Just a check, item might be dead
-                 pass 
             try:
                 self._revert_task_item_in_ui(item, current_task_model)
             except RuntimeError:
@@ -851,7 +825,12 @@ class TreeViewOperationsMixin:
 
         # Update each column with original data
         item.setText(0, original_task.schedule_type.value) # Schedule Type
-        item.setText(4, original_task.name) # Task Name
+        if original_task.is_milestone:
+            item.setText(4, f"◆ {original_task.name}")
+        elif original_task.is_summary:
+            item.setText(4, f"▶ {original_task.name}")
+        else:
+            item.setText(4, original_task.name) # Task Name
         item.setText(5, original_task.start_date.strftime(self._get_strftime_format_string())) # Start Date
         if original_task.is_milestone:
             item.setText(6, original_task.start_date.strftime(self._get_strftime_format_string()))

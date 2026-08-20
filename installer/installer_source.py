@@ -10,7 +10,7 @@ import ctypes
 def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
+    except Exception:
         return False
 
 class InstallerApp:
@@ -134,8 +134,6 @@ class InstallerApp:
                 self.root.after(0, lambda: self.status_label.config(text="Creating shortcut..."))
                 
                 # Find the main exe
-                exe_path = None
-               
                 candidates = [f for f in os.listdir(dest_path) if f.endswith(".exe")]
                 main_exe = "PlanIFlow_2.3.0.exe.exe"
                 if main_exe not in candidates:
@@ -155,7 +153,7 @@ class InstallerApp:
             self.root.after(0, lambda: self.installation_complete(dest_path, main_exe))
             
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
+            self.root.after(0, lambda e=e: messagebox.showerror("Error", str(e)))
             self.root.after(0, lambda: self.install_btn.config(state="normal"))
 
     def create_shortcut(self, target_path, shortcut_name):
@@ -164,7 +162,7 @@ class InstallerApp:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders")
             desktop, _ = winreg.QueryValueEx(key, "Desktop")
             desktop = os.path.expandvars(desktop)
-        except Exception as e:
+        except Exception:
             # Fallback
             desktop = os.path.join(os.environ['USERPROFILE'], 'Desktop')
             

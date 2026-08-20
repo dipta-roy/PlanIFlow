@@ -1,3 +1,4 @@
+from typing import Optional
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
                               QLineEdit, QDoubleSpinBox, QPushButton)
 from data_manager.models import Resource
@@ -6,7 +7,7 @@ from ui.ui_resource_exceptions_widget import ResourceExceptionsWidget
 class ResourceDialog(QDialog):
     """Dialog for adding/editing resources"""
     
-    def __init__(self, parent, data_manager, resource: Resource = None):
+    def __init__(self, parent, data_manager, resource: Optional[Resource] = None):
         super().__init__(parent)
         self.data_manager = data_manager
         self.resource = resource

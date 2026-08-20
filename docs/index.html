@@ -4,54 +4,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PlanIFlow | Offline-First Project Planner</title>
+    <title>PlanIFlow | Offline-First Desktop Project Planner</title>
     <meta name="theme-color" content="#0f172a">
-    
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+
     <!-- SEO Meta Tags -->
-    <meta name="description" content="PlanIFlow is the ultimate offline-first desktop application for project planning, execution, and risk management. No cloud lock-in, total data control.">
-    <meta name="keywords" content="PlanIFlow, project planner, offline project management, Gantt chart software, Kanban board, Monte Carlo risk analysis, EVM, desktop application">
+    <meta name="description"
+        content="PlanIFlow is the ultimate offline-first desktop application for project planning, Gantt visualization, Earned Value Management (EVM), and Monte Carlo risk analysis. Zero cloud dependencies, total data privacy.">
+    <meta name="keywords"
+        content="PlanIFlow, project planner, offline project management, Gantt chart software, Kanban board, Monte Carlo risk analysis, EVM, desktop application, PyQt6, Python">
     <meta name="author" content="Dipta Roy">
     <meta name="robots" content="index, follow">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="PlanIFlow | Offline-First Project Planner">
-    <meta property="og:description" content="Master your projects offline. The ultimate standalone desktop application for secure project planning, execution, and risk management.">
-    <!-- Replace this with a real screenshot URL if you host one -->
-    <meta property="og:image" content="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Dashboard.png">
+    <meta property="og:title" content="PlanIFlow | Offline-First Desktop Project Planner">
+    <meta property="og:description"
+        content="Master your projects offline. The ultimate standalone desktop application for secure project planning, execution, EVM, and Monte Carlo risk analysis.">
+    <meta property="og:image"
+        content="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Dashboard.png">
     <meta property="og:site_name" content="PlanIFlow">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:title" content="PlanIFlow | Offline-First Project Planner">
-    <meta property="twitter:description" content="Master your projects offline. The ultimate standalone desktop application for secure project planning, execution, and risk management.">
-    <meta property="twitter:image" content="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Dashboard.png">
+    <meta property="twitter:title" content="PlanIFlow | Offline-First Desktop Project Planner">
+    <meta property="twitter:description"
+        content="Master your projects offline. The ultimate standalone desktop application for secure project planning, execution, EVM, and Monte Carlo risk analysis.">
+    <meta property="twitter:image"
+        content="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Dashboard.png">
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-2EZ7F16X02"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
+        function gtag() { dataLayer.push(arguments); }
         gtag('js', new Date());
         gtag('config', 'G-2EZ7F16X02');
     </script>
 
     <!-- Fonts & Styles -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
     <!-- Top Navigation -->
-    <header class="navbar">
+    <header class="navbar" id="main-navbar">
         <div class="nav-container">
-            <a href="#" class="logo">📊 PlanIFlow</a>
+            <a href="#" class="logo" id="nav-brand">
+                <img src="logo.png" alt="PlanIFlow Logo" class="nav-logo-img">
+                <span>PlanIFlow</span>
+            </a>
             <ul class="nav-links">
                 <li><a href="#hero" class="active">Overview</a></li>
-                <li><a href="#mvp">Core Value</a></li>
-                <li><a href="#interactive-features">Features</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#interactive-features">Interactive Core</a></li>
+                <li><a href="#tech-stack">Tech Stack</a></li>
                 <li><a href="#screenshots">Gallery</a></li>
                 <li><a href="#security">Security</a></li>
+                <li><a href="#shortcuts">Shortcuts</a></li>
                 <li><a href="#download" class="btn outline-btn">Download</a></li>
             </ul>
         </div>
@@ -61,19 +76,24 @@
         <!-- Hero Section -->
         <section id="hero" class="hero section">
             <div class="container text-center" data-animate="fade-up">
+                <div class="badges justify-center mb-6">
+                    <span class="badge badge-version">v2.8.0 Release</span>
+                    <span class="badge badge-tech">100% Offline-First</span>
+                    <span class="badge badge-tech">Python 3.11+ & PyQt6</span>
+                    <span class="badge badge-tech">MIT License</span>
+                    <span class="badge badge-tech">Security Rating: LOW RISK</span>
+                </div>
                 <h1 class="hero-title gradient-text">Stop Paying for Cloud Subscriptions. Take Back Control.</h1>
                 <p class="hero-subtitle">
-                    The ultimate offline-first desktop application for project planning, execution, and risk management.
-                    Own your data, manage your timelines securely, and deliver on budget.
+                    The ultimate offline-first desktop application for project planning, execution, Earned Value
+                    Management, and Monte Carlo risk analysis.
+                    Own your data, manage timelines securely on your local machine, and deliver projects on budget.
                 </p>
-                <div class="badges justify-center mt-4">
-                    <span class="badge">Project Managers</span>
-                    <span class="badge">Security-Conscious Enterprises</span>
-                    <span class="badge">Solo Contractors</span>
-                </div>
                 <div class="hero-actions mt-6">
-                    <a href="#download" class="btn primary-btn btn-large magnetic">Download PlanIFlow</a>
-                    <a href="#mvp" class="btn secondary-btn btn-large magnetic">See the ROI</a>
+                    <a href="#download" class="btn primary-btn btn-large magnetic" id="hero-btn-download">⬇️ Download
+                        PlanIFlow</a>
+                    <a href="#security" class="btn secondary-btn btn-large magnetic" id="hero-btn-security">🛡️ Security
+                        Report</a>
                 </div>
             </div>
         </section>
@@ -88,12 +108,17 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-number gradient-text" data-target="11">0</div>
-                        <div class="stat-label">Project Baselines</div>
+                        <div class="stat-label">Project Baseline Snapshots</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number gradient-text" data-target="100">0</div><span
                             class="stat-suffix gradient-text">%</span>
-                        <div class="stat-label">Offline & Secure Data</div>
+                        <div class="stat-label">Offline & Privacy Control</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number gradient-text" data-target="0">0</div><span
+                            class="stat-suffix gradient-text">$</span>
+                        <div class="stat-label">Monthly Cloud Fees</div>
                     </div>
                 </div>
             </div>
@@ -102,46 +127,48 @@
         <!-- MVP / Core Value Propositions -->
         <section id="mvp" class="mvp section">
             <div class="container text-center" data-animate="fade-up">
-                <h2 class="section-title">Most Valuable Propositions (MVPs)</h2>
-                <p class="section-description">Why industry professionals are switching to PlanIFlow.</p>
+                <h2 class="section-title">Most Valuable Propositions</h2>
+                <p class="section-description">Why project managers, engineers, and enterprise contractors rely on
+                    PlanIFlow.</p>
 
                 <div class="mvp-grid mt-6">
                     <div class="mvp-card glass-panel" data-animate="fade-up" data-delay="0.1s">
                         <div class="feature-icon">🔒</div>
-                        <h3>Zero Data Exfiltration Risk</h3>
-                        <p>No databases, no cloud storage, no telemetry. Your project data stays on your local machine,
-                            passing the strictest enterprise security requirements.</p>
+                        <h3>Zero Cloud Dependency & Telemetry</h3>
+                        <p>No external databases, no cloud synchronization, no user tracking. Your sensitive project
+                            timelines and financial costs remain securely stored on your local disk.</p>
                     </div>
                     <div class="mvp-card glass-panel" data-animate="fade-up" data-delay="0.2s">
                         <div class="feature-icon">💸</div>
-                        <h3>No Recurring Fees</h3>
-                        <p>Ditch the expensive monthly SaaS subscriptions. PlanIFlow provides professional-grade tools
-                            like EVM and Monte Carlo analysis with a one-time setup.</p>
+                        <h3>No Recurring Subscription Fees</h3>
+                        <p>Eliminate ongoing SaaS subscription costs. Gain access to enterprise-grade tools like EVM,
+                            Monte Carlo risk simulation, and project baselining with a perpetual open-source tool.</p>
                     </div>
                     <div class="mvp-card glass-panel" data-animate="fade-up" data-delay="0.3s">
                         <div class="feature-icon">⚡</div>
                         <h3>Instant Native Performance</h3>
-                        <p>Built with PyQt6 and Python, experience zero latency. Large projects with thousands of tasks
-                            load instantly without waiting for a web request.</p>
+                        <p>Powered by PyQt6 and Python 3.11+, experience sub-millisecond table rendering and instant
+                            filtering across thousands of project activities with zero web latency.</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Interactive Feature Tabs (Minimum Viable Products) -->
+        <!-- Interactive Feature Tabs -->
         <section id="interactive-features" class="interactive-features section bg-darker">
             <div class="container">
                 <h2 class="section-title text-center" data-animate="fade-up">Core Minimum Viable Product</h2>
-                <p class="section-description text-center" data-animate="fade-up">Explore the robust features that make
-                    PlanIFlow the complete package.</p>
+                <p class="section-description text-center" data-animate="fade-up">Explore the comprehensive analytical
+                    modules built right into PlanIFlow.</p>
 
                 <div class="interactive-tabs-container mt-6" data-animate="fade-up">
                     <!-- Tab Buttons -->
-                    <div class="tab-buttons">
+                    <div class="tab-buttons" id="feature-tab-buttons">
                         <button class="tab-btn active" data-tab="gantt">Dynamic Gantt Charts</button>
                         <button class="tab-btn" data-tab="kanban">Interactive Kanban</button>
-                        <button class="tab-btn" data-tab="risk">Monte Carlo Analysis</button>
+                        <button class="tab-btn" data-tab="risk">Monte Carlo Risk Analysis</button>
                         <button class="tab-btn" data-tab="evm">Earned Value (EVM)</button>
+                        <button class="tab-btn" data-tab="diagnosis">Smart Diagnosis</button>
                     </div>
 
                     <!-- Tab Content -->
@@ -150,19 +177,19 @@
                         <div class="tab-pane active" id="tab-gantt">
                             <div class="tab-split">
                                 <div class="tab-text">
-                                    <h3>Visualize Your Timeline</h3>
-                                    <p>Real-time visualization of your project timeline. Includes interactive tooltips,
-                                        zoom capabilities, and instant critical path highlighting to keep your project
-                                        on track.</p>
+                                    <h3>Visualize & Control Your Schedule Timeline</h3>
+                                    <p>Real-time timeline rendering powered by Matplotlib and PyQt. Visualize
+                                        activities, milestones, and summary task relationships with precision.</p>
                                     <ul class="check-list mt-4">
-                                        <li>Standard Dependency Notation (FS, SS, FF, SF)</li>
-                                        <li>Custom lead and lag times</li>
-                                        <li>Hierarchical summary and sub-tasks</li>
+                                        <li>Standard Dependency Notation: FS, SS, FF, SF with lead & lag times</li>
+                                        <li>One-click Critical Path Highlighting (Red zero-slack tasks)</li>
+                                        <li>Interactive zoom controls (Day / Week / Month timeline scale)</li>
+                                        <li>Milestone markers and summary task progress bars</li>
                                     </ul>
                                 </div>
                                 <div class="tab-image">
-                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Gantt Chart.png" alt="Dynamic Gantt Chart"
-                                        class="interactive-img">
+                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Gantt%20Chart.png"
+                                        alt="Dynamic Gantt Chart" class="interactive-img">
                                 </div>
                             </div>
                         </div>
@@ -171,18 +198,20 @@
                         <div class="tab-pane" id="tab-kanban">
                             <div class="tab-split">
                                 <div class="tab-text">
-                                    <h3>Agile Execution</h3>
-                                    <p>Visual task management with drag-and-drop cards. Organize your workflow
-                                        seamlessly by status: To Do, In Progress, Delayed, Blocked, and Completed.</p>
+                                    <h3>Agile Execution & Visual Workflows</h3>
+                                    <p>Streamline team tasks with a responsive, interactive Kanban board featuring
+                                        drag-and-drop card movements and multi-dimensional filtering.</p>
                                     <ul class="check-list mt-4">
-                                        <li>Task-level and resource-level filtering</li>
-                                        <li>Quick-edit notes directly on cards</li>
-                                        <li>Visual block indicators</li>
+                                        <li>5 Status Columns: 📝 To Do, 🚀 In Progress, ⚠️ Delayed, 🚫 Blocked, ✅
+                                            Completed</li>
+                                        <li>Task WBS, dates, completion %, resource badges, and card notes</li>
+                                        <li>Task-level and resource-level quick filtering</li>
+                                        <li>Inline card editing dialogs for rapid updates</li>
                                     </ul>
                                 </div>
                                 <div class="tab-image">
-                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Kanban Board.png" alt="Interactive Kanban"
-                                        class="interactive-img">
+                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Kanban%20Board.png"
+                                        alt="Interactive Kanban Board" class="interactive-img">
                                 </div>
                             </div>
                         </div>
@@ -191,19 +220,20 @@
                         <div class="tab-pane" id="tab-risk">
                             <div class="tab-split">
                                 <div class="tab-text">
-                                    <h3>Forecast with Confidence</h3>
-                                    <p>Don't guess your completion dates. Run thousands of statistical simulations to
-                                        accurately forecast your project completion dates and identify the highest-risk
-                                        tasks.</p>
+                                    <h3>Monte Carlo Schedule Risk Analysis</h3>
+                                    <p>Move beyond single-point estimates. Run up to 10,000 statistical simulations to
+                                        forecast realistic project completion probabilities under uncertainty.</p>
                                     <ul class="check-list mt-4">
-                                        <li>P50, P80, P90 Confidence Intervals</li>
-                                        <li>Top Risk Drivers Identification</li>
-                                        <li>Completion Date Distribution Charts</li>
+                                        <li>Statistical Confidence Metrics: P50, P80, and P90 completion dates</li>
+                                        <li>Identification of top risk-driver activities influencing project variance
+                                        </li>
+                                        <li>Probability distribution graphs and cumulative frequency charts</li>
+                                        <li>Optimistic, Most Likely, and Pessimistic duration modeling</li>
                                     </ul>
                                 </div>
                                 <div class="tab-image">
-                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Risk Analysis.png" alt="Monte Carlo Analysis"
-                                        class="interactive-img">
+                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Risk%20Analysis.png"
+                                        alt="Monte Carlo Risk Analysis" class="interactive-img">
                                 </div>
                             </div>
                         </div>
@@ -212,18 +242,43 @@
                         <div class="tab-pane" id="tab-evm">
                             <div class="tab-split">
                                 <div class="tab-text">
-                                    <h3>Professional Metrics</h3>
-                                    <p>Track project performance using industry-standard Earned Value Management
-                                        metrics. Instantly know if you are over budget or behind schedule.</p>
+                                    <h3>Earned Value Management (EVM) Metrics</h3>
+                                    <p>Monitor project schedule and budget health using ANSI/EIA 748 standard Earned
+                                        Value Management performance indices.</p>
                                     <ul class="check-list mt-4">
-                                        <li>Calculates CPI, SPI, CV, SV, EAC, and VAC</li>
-                                        <li>Plain-English Health Summaries</li>
-                                        <li>Comprehensive Excel Export Dashboard</li>
+                                        <li>Metrics: PV (Planned Value), EV (Earned Value), AC (Actual Cost)</li>
+                                        <li>Indices: Cost Performance Index (CPI) and Schedule Performance Index (SPI)
+                                        </li>
+                                        <li>Variances & Estimates: CV, SV, Estimate at Completion (EAC), Variance at
+                                            Completion (VAC)</li>
+                                        <li>Plain-English health summary reports & multi-sheet Excel exports</li>
                                     </ul>
                                 </div>
                                 <div class="tab-image">
-                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/EVM Analysis.png" alt="Earned Value Management"
-                                        class="interactive-img">
+                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/EVM%20Analysis.png"
+                                        alt="Earned Value Management" class="interactive-img">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Diagnosis Tab -->
+                        <div class="tab-pane" id="tab-diagnosis">
+                            <div class="tab-split">
+                                <div class="tab-text">
+                                    <h3>Smart Project Health Diagnosis</h3>
+                                    <p>An intelligent automated audit engine that synthesizes schedule logic, Monte
+                                        Carlo risk findings, and EVM performance into an executive summary report.</p>
+                                    <ul class="check-list mt-4">
+                                        <li>Automated Schedule Health Checks (dangling tasks, excessive lag, missing
+                                            predecessors)</li>
+                                        <li>Combined Schedule & Cost Variance Executive Assessment</li>
+                                        <li>Plain-English action recommendations for project managers</li>
+                                        <li>One-click status report export to PDF and Excel</li>
+                                    </ul>
+                                </div>
+                                <div class="tab-image">
+                                    <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Dashboard.png"
+                                        alt="Project Diagnosis & Dashboard" class="interactive-img">
                                 </div>
                             </div>
                         </div>
@@ -232,82 +287,454 @@
             </div>
         </section>
 
-        <!-- Screenshots Gallery Section -->
-        <section id="screenshots" class="screenshots section">
+        <!-- Detailed Features List Section -->
+        <section id="features" class="features section">
             <div class="container">
-                <h2 class="section-title text-center" data-animate="fade-up">See it in Action</h2>
-                <div class="gallery-grid mt-6" data-animate="fade-up">
-                    <div class="gallery-item">
-                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Dashboard.png" alt="Dashboard" loading="lazy">
-                        <div class="gallery-caption">Comprehensive Dashboard</div>
+                <h2 class="section-title text-center" data-animate="fade-up">Complete Feature Suite</h2>
+                <p class="section-description text-center" data-animate="fade-up">Everything you need for end-to-end
+                    desktop project management.</p>
+
+                <div class="features-grid mt-6">
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">📑</div>
+                        <h3>Bulk Add & Bulk Edit Tasks</h3>
+                        <p>Quickly populate projects by pasting multiline task lists (<kbd
+                                class="kbd">Ctrl+Shift+D</kbd>). Select multiple tasks to edit completion %, durations,
+                            resources, or notes simultaneously.</p>
                     </div>
-                    <div class="gallery-item">
-                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Project Baseline.png" alt="Project Baselining" loading="lazy">
-                        <div class="gallery-caption">Variance Tracking</div>
+
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">🌲</div>
+                        <h3>Hierarchical WBS Structure</h3>
+                        <p>Build multi-level Summary Tasks and Sub-tasks. Restructure project hierarchies easily using
+                            keyboard shortcuts: <kbd class="kbd">Tab</kbd> (Indent) and <kbd class="kbd">Shift+Tab</kbd>
+                            (Outdent).</p>
                     </div>
-                    <div class="gallery-item">
-                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Resource.png" alt="Resource Management" loading="lazy">
-                        <div class="gallery-caption">Resource Allocation</div>
+
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">📅</div>
+                        <h3>Resource Exception Days</h3>
+                        <p>Define resource-specific leaves, vacations, and blackout date ranges. Scheduling logic
+                            automatically adjusts activity timelines based on resource availability.</p>
                     </div>
-                    <div class="gallery-item">
-                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Task_List.png" alt="Task List" loading="lazy">
-                        <div class="gallery-caption">Advanced Task Management</div>
+
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">📸</div>
+                        <h3>Project Baselining (11 Snapshots)</h3>
+                        <p>Capture and store up to 11 baseline snapshots per project. Compare active schedules against
+                            historical baselines in the variance tracking dashboard.</p>
+                    </div>
+
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">💱</div>
+                        <h3>Multi-Currency Support</h3>
+                        <p>Configure project-wide currency symbols (USD $, EUR €, GBP £, JPY ¥, INR ₹, etc.) reflected
+                            across financial cost tables, EVM, and exported reports.</p>
+                    </div>
+
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">📊</div>
+                        <h3>Rich File Export Suite</h3>
+                        <p>Export projects to high-fidelity JSON files, multi-sheet formatted Excel workbooks
+                            (<kbd>.xlsx</kbd>), and publication-ready PDF documents with Gantt charts.</p>
+                    </div>
+
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">↩️</div>
+                        <h3>Full Undo & Redo History</h3>
+                        <p>Never worry about accidental edits. Complete action stack support for task edits, hierarchy
+                            changes, and resource assignments via <kbd class="kbd">Ctrl+Z</kbd> and <kbd
+                                class="kbd">Ctrl+Y</kbd>.</p>
+                    </div>
+
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">⏱️</div>
+                        <h3>Days & Hours Duration Units</h3>
+                        <p>Switch project estimation units between 'Days' and 'Hours' for high-precision operational
+                            task scheduling.</p>
+                    </div>
+
+                    <div class="feature-card glass-panel" data-animate="fade-up">
+                        <div class="feature-icon">🌙</div>
+                        <h3>High-Contrast Dark Theme</h3>
+                        <p>Designed for prolonged engineering sessions with sleek dark mode aesthetics and color-coded
+                            status badges.</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Security Section -->
+        <!-- Tech Stack & Architecture Section -->
+        <section id="tech-stack" class="tech-stack section bg-darker">
+            <div class="container" data-animate="fade-up">
+                <h2 class="section-title text-center">Technologies & Architecture</h2>
+                <p class="section-description text-center mb-6">Engineered with high-performance Python 3.11+ libraries
+                    and a modular architecture.</p>
+
+                <!-- Architecture Box -->
+                <div class="arch-diagram mb-6">
+                    [PyQt6 UI Layer] ──► [DataManager Models & ProjectValidator] ──► [Local File I/O: JSON / XLSX / PDF]
+                    ▲
+                    │
+                    [Analytical Core: Monte Carlo / EVM / Gantt Engine]
+                    │
+                    [Update Checker (updater/)] ◄── (TLS/HTTPS Check) ──► [GitHub Releases API]
+                </div>
+
+                <div class="tech-grid">
+                    <div class="tech-card">
+                        <h4>Python</h4>
+                        <div class="tech-ver">v3.11+</div>
+                        <p>Core programming language providing robust data structures and cross-platform compatibility.
+                        </p>
+                    </div>
+                    <div class="tech-card">
+                        <h4>PyQt6</h4>
+                        <div class="tech-ver">v6.10.1</div>
+                        <p>Native GUI framework delivering desktop widgets, tree tables, drag-and-drop Kanban, and
+                            dialogs.</p>
+                    </div>
+                    <div class="tech-card">
+                        <h4>Pandas</h4>
+                        <div class="tech-ver">v2.3.3</div>
+                        <p>High-performance data manipulation engine for schedule matrices, cost aggregations, and
+                            baseline tracking.</p>
+                    </div>
+                    <div class="tech-card">
+                        <h4>Matplotlib</h4>
+                        <div class="tech-ver">v3.10.7</div>
+                        <p>Gantt chart rendering engine with custom bar formatting, milestone markers, and critical path
+                            lines.</p>
+                    </div>
+                    <div class="tech-card">
+                        <h4>Openpyxl</h4>
+                        <div class="tech-ver">v3.1.5</div>
+                        <p>Advanced Excel report exporter generating styled multi-sheet financial and schedule
+                            workbooks.</p>
+                    </div>
+                    <div class="tech-card">
+                        <h4>ReportLab</h4>
+                        <div class="tech-ver">v4.4.5</div>
+                        <p>PDF document generation engine crafting printable executive project reports.</p>
+                    </div>
+                    <div class="tech-card">
+                        <h4>NumPy</h4>
+                        <div class="tech-ver">v2.1.2</div>
+                        <p>Numerical array processing powering 10,000-iteration Monte Carlo probability distributions.
+                        </p>
+                    </div>
+                    <div class="tech-card">
+                        <h4>Jsonschema</h4>
+                        <div class="tech-ver">v4.23.0</div>
+                        <p>Strict schema validation enforcing local project JSON data integrity and blocking corrupted
+                            imports.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Screenshots Gallery Section -->
+        <section id="screenshots" class="screenshots section">
+            <div class="container">
+                <h2 class="section-title text-center" data-animate="fade-up">Application Interface Gallery</h2>
+                <p class="section-description text-center" data-animate="fade-up">Click any screenshot to view in full
+                    resolution.</p>
+
+                <div class="gallery-grid mt-6" data-animate="fade-up">
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Dashboard.png"
+                            alt="Executive Dashboard" loading="lazy">
+                        <div class="gallery-caption">Executive Dashboard & KPIs</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Task_List.png"
+                            alt="Task Management Table" loading="lazy">
+                        <div class="gallery-caption">Advanced Task Management Tree</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Gantt%20Chart.png"
+                            alt="Dynamic Gantt Chart" loading="lazy">
+                        <div class="gallery-caption">Dynamic Gantt Chart Timeline</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Gantt%20Chart%20With%20Critical%20Path.png"
+                            alt="Gantt Critical Path" loading="lazy">
+                        <div class="gallery-caption">Critical Path Highlighting (Red Slack)</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Kanban%20Board.png"
+                            alt="Kanban Board View" loading="lazy">
+                        <div class="gallery-caption">Interactive Agile Kanban Board</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Risk%20Analysis.png"
+                            alt="Monte Carlo Risk Analysis" loading="lazy">
+                        <div class="gallery-caption">Monte Carlo Schedule Risk Analysis</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/EVM%20Analysis.png"
+                            alt="Earned Value Management" loading="lazy">
+                        <div class="gallery-caption">Earned Value Management (EVM)</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Resource.png"
+                            alt="Resource Allocation Manager" loading="lazy">
+                        <div class="gallery-caption">Resource Allocation & Exceptions</div>
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://raw.githubusercontent.com/dipta-roy/PlanIFlow/main/screenshot/Project%20Baseline.png"
+                            alt="Baseline Variance Manager" loading="lazy">
+                        <div class="gallery-caption">Project Baselining & Variance Tracking</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security & Formal Assessment Section (from SECURITY.md) -->
         <section id="security" class="security section bg-darker">
             <div class="container" data-animate="fade-up">
                 <div class="split-layout">
                     <div class="security-content">
-                        <h2 class="section-title">Enterprise-Grade Security</h2>
-                        <h3 class="security-rating gradient-text">Assessment: LOW RISK – SECURE</h3>
+                        <h2 class="section-title">Formal Security Assessment</h2>
+                        <h3 class="security-rating gradient-text">Assessment: LOW RISK – SECURE FOR DEPLOYMENT</h3>
                         <p class="mt-4">
-                            PlanIFlow is designed from the ground up to respect your privacy and secure your data.
-                            Assessed via static code analysis, manual review, and STRIDE threat modeling.
+                            PlanIFlow underwent a comprehensive security audit across all core Python source files using
+                            SAST (<kbd>bandit</kbd>, <kbd>pip-audit</kbd>, <kbd>xenon</kbd>), manual code review, and
+                            STRIDE threat modeling.
                         </p>
                         <ul class="security-list mt-4">
-                            <li><strong>Zero Cloud Dependency:</strong> Fully offline data storage. No database server
-                                or persistent network listeners.</li>
-                            <li><strong>Strict Input Validation:</strong> Advanced parsing prevents memory exhaustion
-                                and blocks malformed data. Max limits applied to task strings and sizes.</li>
-                            <li><strong>Secure Auto-Updates:</strong> Uses HTTPS + SHA256 integrity verification to
-                                guarantee downloaded updates are untampered.</li>
+                            <li><strong>Zero Cloud Telemetry:</strong> Operating 100% offline. No database server,
+                                background cloud sync, or external tracking listeners.</li>
+                            <li><strong>Strict DoS & Input Validation:</strong> Enforced by <kbd>ProjectValidator</kbd>
+                                hard limits (<kbd>MAX_TASKS = 10,000</kbd>, <kbd>MAX_STR_LEN = 250</kbd>).</li>
+                            <li><strong>Secure Auto-Updates:</strong> Uses TLS/HTTPS certificate verification and
+                                mandatory local SHA-256 hash checksum matching against official release records before
+                                executing installers.</li>
+                            <li><strong>Safe Deserialization:</strong> Strict JSON validation via <kbd>jsonschema</kbd>.
+                                No <kbd>pickle</kbd> or <kbd>eval()</kbd> code execution.</li>
                         </ul>
                     </div>
                     <div class="security-badge-container glass-panel">
                         <div class="shield-icon">🛡️</div>
                     </div>
                 </div>
+
+                <!-- Threat Matrix Summary Table -->
+                <div class="mt-6">
+                    <h3 class="mb-4 text-center">STRIDE Threat Modeling Summary</h3>
+                    <div class="doc-table-container">
+                        <table class="doc-table">
+                            <thead>
+                                <tr>
+                                    <th>Threat Category</th>
+                                    <th>Potential Scenario</th>
+                                    <th>Mitigation Strategy</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Spoofing</strong></td>
+                                    <td>Impersonating GitHub update server</td>
+                                    <td>HTTPS/TLS certificate validation enforced via Requests library</td>
+                                    <td><span style="color:#10b981; font-weight:bold;">✅ Mitigated</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tampering</strong></td>
+                                    <td>Manipulating local JSON project files</td>
+                                    <td>ProjectValidator schema validation & string sanitization. No macro execution.
+                                    </td>
+                                    <td><span style="color:#10b981; font-weight:bold;">✅ Mitigated</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tampering</strong></td>
+                                    <td>Modifying installer binary in transit</td>
+                                    <td>Local SHA-256 hash calculation compared against trusted release .sha256.txt</td>
+                                    <td><span style="color:#10b981; font-weight:bold;">✅ Mitigated</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Information Disclosure</strong></td>
+                                    <td>Leaking sensitive data in crash reports</td>
+                                    <td>Sanitized UI exception handlers. Zero automatic crash reporting or telemetry.
+                                    </td>
+                                    <td><span style="color:#10b981; font-weight:bold;">✅ Mitigated</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Denial of Service</strong></td>
+                                    <td>Importing massive file to exhaust RAM</td>
+                                    <td>Hard resource limits (MAX_TASKS = 10,000, string length caps) prevent memory
+                                        exhaustion.</td>
+                                    <td><span style="color:#10b981; font-weight:bold;">✅ Mitigated</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Code Certificate Installation Guide -->
+                <div class="cert-guide-box mt-6">
+                    <h4>🔐 Windows Code Verification Certificate Guide</h4>
+                    <p class="text-muted text-sm mb-4">
+                        To verify digital signatures on Windows, download the <a
+                            href="https://github.com/dipta-roy/dipta-roy.github.io/blob/main/downloads/Code%20Verifying%20Certificates.zip"
+                            target="_blank" class="text-link">Code Verification Certificate</a> by Dipta Roy and trust
+                        it locally:
+                    </p>
+                    <ol class="cert-steps">
+                        <li>Download and extract <kbd>Signed_By_Dipta_CodeSigningPublicKey.cer</kbd>.</li>
+                        <li>Right-click the certificate → <strong>Install Certificate</strong> → Select <strong>Local
+                                Machine</strong>.</li>
+                        <li>Choose <em>"Place all certificates in the following store"</em> → Browse → Select
+                            <strong>Trusted Root Certification Authorities</strong>.</li>
+                        <li>Complete the wizard. Right-click <kbd>PlanIFlow_2.8.0.msi</kbd> → Properties →
+                            <strong>Digital Signatures</strong> tab to confirm: <em>"This digital signature is OK."</em>
+                        </li>
+                    </ol>
+                </div>
             </div>
         </section>
 
-        <!-- Call to Action / Download -->
-        <section id="download" class="cta section">
+        <!-- Keyboard Shortcuts Section -->
+        <section id="shortcuts" class="shortcuts section">
+            <div class="container" data-animate="fade-up">
+                <h2 class="section-title text-center">Keyboard Shortcuts Cheatsheet</h2>
+                <p class="section-description text-center mb-6">Boost your project management productivity with native
+                    keyboard shortcuts.</p>
+
+                <div class="doc-table-container">
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Shortcut</th>
+                                <th>Action Description</th>
+                                <th>Scope</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><kbd class="kbd">Ctrl+T</kbd></td>
+                                <td>Add a new individual Task</td>
+                                <td>Task View / Tree</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Ctrl+Shift+D</kbd></td>
+                                <td>Bulk Add Tasks from multiline list</td>
+                                <td>Task View</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Ctrl+M</kbd></td>
+                                <td>Add Milestone Activity (0 duration)</td>
+                                <td>Task View</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Ctrl+Shift+T</kbd></td>
+                                <td>Add Subtask under selected parent task</td>
+                                <td>Task View</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Tab</kbd></td>
+                                <td>Indent task (demote to subtask)</td>
+                                <td>Task Tree Table</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Shift+Tab</kbd></td>
+                                <td>Outdent task (promote to higher level)</td>
+                                <td>Task Tree Table</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Ctrl+B</kbd> / <kbd class="kbd">Ctrl+I</kbd> / <kbd
+                                        class="kbd">Ctrl+U</kbd></td>
+                                <td>Format Task text (Bold / Italic / Underline)</td>
+                                <td>Task View</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Ctrl+Z</kbd> / <kbd class="kbd">Ctrl+Y</kbd></td>
+                                <td>Undo / Redo action history</td>
+                                <td>Global Application</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Ctrl++</kbd> / <kbd class="kbd">Ctrl+-</kbd></td>
+                                <td>Zoom In / Zoom Out timeline scale</td>
+                                <td>Gantt Chart View</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">F5</kbd></td>
+                                <td>Refresh all view widgets and charts</td>
+                                <td>Global Application</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">Ctrl+N</kbd> / <kbd class="kbd">Ctrl+O</kbd> / <kbd
+                                        class="kbd">Ctrl+S</kbd></td>
+                                <td>New Project / Open Project / Save Project</td>
+                                <td>Global Application</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Download & Getting Started Section -->
+        <section id="download" class="cta section bg-darker">
             <div class="container text-center glass-panel cta-panel" data-animate="fade-up">
-                <h2>Ready to take control of your projects?</h2>
-                <p class="mt-4 mb-6">Join users who trust PlanIFlow for their critical project management.</p>
+                <h2>Ready to Master Your Projects Offline?</h2>
+                <p class="mt-4 mb-6">Join project managers and security-conscious teams using PlanIFlow.</p>
 
                 <div id="latest-release-container" class="mb-6">
                     <a href="https://github.com/dipta-roy/PlanIFlow/releases/latest" id="latest-download-btn"
                         class="btn primary-btn btn-large magnetic" target="_blank">
-                        ⬇️ Download Latest Release <span id="latest-version-text"></span>
+                        ⬇️ Download PlanIFlow Installer <span id="latest-version-text">(v2.8.0)</span>
                     </a>
-                    <p class="text-sm text-muted mt-2" id="latest-release-date"></p>
+                    <p class="text-sm text-muted mt-2" id="latest-release-date">Verified Windows MSI Package</p>
                 </div>
 
                 <div class="divider"></div>
 
-                <h3 class="mt-6 mb-4" style="color: var(--text-muted); font-size: 1.125rem;">Or run from source:</h3>
+                <h3 class="mt-6 mb-4" style="color: var(--text-muted); font-size: 1.125rem;">Batch Automation Scripts
+                    Reference:</h3>
+                <div class="doc-table-container mb-6 text-left" style="max-width: 800px; margin: 0 auto;">
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Script Name</th>
+                                <th>Purpose & Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><kbd class="kbd">run.bat</kbd></td>
+                                <td>Launches PlanIFlow, initializing Python virtual environment and dependencies
+                                    automatically.</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">build.bat</kbd></td>
+                                <td>Compiles standalone executable using cx_Freeze.</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">build_msi.bat</kbd></td>
+                                <td>Generates signed Windows MSI installer package.</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">launch_build_tool.bat</kbd></td>
+                                <td>Launches GUI Build Automation Tool (<kbd>build_automation_gui.py</kbd>).</td>
+                            </tr>
+                            <tr>
+                                <td><kbd class="kbd">run_security_scans.bat</kbd></td>
+                                <td>Executes security audit suite (<kbd>bandit</kbd>, <kbd>pip-audit</kbd>,
+                                    <kbd>vulture</kbd>, <kbd>xenon</kbd>).</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="mt-6 mb-4" style="color: var(--text-muted); font-size: 1.125rem;">Or Run From Source:</h3>
                 <div class="install-instructions">
                     <div class="code-block">
-                        <div class="code-header">Windows (Source)</div>
+                        <div class="code-header">Windows (Source Launcher)</div>
                         <code>run.bat</code>
                     </div>
                     <div class="code-block mt-4">
-                        <div class="code-header">Linux / Mac (Source)</div>
+                        <div class="code-header">Linux / macOS (Source Execution)</div>
                         <code>python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -321,15 +748,22 @@ python3 main.py</code>
     <!-- Footer -->
     <footer class="footer">
         <div class="container text-center">
-            <p>Built with ❤️ by Dipta Roy.</p>
-            <p class="text-muted text-sm mt-2">Licensed under the MIT License.</p>
+            <p>Built with ❤️ by <a href="https://dipta-roy.github.io" target="_blank" class="text-link">Dipta Roy</a>.
+            </p>
+            <p class="text-muted text-sm mt-2">
+                Licensed under the MIT License. |
+                <a href="https://github.com/dipta-roy/PlanIFlow" target="_blank" class="text-link">GitHub Repository</a>
+                |
+                <a href="https://github.com/dipta-roy/PlanIFlow/blob/main/SECURITY.md" target="_blank"
+                    class="text-link">Security Report</a>
+            </p>
         </div>
     </footer>
 
     <!-- Image Modal -->
     <div id="image-modal" class="modal">
         <span class="close-modal">&times;</span>
-        <img class="modal-content" id="modal-img">
+        <img class="modal-content" id="modal-img" alt="Enlarged View">
         <div id="modal-caption"></div>
     </div>
 

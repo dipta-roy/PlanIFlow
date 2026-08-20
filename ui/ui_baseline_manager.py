@@ -18,12 +18,17 @@ class BaselineOperationsMixin:
     
     def _show_baseline_comparison(self):
         """Switch to baseline comparison tab"""
-        # Find the baseline comparison tab index
+        if hasattr(self, 'baseline_comparison'):
+            index = self.tabs.indexOf(self.baseline_comparison)
+            if index != -1:
+                self.tabs.setCurrentIndex(index)
+                self.baseline_comparison.refresh_baselines()
+                return
+
+        # Fallback search if widget instance index is not found directly
         for i in range(self.tabs.count()):
-            if self.tabs.tabText(i) == "📊 Baseline Comparison":
+            if "Baseline Comparison" in self.tabs.tabText(i):
                 self.tabs.setCurrentIndex(i)
-                
-                # Refresh the comparison data
                 if hasattr(self, 'baseline_comparison'):
                     self.baseline_comparison.refresh_baselines()
                 break

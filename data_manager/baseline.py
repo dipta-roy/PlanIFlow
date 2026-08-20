@@ -19,7 +19,7 @@ class TaskSnapshot:
         self.percent_complete = percent_complete
         self.wbs = wbs
     
-    def to_dict(self, date_format: DateFormat = None) -> Dict[str, Any]:
+    def to_dict(self, date_format: Optional[DateFormat] = None) -> Dict[str, Any]:
         """Convert snapshot to dictionary"""
         date_format_str = self._get_format_string(date_format) if date_format else '%Y-%m-%dT%H:%M:%S'
         
@@ -34,7 +34,7 @@ class TaskSnapshot:
         }
     
     @staticmethod
-    def from_dict(data: Dict[str, Any], date_format: DateFormat = None) -> 'TaskSnapshot':
+    def from_dict(data: Dict[str, Any], date_format: Optional[DateFormat] = None) -> 'TaskSnapshot':
         """Create snapshot from dictionary"""
         date_format_str = TaskSnapshot._get_format_string_static(date_format) if date_format else '%Y-%m-%dT%H:%M:%S'
         
@@ -48,7 +48,7 @@ class TaskSnapshot:
             wbs=data.get('wbs', '')
         )
     
-    def _get_format_string(self, date_format: DateFormat) -> str:
+    def _get_format_string(self, date_format: Optional[DateFormat]) -> str:
         """Get date format string"""
         if date_format == DateFormat.DD_MM_YYYY:
             return '%d-%m-%Y %H:%M:%S'
@@ -58,7 +58,7 @@ class TaskSnapshot:
             return '%Y-%m-%dT%H:%M:%S'
     
     @staticmethod
-    def _get_format_string_static(date_format: DateFormat) -> str:
+    def _get_format_string_static(date_format: Optional[DateFormat]) -> str:
         """Get date format string (static version)"""
         if date_format == DateFormat.DD_MM_YYYY:
             return '%d-%m-%Y %H:%M:%S'
@@ -71,7 +71,7 @@ class TaskSnapshot:
 class Baseline:
     """Project baseline capturing task states at a specific point in time"""
     
-    def __init__(self, name: str, created_date: datetime = None):
+    def __init__(self, name: str, created_date: Optional[datetime] = None):
         self.name = name
         self.created_date = created_date or datetime.now()
         self.task_snapshots: Dict[int, TaskSnapshot] = {}  # task_id -> TaskSnapshot
@@ -88,7 +88,7 @@ class Baseline:
         """Get all task snapshots"""
         return self.task_snapshots
     
-    def to_dict(self, date_format: DateFormat = None) -> Dict[str, Any]:
+    def to_dict(self, date_format: Optional[DateFormat] = None) -> Dict[str, Any]:
         """Convert baseline to dictionary"""
         date_format_str = self._get_format_string(date_format) if date_format else '%Y-%m-%dT%H:%M:%S'
         
@@ -102,7 +102,7 @@ class Baseline:
         }
     
     @staticmethod
-    def from_dict(data: Dict[str, Any], date_format: DateFormat = None) -> 'Baseline':
+    def from_dict(data: Dict[str, Any], date_format: Optional[DateFormat] = None) -> 'Baseline':
         """Create baseline from dictionary"""
         date_format_str = Baseline._get_format_string_static(date_format) if date_format else '%Y-%m-%dT%H:%M:%S'
         

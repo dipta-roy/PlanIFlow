@@ -5,7 +5,7 @@ import traceback
 from data_manager.models import Task, ScheduleType, Resource
 from ui.ui_task_dialog import TaskDialog
 from ui.ui_resource_dialog import ResourceDialog
-from command_manager.commands import EditTaskCommand, DeleteTaskCommand, AddTaskCommand, MoveTaskCommand, MacroCommand
+from command_manager.commands import EditTaskCommand, DeleteTaskCommand, AddTaskCommand, MacroCommand
 from constants.constants import ERROR_TITLE, ERROR_GENERIC_MESSAGE
 from ui.ui_bulk_add_dialog import BulkAddDialog
 

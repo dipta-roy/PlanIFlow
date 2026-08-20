@@ -68,6 +68,16 @@ body {
     font-weight: 700;
     color: var(--text-color);
     text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.nav-logo-img {
+    height: 36px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.4));
 }
 
 .nav-links {
@@ -656,6 +666,135 @@ body {
     color: var(--primary);
     font-weight: bold;
 }
+
+/* Custom Badges & Version */
+.badge-version {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    font-weight: 700;
+}
+.badge-tech {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+}
+
+/* Tech Stack Grid */
+.tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+}
+.tech-card {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+.tech-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--primary);
+}
+.tech-card h4 {
+    color: var(--text-color);
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+}
+.tech-card .tech-ver {
+    color: var(--primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+.tech-card p {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+/* Styled Data Tables (Shortcuts, Batch Scripts, Security) */
+.doc-table-container {
+    overflow-x: auto;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-color);
+    background: rgba(15, 23, 42, 0.6);
+}
+.doc-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.95rem;
+}
+.doc-table th {
+    background-color: var(--secondary);
+    color: var(--text-color);
+    padding: 0.85rem 1.25rem;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+}
+.doc-table td {
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+}
+.doc-table tr:hover td {
+    background-color: rgba(255, 255, 255, 0.02);
+    color: var(--text-color);
+}
+.kbd {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    background-color: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 0.25rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Certificate Guide Accordion / Box */
+.cert-guide-box {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    text-align: left;
+}
+.cert-guide-box h4 {
+    color: var(--primary);
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.cert-steps {
+    list-style: decimal;
+    padding-left: 1.5rem;
+    color: var(--text-muted);
+}
+.cert-steps li {
+    margin-bottom: 0.5rem;
+}
+
+/* Architecture Flow */
+.arch-diagram {
+    background: rgba(2, 6, 23, 0.8);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: #38bdf8;
+    overflow-x: auto;
+    white-space: pre;
+    text-align: center;
+    line-height: 1.5;
+}
+
+
 
 /* Responsive */
 @media (max-width: 768px) {

@@ -1,19 +1,20 @@
 import os
-import shutil
 import zipfile
 import subprocess
 import sys
 import base64
 
+from typing import Optional
+
 # Add project root to path to allow imports from constants
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+LOGO_ICO_BASE64: Optional[str] = None
 try:
     from constants.app_images import LOGO_ICO_BASE64
 except ImportError:
     # Fallback if running from root without package structure or similar issues
     print("[WARN] Could not import LOGO_ICO_BASE64. Icon will not be set.")
-    LOGO_ICO_BASE64 = None
 
 def package_installer():
     base_dir = os.getcwd()

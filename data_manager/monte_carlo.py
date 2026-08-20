@@ -1,10 +1,9 @@
 
 import random
 import statistics
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Set, Tuple
+from datetime import datetime
+from typing import List, Dict, Any, Optional
 from collections import deque
-import copy
 
 from data_manager.models import Task, DependencyType
 from calendar_manager.calendar_manager import CalendarManager
@@ -30,7 +29,7 @@ class SimulatedTask:
         self.mode_duration = float(self.base_duration_days)
         self.min_duration = self.mode_duration * 0.75
         self.max_duration = self.mode_duration * 1.25
-        self.critical_driver = None
+        self.critical_driver: Optional[int] = None
 
     def randomize_duration(self):
         """Randomize duration for this iteration"""
@@ -71,28 +70,26 @@ class MonteCarloSimulator:
                     self._successors_map[pred_id] = []
                 self._successors_map[pred_id].append(t.id)
 
-    def run_simulation(self, iterations: int = 1000) -> Dict[str, Any]:
-        """Run the Monte Carlo simulation"""
+    def run_simulation(self, iterations: int = 1000, progress_callback=None) -> Dict[str, Any]:
+        """Run the Monte Carlo simulation with optional progress callback"""
         self._initialize_simulation()
         
-        results = {
+        results: Dict[str, Any] = {
             'completion_dates': [],
             'critical_tasks': {} # Counter for tasks on critical path
         }
         
         for i in range(iterations):
             self._run_single_iteration(results)
+            if progress_callback and (i % max(1, iterations // 50) == 0 or i == iterations - 1):
+                progress = int(((i + 1) / iterations) * 100)
+                progress_callback(progress)
             
         return self._analyze_results(results, iterations)
 
-    def _run_single_iteration(self, results: Dict):
-        """Execute one simulation pass"""
-        
-        # 1. Randomize Durations
-        for task in self._sim_tasks.values():
-            task.randomize_duration()
+    def _topo_sort(self) -> List[int]:
         in_degree = {uid: 0 for uid in self._sim_tasks}
-        graph = {uid: [] for uid in self._sim_tasks}
+        graph: Dict[int, List[int]] = {uid: [] for uid in self._sim_tasks}
         
         for uid, task in self._sim_tasks.items():
             for pred_id, _, _ in task.predecessors:
@@ -100,7 +97,6 @@ class MonteCarloSimulator:
                     graph[pred_id].append(uid)
                     in_degree[uid] += 1
         
-        # Queue for topo sort
         queue = deque([uid for uid, deg in in_degree.items() if deg == 0])
         topo_order = []
         
@@ -112,20 +108,13 @@ class MonteCarloSimulator:
                 if in_degree[v] == 0:
                     queue.append(v)
         if len(topo_order) < len(self._sim_tasks):
-            # Fallback: add remaining tasks
             remain = [uid for uid in self._sim_tasks if uid not in topo_order]
             topo_order.extend(remain)
-            
-        # 3. Calculate Dates in Topo Order
-        project_start = self.original_tasks[0].start_date if self.original_tasks else datetime.now() 
-       
-        for uid in topo_order:
-            task = self._sim_tasks[uid]
-            self._calculate_task_dates(task)
-            pass
+        return topo_order
+
+    def _update_summary_hierarchy(self):
         levels = []
         for uid, task in self._sim_tasks.items():
-            # Calculate level (inefficient but safe)
             lvl = 0
             pid = task.parent_id
             while pid is not None and pid in self._sim_tasks:
@@ -133,49 +122,54 @@ class MonteCarloSimulator:
                 pid = self._sim_tasks[pid].parent_id
             levels.append((lvl, uid))
             
-        # Sort levels descending (deepest first)
         levels.sort(key=lambda x: x[0], reverse=True)
-        
         for _, uid in levels:
             task = self._sim_tasks[uid]
             if task.is_summary:
                 self._update_summary_from_children(task)
-                
-        # 5. Record Project Finish
-        # Find latest end date among all tasks (or just top level)
-        if not self._sim_tasks:
-            return
-            
-        max_end = max(t.end_date for t in self._sim_tasks.values())
-        results['completion_dates'].append(max_end)
-        
-        # Track Critical Path
-        # Find tasks that finish at max_end (candidates for critical path end)
+
+    def _track_critical_path(self, max_end: datetime, results: Dict):
         candidates = [t for t in self._sim_tasks.values() if t.end_date == max_end]
-        
         visited = set()
         for cand in candidates:
-            curr = cand
+            curr: Optional[SimulatedTask] = cand
             while curr:
                 if curr.id in visited:
                     break
                 visited.add(curr.id)
-                
                 if curr.id not in results['critical_tasks']:
                     results['critical_tasks'][curr.id] = 0
                 results['critical_tasks'][curr.id] += 1
                 
-                # Backtrack
                 if curr.critical_driver is not None and curr.critical_driver in self._sim_tasks:
                    curr = self._sim_tasks[curr.critical_driver]
                 else:
                    curr = None
 
+    def _run_single_iteration(self, results: Dict):
+        """Execute one simulation pass"""
+        for task in self._sim_tasks.values():
+            task.randomize_duration()
+            
+        topo_order = self._topo_sort()
+        for uid in topo_order:
+            self._calculate_task_dates(self._sim_tasks[uid])
+            
+        self._update_summary_hierarchy()
+
+        if not self._sim_tasks:
+            return
+            
+        max_end = max(t.end_date for t in self._sim_tasks.values())
+        results['completion_dates'].append(max_end)
+        self._track_critical_path(max_end, results)
+
     def _calculate_task_dates(self, task: SimulatedTask):
         """Calculate start and end dates based on predecessors"""
         if not task.predecessors:
             duration_days = int(round(task.simulated_duration))
-            if duration_days < 0: duration_days = 0
+            if duration_days < 0:
+                duration_days = 0
             if task.is_milestone:
                 task.end_date = task.start_date
             else:
@@ -186,14 +180,12 @@ class MonteCarloSimulator:
 
         # Has predecessors
         latest_start = None
-        latest_end = None # For FF/SF
         
         for pred_id, dep_type_str, lag_days in task.predecessors:
             if pred_id not in self._sim_tasks:
                 continue
             pred = self._sim_tasks[pred_id]
             dep_type = DependencyType[dep_type_str]
-            lag = timedelta(days=lag_days)
             
             if dep_type == DependencyType.FS:
                 try:
@@ -204,7 +196,7 @@ class MonteCarloSimulator:
                     if latest_start is None or constraint_start > latest_start:
                         latest_start = constraint_start
                         task.critical_driver = pred.id
-                except:
+                except Exception:
                     pass
 
         # Apply Start
@@ -262,7 +254,7 @@ class MonteCarloSimulator:
         try:
             stdev_ts = statistics.stdev(timestamps)
             stdev_days = stdev_ts / (24 * 3600)
-        except:
+        except Exception:
             stdev_days = 0
             
         mean_date = datetime.fromtimestamp(mean_ts)
@@ -271,6 +263,7 @@ class MonteCarloSimulator:
         
         return {
             'iterations': iterations,
+            'completion_dates': dates,
             'min_date': min_date,
             'max_date': max_date,
             'p50_date': p50_date,

@@ -2,7 +2,7 @@
 Gantt Chart - Creates and updates Gantt chart visualization
 Enhanced with hierarchical tasks, dependency types, and status indicators
 """
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -17,7 +17,7 @@ import constants.constants as constants
 class GanttChart(FigureCanvas):
     """Interactive Gantt chart widget with hierarchy and status support"""
     
-    def __init__(self, parent=None, dark_mode=False):
+    def __init__(self, parent: Optional[Any] = None, dark_mode: bool = False) -> None:
         self.fig = Figure(figsize=(14, 8))
         self.ax = self.fig.add_subplot(111)
         super().__init__(self.fig)
@@ -29,7 +29,11 @@ class GanttChart(FigureCanvas):
         self.show_summary_tasks = True # New attribute
         self.show_critical_path = False # New attribute for critical path
         self.current_scale = "Days" # Default scale
-        self.display_tasks = [] # Cache for ordered tasks
+        self.display_tasks: List[Task] = [] # Cache for ordered tasks
+        
+        # Dirty tracking for tab switching performance optimization
+        self._needs_update = True
+        self._is_rendered = False
         
         # Color scheme for status indicators
         self.status_colors = constants.GANTT_STATUS_COLORS
@@ -83,8 +87,18 @@ class GanttChart(FigureCanvas):
             self.text_color = 'black'
             self.grid_color = '#d0d0d0'
     
-    def update_chart(self, tasks: List[Task], data_manager: DataManager = None):
+    def mark_dirty(self):
+        """Mark the Gantt chart as requiring a refresh."""
+        self._needs_update = True
+
+    def update_chart(self, tasks: List[Task], data_manager: Optional[DataManager] = None, force: bool = False):
         """Update Gantt chart with new task data including hierarchy"""
+        if tasks != self.tasks or data_manager != self.data_manager:
+            self._needs_update = True
+
+        if not force and not self._needs_update and self._is_rendered:
+            return
+
         self.tasks = tasks
         self.data_manager = data_manager
         self._setup_chart()
@@ -95,9 +109,12 @@ class GanttChart(FigureCanvas):
                         verticalalignment='center',
                         transform=self.ax.transAxes,
                         fontsize=14,
-                        color='gray')
-            self.draw()
+                        color=self.text_color)
+            self._needs_update = False
+            self._is_rendered = True
+            self.draw_idle()
             return
+
         
         # Reset critical path flags for all tasks before potential recalculation
         for task in self.tasks:
@@ -262,7 +279,9 @@ class GanttChart(FigureCanvas):
         self.fig.tight_layout()
         
         # Refresh canvas
-        self.draw()
+        self._needs_update = False
+        self._is_rendered = True
+        self.draw_idle()
     
     def _draw_milestone(self, y: float, task: Task, is_critical: bool = False):
         """Draw a milestone as a star icon"""
@@ -287,7 +306,7 @@ class GanttChart(FigureCanvas):
             return []
             
         # Build children map once for O(1) lookups
-        children_map = {}
+        children_map: Dict[Optional[int], List[Task]] = {}
         for task in tasks:
             pid = task.parent_id
             if pid not in children_map:
@@ -374,7 +393,7 @@ class GanttChart(FigureCanvas):
                 # Get dependency type
                 try:
                     dep_type = DependencyType[dep_type_str]
-                except:
+                except Exception:
                     dep_type = DependencyType.FS
                 
                 # Draw arrow based on dependency type
@@ -515,6 +534,11 @@ class GanttChart(FigureCanvas):
         if not self.data_manager or not self.data_manager.calendar_manager:
             return
         
+        # Performance optimization: Skip non-working shading for large date spans or coarse scales
+        total_days = (max_date - min_date).days
+        if self.current_scale in ["Month", "Year"] or total_days > 180:
+            return
+            
         calendar = self.data_manager.calendar_manager
         
         # Determine shading color based on theme
@@ -534,7 +558,7 @@ class GanttChart(FigureCanvas):
                 work_end_parts = calendar.working_hours_end.split(':')
                 ws_h, ws_m = int(work_start_parts[0]), int(work_start_parts[1])
                 we_h, we_m = int(work_end_parts[0]), int(work_end_parts[1])
-            except:
+            except Exception:
                 ws_h, ws_m, we_h, we_m = 8, 0, 16, 0
             
             # Use a slightly wider range to ensure full coverage
@@ -774,35 +798,42 @@ class GanttChart(FigureCanvas):
     def set_dark_mode(self, enabled: bool):
         """Toggle dark mode"""
         self.dark_mode = enabled
+        self.mark_dirty()
         if self.data_manager:
-            self.update_chart(self.tasks, self.data_manager)
+            self.update_chart(self.tasks, self.data_manager, force=True)
         else:
-            self.update_chart(self.tasks)
+            self.update_chart(self.tasks, force=True)
 
     def set_show_summary_tasks(self, show: bool):
         """Set whether to show summary tasks and refresh the chart."""
         if self.show_summary_tasks != show:
             self.show_summary_tasks = show
-            if self.data_manager and self.tasks:
-                self.update_chart(self.tasks, self.data_manager)
+            self.mark_dirty()
+            if self.data_manager:
+                self.update_chart(self.tasks, self.data_manager, force=True)
+            else:
+                self.update_chart(self.tasks, force=True)
 
     def set_show_critical_path(self, show: bool):
         """Set whether to show the critical path and refresh the chart."""
         if self.show_critical_path != show:
             self.show_critical_path = show
-            if self.data_manager and self.tasks:
-                self.update_chart(self.tasks, self.data_manager)
-            elif self.tasks:
-                self.update_chart(self.tasks)
+            self.mark_dirty()
+            if self.data_manager:
+                self.update_chart(self.tasks, self.data_manager, force=True)
+            else:
+                self.update_chart(self.tasks, force=True)
 
     def set_axis_scale(self, scale: str):
         """Set the X-axis scale for the Gantt chart and refresh."""
         if self.current_scale != scale:
             self.current_scale = scale
-            if self.data_manager and self.tasks:
-                self.update_chart(self.tasks, self.data_manager)
-            elif self.tasks:
-                self.update_chart(self.tasks)
+            self.mark_dirty()
+            if self.data_manager:
+                self.update_chart(self.tasks, self.data_manager, force=True)
+            else:
+                self.update_chart(self.tasks, force=True)
+
 
     def save_chart(self, file_path: str):
         """Save the Gantt chart to a file."""
