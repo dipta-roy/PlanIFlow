@@ -76,7 +76,7 @@ PlanIFlow is an **Offline-First**, standalone desktop application for project pl
 - **Openpyxl (v3.1.5)**: Advanced Excel report export with formatted sheets.
 - **ReportLab (v4.4.5)**: Professional PDF document generation.
 - **NumPy (v2.1.2)**: Numerical calculations and Monte Carlo distribution modeling.
-- **Pillow (v12.3.0)**: Image manipulation and icon rendering.
+- **Pillow (v13.0.0)**: Image manipulation and icon rendering.
 - **Jsonschema (v4.23.0)**: Project JSON file structure and validation.
 - **Python-dateutil (v2.9.0)**: Advanced calendar date calculations.
 - **Requests (v2.33.0)**: Secure HTTPS communication (Updater module only).

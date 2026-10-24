@@ -98,7 +98,7 @@ The project's dependencies are explicitly pinned in `requirements.txt`.
 | matplotlib | `3.10.7` | None | Low |
 | reportlab | `4.4.5` | None | Low |
 | numpy | `2.1.2` | None | Low |
-| Pillow | `12.3.0` | None | Low |
+| Pillow | `13.0.0` | None | Low |
 | jsonschema | `4.23.0` | None | Low |
 | python-dateutil | `2.9.0` | None | Low |
 | requests | `2.33.0` | None | Low |
